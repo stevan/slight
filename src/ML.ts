@@ -501,12 +501,12 @@ export class Output {
 // ============================================================================
 
 async function main() {
-    const repl = new REPL();
-    const tokenizer = new Tokenizer();
-    const parser = new Parser();
-    const compiler = new Compiler();
+    const repl        = new REPL();
+    const tokenizer   = new Tokenizer();
+    const parser      = new Parser();
+    const compiler    = new Compiler();
     const interpreter = new Interpreter();
-    const output = new Output();
+    const output      = new Output();
 
     try {
         await output.run(
