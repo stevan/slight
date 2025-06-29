@@ -84,9 +84,12 @@ export class REPL {
 
     async *run(): AsyncGenerator<string, void, void> {
         this.$running = true;
+        let buffer = '';
+        let parenCount = 0;
+        let prompt = '? ';
         while (this.$running) {
-            yield new Promise<string>((resolve) => {
-                this.$readline.question('? ', (answer: string) => {
+            const line = await new Promise<string>((resolve) => {
+                this.$readline.question(prompt, (answer: string) => {
                     if (answer === ':q') {
                         this.$running = false;
                         answer = '';
@@ -94,6 +97,16 @@ export class REPL {
                     resolve(answer);
                 });
             });
+            if (!this.$running) break;
+            buffer += (buffer ? '\n' : '') + line;
+            // Count parens (simple approach, does not ignore strings/comments)
+            parenCount += (line.match(/\(/g) || []).length;
+            parenCount -= (line.match(/\)/g) || []).length;
+            prompt = parenCount > 0 ? '... ' : '? ';
+            if (parenCount === 0 && buffer.trim() !== '') {
+                yield buffer;
+                buffer = '';
+            }
         }
         this.$readline.close();
     }
