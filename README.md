@@ -1,6 +1,6 @@
-# ML - Mini-LISP
+# Slight
 
-A modular, pipeline-based Lisp-like interpreter written in TypeScript. The interpreter features a REPL, tokenizer, parser, compiler, interpreter, and output, each as a composable async generator. The codebase is fully tested and supports debugging at any pipeline stage.
+A modular, pipeline-based mini-Lisp-like interpreter written in TypeScript. The interpreter features a REPL, tokenizer, parser, compiler, interpreter, and output, each as a composable async generator. The codebase is fully tested and supports debugging at any pipeline stage.
 
 ---
 
