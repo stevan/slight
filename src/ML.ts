@@ -1,4 +1,3 @@
-
 import * as readline from 'readline';
 
 // ============================================================================
@@ -25,7 +24,7 @@ export interface Token {
 
 export type CaseClause = { test : ASTNode, result : ASTNode }
 
-export type ASTNode = 
+export type ASTNode =
   | { type: 'NUMBER',  value    : number }
   | { type: 'STRING',  value    : string }
   | { type: 'BOOLEAN', value    : boolean }
@@ -51,6 +50,21 @@ export interface Expression {
 }
 
 export type CompilerOutput = FunctionDef | Expression;
+
+// ============================================================================
+// Error Type
+// ============================================================================
+
+export type PipelineError = {
+    type: 'ERROR';
+    stage: string;
+    message: string;
+    details?: any;
+};
+
+function isPipelineError(obj: any): obj is PipelineError {
+    return obj && obj.type === 'ERROR';
+}
 
 // ============================================================================
 // REPL
@@ -96,12 +110,12 @@ export class Tokenizer {
     private readonly IS_SYMBOL  = /^[^\s\(\)#]+$/;
     private readonly SPLITTER   = /\(|\)|"[^"]*"|'[^']*'|[^\s\(\)#]+/g;
 
-    async *run(source: AsyncGenerator<string, void, void>): AsyncGenerator<Token, void, void> {
+    async *run(source: AsyncGenerator<string, void, void>): AsyncGenerator<Token | PipelineError, void, void> {
         let sequence_id = 0;
         for await (const chunk of source) {
             // Skip empty lines
             if (chunk.trim() === '') continue;
-            
+
             // Handle comments - ignore everything after #
             const cleanChunk = chunk.split('#')[0];
             if (cleanChunk.trim() === '') continue;
@@ -110,21 +124,25 @@ export class Tokenizer {
             this.SPLITTER.lastIndex = 0; // Reset regex state
             while ((match = this.SPLITTER.exec(cleanChunk)) !== null) {
                 const m = match[0] as string;
-                
-                if (m === '(') {
-                    yield { type: 'LPAREN', source: m, sequence_id: ++sequence_id };
-                } else if (m === ')') {
-                    yield { type: 'RPAREN', source: m, sequence_id: ++sequence_id };
-                } else if (this.IS_STRING.test(m)) {
-                    yield { type: 'STRING', source: m.slice(1, -1), sequence_id: ++sequence_id };
-                } else if (this.IS_NUMBER.test(m)) {
-                    yield { type: 'NUMBER', source: m, sequence_id: ++sequence_id };
-                } else if (this.IS_BOOLEAN.test(m)) {
-                    yield { type: 'BOOLEAN', source: m, sequence_id: ++sequence_id };
-                } else if (this.IS_SYMBOL.test(m)) {
-                    yield { type: 'SYMBOL', source: m, sequence_id: ++sequence_id };
-                } else {
-                    throw new Error(`Unrecognized token: ${m}`);
+
+                try {
+                    if (m === '(') {
+                        yield { type: 'LPAREN', source: m, sequence_id: ++sequence_id };
+                    } else if (m === ')') {
+                        yield { type: 'RPAREN', source: m, sequence_id: ++sequence_id };
+                    } else if (this.IS_STRING.test(m)) {
+                        yield { type: 'STRING', source: m.slice(1, -1), sequence_id: ++sequence_id };
+                    } else if (this.IS_NUMBER.test(m)) {
+                        yield { type: 'NUMBER', source: m, sequence_id: ++sequence_id };
+                    } else if (this.IS_BOOLEAN.test(m)) {
+                        yield { type: 'BOOLEAN', source: m, sequence_id: ++sequence_id };
+                    } else if (this.IS_SYMBOL.test(m)) {
+                        yield { type: 'SYMBOL', source: m, sequence_id: ++sequence_id };
+                    } else {
+                        yield { type: 'ERROR', stage: 'Tokenizer', message: `Unrecognized token: ${m}` };
+                    }
+                } catch (e) {
+                    yield { type: 'ERROR', stage: 'Tokenizer', message: (e as Error).message };
                 }
             }
         }
@@ -136,58 +154,67 @@ export class Tokenizer {
 // ============================================================================
 
 export class Parser {
-    async *run(source: AsyncGenerator<Token, void, void>): AsyncGenerator<ASTNode, void, void> {
+    async *run(source: AsyncGenerator<Token | PipelineError, void, void>): AsyncGenerator<ASTNode | PipelineError, void, void> {
         let stack: { type: 'LIST', elements: ASTNode[] }[] = [];
-        
+
         for await (const token of source) {
-            switch (token.type) {
-                case 'STRING':
-                    const stringNode = { type: 'STRING' as const, value: token.source };
-                    this.addNode(stringNode, stack);
-                    break;
-                    
-                case 'NUMBER':
-                    const numValue = token.source.includes('.') ? parseFloat(token.source) : parseInt(token.source);
-                    const numberNode = { type: 'NUMBER' as const, value: numValue };
-                    this.addNode(numberNode, stack);
-                    break;
-                    
-                case 'BOOLEAN':
-                    const boolNode = { type: 'BOOLEAN' as const, value: token.source === 'true' };
-                    this.addNode(boolNode, stack);
-                    break;
-                    
-                case 'SYMBOL':
-                    const symbolNode = { type: 'SYMBOL' as const, name: token.source };
-                    this.addNode(symbolNode, stack);
-                    break;
-                    
-                case 'LPAREN':
-                    stack.push({ type: 'LIST', elements: [] });
-                    break;
-                    
-                case 'RPAREN':
-                    if (stack.length === 0) {
-                        throw new Error("Unmatched closing parenthesis");
-                    }
-                    const expr = stack.pop()!;
-                    if (stack.length === 0) {
-                        yield expr as ASTNode;
-                    } else {
-                        stack[stack.length - 1].elements.push(expr as ASTNode);
-                    }
-                    break;
-                    
-                default:
-                    throw new Error(`Unknown token type: ${token.type}`);
+            if (isPipelineError(token)) {
+                yield token;
+                continue;
+            }
+            try {
+                switch (token.type) {
+                    case 'STRING':
+                        const stringNode = { type: 'STRING' as const, value: token.source };
+                        this.addNode(stringNode, stack);
+                        break;
+
+                    case 'NUMBER':
+                        const numValue = token.source.includes('.') ? parseFloat(token.source) : parseInt(token.source);
+                        const numberNode = { type: 'NUMBER' as const, value: numValue };
+                        this.addNode(numberNode, stack);
+                        break;
+
+                    case 'BOOLEAN':
+                        const boolNode = { type: 'BOOLEAN' as const, value: token.source === 'true' };
+                        this.addNode(boolNode, stack);
+                        break;
+
+                    case 'SYMBOL':
+                        const symbolNode = { type: 'SYMBOL' as const, name: token.source };
+                        this.addNode(symbolNode, stack);
+                        break;
+
+                    case 'LPAREN':
+                        stack.push({ type: 'LIST', elements: [] });
+                        break;
+
+                    case 'RPAREN':
+                        if (stack.length === 0) {
+                            yield { type: 'ERROR', stage: 'Parser', message: 'Unmatched closing parenthesis' };
+                            break;
+                        }
+                        const expr = stack.pop()!;
+                        if (stack.length === 0) {
+                            yield expr as ASTNode;
+                        } else {
+                            stack[stack.length - 1].elements.push(expr as ASTNode);
+                        }
+                        break;
+
+                    default:
+                        yield { type: 'ERROR', stage: 'Parser', message: `Unknown token type: ${(token as any).type}` };
+                }
+            } catch (e) {
+                yield { type: 'ERROR', stage: 'Parser', message: (e as Error).message };
             }
         }
-        
+
         if (stack.length > 0) {
-            throw new Error(`Unbalanced parentheses - ${stack.length} unclosed expressions`);
+            yield { type: 'ERROR', stage: 'Parser', message: `Unbalanced parentheses - ${stack.length} unclosed expressions` };
         }
     }
-    
+
     private addNode(node: ASTNode, stack: { type: 'LIST', elements: ASTNode[] }[]): void {
         if (stack.length === 0) {
             throw new Error("Cannot have a literal outside of an expression");
@@ -202,51 +229,71 @@ export class Parser {
 // ============================================================================
 
 export class Compiler {
-    async *run(source: AsyncGenerator<ASTNode, void, void>): AsyncGenerator<CompilerOutput, void, void> {
+    async *run(source: AsyncGenerator<ASTNode | PipelineError, void, void>): AsyncGenerator<CompilerOutput | PipelineError, void, void> {
         for await (const ast of source) {
-            if (ast.type === 'LIST' && ast.elements.length > 0) {
-                const firstElement = ast.elements[0];
-                
-                if (firstElement.type === 'SYMBOL') {
-                    switch (firstElement.name) {
-                        case 'def':
-                            yield this.compileFunctionDef(ast);
-                            break;
-                        default:
-                            yield { type: 'EXPRESSION', ast: this.compileExpression(ast) };
+            if (isPipelineError(ast)) {
+                yield ast;
+                continue;
+            }
+            try {
+                if (ast.type === 'LIST' && ast.elements.length > 0) {
+                    const firstElement = ast.elements[0];
+                    if (firstElement.type === 'SYMBOL') {
+                        switch (firstElement.name) {
+                            case 'def': {
+                                const defResult = this.compileFunctionDef(ast);
+                                if (isPipelineError(defResult)) {
+                                    yield defResult;
+                                } else {
+                                    yield defResult;
+                                }
+                                break;
+                            }
+                            default: {
+                                const exprResult = this.compileExpression(ast);
+                                if (isPipelineError(exprResult)) {
+                                    yield exprResult;
+                                } else {
+                                    yield { type: 'EXPRESSION', ast: exprResult };
+                                }
+                                break;
+                            }
+                        }
+                    } else {
+                        const exprResult = this.compileExpression(ast);
+                        if (isPipelineError(exprResult)) {
+                            yield exprResult;
+                        } else {
+                            yield { type: 'EXPRESSION', ast: exprResult };
+                        }
                     }
                 } else {
-                    yield { type: 'EXPRESSION', ast: this.compileExpression(ast) };
+                    yield { type: 'EXPRESSION', ast };
                 }
-            } else {
-                yield { type: 'EXPRESSION', ast };
+            } catch (e) {
+                yield { type: 'ERROR', stage: 'Compiler', message: (e as Error).message };
             }
         }
     }
-    
-    private compileFunctionDef(ast: ASTNode): FunctionDef {
+
+    private compileFunctionDef(ast: ASTNode): FunctionDef | PipelineError {
         if (ast.type !== 'LIST' || ast.elements.length !== 4) {
-            throw new Error('Invalid def syntax: expected (def name (params...) body)');
+            return { type: 'ERROR', stage: 'Compiler', message: 'Invalid def syntax: expected (def name (params...) body)' };
         }
-        
         const [defSymbol, nameNode, paramsNode, bodyNode] = ast.elements;
-        
         if (nameNode.type !== 'SYMBOL') {
-            throw new Error('Function name must be a symbol');
+            return { type: 'ERROR', stage: 'Compiler', message: 'Function name must be a symbol' };
         }
-        
         if (paramsNode.type !== 'LIST') {
-            throw new Error('Parameters must be a list');
+            return { type: 'ERROR', stage: 'Compiler', message: 'Parameters must be a list' };
         }
-        
         const params: string[] = [];
         for (const param of paramsNode.elements) {
             if (param.type !== 'SYMBOL') {
-                throw new Error('All parameters must be symbols');
+                return { type: 'ERROR', stage: 'Compiler', message: 'All parameters must be symbols' };
             }
             params.push(param.name);
         }
-        
         return {
             type   : 'FUNCTION_DEF',
             name   : nameNode.name,
@@ -254,70 +301,82 @@ export class Compiler {
             body   : bodyNode
         };
     }
-    
-    private compileExpression(ast: ASTNode): ASTNode {
+
+    private compileExpression(ast: ASTNode): ASTNode | PipelineError {
         if (ast.type === 'LIST' && ast.elements.length > 0) {
             const firstElement = ast.elements[0];
-            
             if (firstElement.type === 'SYMBOL') {
                 switch (firstElement.name) {
-                    case 'cond':
-                        return this.compileCond(ast);
-                    case 'quote':
-                        return this.compileQuote(ast);
+                    case 'cond': {
+                        const condResult = this.compileCond(ast);
+                        if (isPipelineError(condResult)) {
+                            return condResult;
+                        }
+                        return condResult;
+                    }
+                    case 'quote': {
+                        const quoteResult = this.compileQuote(ast);
+                        if (isPipelineError(quoteResult)) {
+                            return quoteResult;
+                        }
+                        return quoteResult;
+                    }
                     default:
                         return {
                             type     : 'LIST',
-                            elements : ast.elements.map(elem => this.compileExpression(elem))
+                            elements : ast.elements.map(elem => {
+                                const res = this.compileExpression(elem);
+                                if (isPipelineError(res)) throw new Error(res.message); // propagate error up
+                                return res;
+                            })
                         };
                 }
             }
-            
             return {
                 type     : 'LIST',
-                elements : ast.elements.map(elem => this.compileExpression(elem))
+                elements : ast.elements.map(elem => {
+                    const res = this.compileExpression(elem);
+                    if (isPipelineError(res)) throw new Error(res.message); // propagate error up
+                    return res;
+                })
             };
         }
-        
         return ast;
     }
-    
-    private compileCond(ast: ASTNode): ASTNode {
+
+    private compileCond(ast: ASTNode): ASTNode | PipelineError {
         if (ast.type !== 'LIST' || ast.elements.length < 2) {
-            throw new Error('Invalid cond syntax');
+            return { type: 'ERROR', stage: 'Compiler', message: 'Invalid cond syntax' };
         }
-        
         const clauses: CaseClause[] = [];
         let elseClause: ASTNode | undefined;
-        
         for (let i = 1; i < ast.elements.length; i++) {
             const clause = ast.elements[i];
             if (clause.type !== 'LIST' || clause.elements.length !== 2) {
-                throw new Error('Each cond clause must be (test result)');
+                return { type: 'ERROR', stage: 'Compiler', message: 'Each cond clause must be (test result)' };
             }
-            
             const [test, result] = clause.elements;
-            
+            const testCompiled = this.compileExpression(test);
+            if (isPipelineError(testCompiled)) return testCompiled;
+            const resultCompiled = this.compileExpression(result);
+            if (isPipelineError(resultCompiled)) return resultCompiled;
             if (test.type === 'SYMBOL' && test.name === 'else') {
-                elseClause = this.compileExpression(result);
+                elseClause = resultCompiled;
             } else {
                 clauses.push({
-                    test   : this.compileExpression(test),
-                    result : this.compileExpression(result)
+                    test   : testCompiled,
+                    result : resultCompiled
                 });
             }
         }
-        
         return { type: 'COND', clauses, elseClause };
     }
-    
-    private compileQuote(ast: ASTNode): ASTNode {
+
+    private compileQuote(ast: ASTNode): ASTNode | PipelineError {
         if (ast.type !== 'LIST' || ast.elements.length !== 2) {
-            throw new Error('Invalid quote syntax: expected (quote expr)');
+            return { type: 'ERROR', stage: 'Compiler', message: 'Invalid quote syntax: expected (quote expr)' };
         }
-        
         const [quoteSymbol, expr] = ast.elements;
-        
         return { type : 'QUOTE', expr : expr };
     }
 }
@@ -329,29 +388,37 @@ export class Compiler {
 export class Interpreter {
     private functions : Map<string, FunctionDef> = new Map();
     private builtins  : Map<string, Function>    = new Map();
-    
+
     constructor() {
         this.initBuiltins();
     }
-    
-    async *run(source: AsyncGenerator<CompilerOutput, void, void>): AsyncGenerator<any, void, void> {
+
+    async *run(source: AsyncGenerator<CompilerOutput | PipelineError, void, void>): AsyncGenerator<any | PipelineError, void, void> {
         for await (const compiled of source) {
-            if (compiled.type === 'FUNCTION_DEF') {
-                this.functions.set(compiled.name, compiled);
-                yield true;
-            } else {
-                yield this.evaluate(compiled.ast, new Map());
+            if (isPipelineError(compiled)) {
+                yield compiled;
+                continue;
+            }
+            try {
+                if (compiled.type === 'FUNCTION_DEF') {
+                    this.functions.set(compiled.name, compiled);
+                    yield true;
+                } else {
+                    yield this.evaluate(compiled.ast, new Map());
+                }
+            } catch (e) {
+                yield { type: 'ERROR', stage: 'Interpreter', message: (e as Error).message };
             }
         }
     }
-    
+
     private evaluate(node: ASTNode, params: Map<string, any>): any {
         switch (node.type) {
             case 'NUMBER':
             case 'STRING':
             case 'BOOLEAN':
                 return node.value;
-                
+
             case 'SYMBOL':
                 if (params.has(node.name)) {
                     return params.get(node.name);
@@ -363,18 +430,18 @@ export class Interpreter {
                     return this.functions.get(node.name);
                 }
                 throw new Error(`Undefined symbol: ${node.name}`);
-                
+
             case 'QUOTE':
                 return this.astToValue(node.expr);
-                
+
             case 'LIST':
                 if (node.elements.length === 0) {
                     return [];
                 }
-                
+
                 const func = this.evaluate(node.elements[0], params);
                 const args = node.elements.slice(1).map(arg => this.evaluate(arg, params));
-                
+
                 if (typeof func === 'function') {
                     return func(...args);
                 } else if (func && typeof func === 'object' && func.type === 'FUNCTION_DEF') {
@@ -382,7 +449,7 @@ export class Interpreter {
                 } else {
                     throw new Error(`Not a function: ${node.elements[0]}`);
                 }
-                
+
             case 'COND':
                 for (const clause of node.clauses) {
                     const testResult = this.evaluate(clause.test, params);
@@ -394,25 +461,25 @@ export class Interpreter {
                     return this.evaluate(node.elseClause, params);
                 }
                 return false;
-                
+
             default:
                 throw new Error(`Unknown AST node type: ${(node as any).type}`);
         }
     }
-    
+
     private callUserFunction(func: FunctionDef, args: any[]): any {
         if (args.length !== func.params.length) {
             throw new Error(`Wrong number of arguments for ${func.name}: expected ${func.params.length}, got ${args.length}`);
         }
-        
+
         const localParams = new Map<string, any>();
         for (let i = 0; i < func.params.length; i++) {
             localParams.set(func.params[i], args[i]);
         }
-        
+
         return this.evaluate(func.body, localParams);
     }
-    
+
     private astToValue(ast: ASTNode): any {
         switch (ast.type) {
             case 'NUMBER':
@@ -427,7 +494,7 @@ export class Interpreter {
                 return ast;
         }
     }
-    
+
     private initBuiltins(): void {
         // Arithmetic
         this.builtins.set('+', (...args: number[]) => args.reduce((a, b) => a + b, 0));
@@ -435,21 +502,21 @@ export class Interpreter {
         this.builtins.set('*', (...args: number[]) => args.reduce((a, b) => a * b, 1));
         this.builtins.set('/', (a: number, b: number) => a / b);
         this.builtins.set('%', (a: number, b: number) => a % b);
-        
+
         // Comparison
         this.builtins.set('=', (a: any, b: any) => a === b);
         this.builtins.set('<', (a: number, b: number) => a < b);
         this.builtins.set('>', (a: number, b: number) => a > b);
         this.builtins.set('<=', (a: number, b: number) => a <= b);
         this.builtins.set('>=', (a: number, b: number) => a >= b);
-        
+
         // List operations
         this.builtins.set('list', (...args: any[]) => args);
         this.builtins.set('head', (lst: any[]) => lst.length > 0 ? lst[0] : undefined);
         this.builtins.set('tail', (lst: any[]) => lst.slice(1));
         this.builtins.set('cons', (item: any, lst: any[]) => [item, ...lst]);
         this.builtins.set('empty?', (lst: any[]) => lst.length === 0);
-        
+
         // Logical
         this.builtins.set('and', (...args: any[]) => args.every(x => x));
         this.builtins.set('or', (...args: any[]) => args.some(x => x));
@@ -462,36 +529,40 @@ export class Interpreter {
 // ============================================================================
 
 export class Output {
-    async run(source: AsyncGenerator<any, void, void>): Promise<void> {
+    async run(source: AsyncGenerator<any | PipelineError, void, void>): Promise<void> {
         for await (const result of source) {
             console.log(this.prettyPrint(result));
         }
     }
-    
+
     private prettyPrint(value: any): string {
+        if (isPipelineError(value)) {
+            return `[${value.stage} Error] ${value.message}`;
+        }
+
         if (value === null || value === undefined) {
             return '()';
         }
-        
+
         if (typeof value === 'boolean') {
             return value ? 'true' : 'false';
         }
-        
+
         if (typeof value === 'number') {
             return value.toString();
         }
-        
+
         if (typeof value === 'string') {
             return `"${value}"`;
         }
-        
+
         if (Array.isArray(value)) {
             if (value.length === 0) {
                 return '()';
             }
             return `(${value.map(v => this.prettyPrint(v)).join(' ')})`;
         }
-        
+
         return value.toString();
     }
 }
