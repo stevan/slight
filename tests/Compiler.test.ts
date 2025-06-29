@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Compiler } from '../src/Compiler.js';
-import { isPipelineError } from '../src/Tokenizer.js';
+import { isPipelineError } from '../src/PipelineError.js';
 import type { ASTNode } from '../src/Parser.js';
 import type { CompilerOutput } from '../src/Compiler.js';
 

@@ -1,3 +1,4 @@
+import { PipelineError } from './PipelineError.js';
 // Tokenizer and related types extracted from ML.ts
 export type TokenType =
     | 'STRING'
@@ -13,16 +14,6 @@ export interface Token {
     sequence_id : number;
 }
 
-export type PipelineError = {
-    type: 'ERROR';
-    stage: string;
-    message: string;
-    details?: any;
-};
-
-export function isPipelineError(obj: any): obj is PipelineError {
-    return obj && obj.type === 'ERROR';
-}
 
 export class Tokenizer {
     private readonly IS_NUMBER  = /^-?[0-9][0-9_]*(\.[0-9]+)?$/;

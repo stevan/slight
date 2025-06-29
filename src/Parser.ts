@@ -1,4 +1,4 @@
-import { PipelineError, isPipelineError } from './Tokenizer.js';
+import { PipelineError, isPipelineError } from './PipelineError.js';
 
 export type CaseClause = { test : ASTNode, result : ASTNode };
 

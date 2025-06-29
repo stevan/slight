@@ -4,7 +4,7 @@ import { Tokenizer } from '../src/Tokenizer.js';
 import { Parser } from '../src/Parser.js';
 import { Compiler } from '../src/Compiler.js';
 import { Interpreter } from '../src/Interpreter.js';
-import { isPipelineError } from '../src/Tokenizer.js';
+import { isPipelineError } from '../src/PipelineError.js';
 import type { Token } from '../src/Tokenizer.js';
 import type { ASTNode } from '../src/Parser.js';
 import type { CompilerOutput } from '../src/Compiler.js';

@@ -1,4 +1,4 @@
-import { PipelineError, isPipelineError } from './Tokenizer.js';
+import { PipelineError, isPipelineError } from './PipelineError.js';
 
 export class Output {
     async run(source: AsyncGenerator<any | PipelineError, void, void>): Promise<void> {
