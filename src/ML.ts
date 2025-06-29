@@ -302,11 +302,16 @@ export class Compiler {
             }
             params.push(param.name);
         }
+        // Compile the function body to handle special forms
+        const compiledBody = this.compileExpression(bodyNode);
+        if (isPipelineError(compiledBody)) {
+            return compiledBody;
+        }
         return {
             type   : 'FUNCTION_DEF',
             name   : nameNode.name,
             params : params,
-            body   : bodyNode
+            body   : compiledBody
         };
     }
 
@@ -509,10 +514,11 @@ export class Interpreter {
         this.builtins.set('-', (a: number, ...rest: number[]) => rest.length === 0 ? -a : rest.reduce((acc, b) => acc - b, a));
         this.builtins.set('*', (...args: number[]) => args.reduce((a, b) => a * b, 1));
         this.builtins.set('/', (a: number, b: number) => a / b);
-        this.builtins.set('%', (a: number, b: number) => a % b);
+        this.builtins.set('mod', (a: number, b: number) => a % b);
 
         // Comparison
-        this.builtins.set('=', (a: any, b: any) => a === b);
+        this.builtins.set('==', (a: any, b: any) => a == b);
+        this.builtins.set('!=', (a: any, b: any) => a != b);
         this.builtins.set('<', (a: number, b: number) => a < b);
         this.builtins.set('>', (a: number, b: number) => a > b);
         this.builtins.set('<=', (a: number, b: number) => a <= b);
