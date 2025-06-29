@@ -7,6 +7,6 @@
   },
   "scripts": {
     "repl": "tsc && node js/bin/repl.js",
-    "test": "node --loader ts-node/esm --test"
+    "test": "tsc && node --test js/tests/*.js"
   }
 }
