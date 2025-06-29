@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Tokenizer, Parser, Compiler, Interpreter } from '../src/ML.js';
+import { Tokenizer } from '../src/Tokenizer.js';
+import { Parser } from '../src/Parser.js';
+import { Compiler } from '../src/Compiler.js';
+import { Interpreter } from '../src/Interpreter.js';
 
 test('full pipeline evaluates mutually recursive and nested function calls', async () => {
   async function* mockAsyncGen(items: string[]) { for (const i of items) yield i; }

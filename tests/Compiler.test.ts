@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Compiler, isPipelineError } from '../src/ML.js';
-import type { ASTNode, CompilerOutput } from '../src/ML.js';
+import { Compiler } from '../src/Compiler.js';
+import { isPipelineError } from '../src/Tokenizer.js';
+import type { ASTNode } from '../src/Parser.js';
+import type { CompilerOutput } from '../src/Compiler.js';
 
 test('compiles a simple AST into CompilerOutput', async () => {
   async function* mockAsyncGen(items: ASTNode[]) { for (const i of items) yield i; }

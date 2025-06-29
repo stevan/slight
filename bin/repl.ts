@@ -1,4 +1,10 @@
-import { REPL, Tokenizer, Parser, Compiler, Interpreter, Output } from '../src/ML.js';
+import { REPL } from '../src/REPL.js';
+import { Tokenizer } from '../src/Tokenizer.js';
+import { Parser } from '../src/Parser.js';
+import { Compiler } from '../src/Compiler.js';
+import { Interpreter } from '../src/Interpreter.js';
+import { Output } from '../src/Output.js';
+import { Debugger } from '../src/Debugger.js';
 
 async function main() {
     const repl        = new REPL();

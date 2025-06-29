@@ -1,7 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Tokenizer, Parser, Compiler, Interpreter, isPipelineError } from '../src/ML.js';
-import type { Token, ASTNode, CompilerOutput } from '../src/ML.js';
+import { Tokenizer } from '../src/Tokenizer.js';
+import { Parser } from '../src/Parser.js';
+import { Compiler } from '../src/Compiler.js';
+import { Interpreter } from '../src/Interpreter.js';
+import { isPipelineError } from '../src/Tokenizer.js';
+import type { Token } from '../src/Tokenizer.js';
+import type { ASTNode } from '../src/Parser.js';
+import type { CompilerOutput } from '../src/Compiler.js';
 
 test('Tokenizer yields error for invalid token @', async () => {
   async function* mockAsyncGen(items: string[]) { for (const i of items) yield i; }

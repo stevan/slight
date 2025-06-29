@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Tokenizer } from '../src/ML.js';
+import { Tokenizer, PipelineError, isPipelineError } from '../src/Tokenizer.js';
 
 test('tokenizes a simple expression', async () => {
   async function* mockAsyncGen(items: string[]) { for (const i of items) yield i; }
