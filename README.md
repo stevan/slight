@@ -9,6 +9,30 @@
 
 Slight is a mini-LISP like interpreter written in TypeScript. The interpreter features a REPL, tokenizer, parser, compiler, interpreter, and output, each as a composable async generator.
 
+## Example
+
+
+```lisp
+
+(def adder (n m) (+ n m))
+
+(def factorial (n)
+  (cond
+    ((== n 0) 1)
+    (else (* n (factorial (- n 1))))))
+
+
+(def even? (n) (cond ((== n 0) true ) (else (odd?  (- n 1)))))
+(def odd?  (n) (cond ((== n 0) false) (else (even? (- n 1)))))
+
+
+(def sum-list (lst)
+  (cond
+    ((empty? lst) 0)
+    (else (+ (head lst) (sum-list (tail lst))))))
+
+```
+
 ---
 
 ## Features
