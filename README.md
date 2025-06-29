@@ -1,4 +1,11 @@
-# Slight
+```
+   _____ ___       __    __
+  / ___// (_)___ _/ /_  / /_
+  \__ \/ / / __ `/ __ \/ __/
+ ___/ / / / /_/ / / / / /_
+/____/_/_/\__, /_/ /_/\__/
+         /____/
+```
 
 Slight is a mini-LISP like interpreter written in TypeScript. The interpreter features a REPL, tokenizer, parser, compiler, interpreter, and output, each as a composable async generator.
 
