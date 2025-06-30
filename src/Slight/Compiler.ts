@@ -43,7 +43,6 @@ export class Compiler {
         if (paramsNode.type !== 'LIST')
             return { type: 'ERROR', stage: 'Compiler', message: 'Parameters must be a list' };
 
-
         const params: string[] = [];
         for (const param of paramsNode.elements) {
             if (param.type !== 'SYMBOL')
