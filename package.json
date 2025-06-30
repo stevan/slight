@@ -5,6 +5,7 @@
     "typescript": "^5.4.5"
   },
   "scripts": {
+    "author": "tsc && node js/bin/author.js",
     "repl": "tsc && node js/bin/repl.js",
     "test": "tsc && node --test js/tests/*.js"
   }

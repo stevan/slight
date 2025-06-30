@@ -7,9 +7,11 @@ import {
 
 export class ConsoleOutput implements OutputSink {
 
+    constructor(public prefix : string = '') {}
+
     async run(source: OutputStream): Promise<void> {
         for await (const result of source) {
-            console.log(result.type, this.prettyPrint(result));
+            console.log(this.prefix, result.type, this.prettyPrint(result));
         }
     }
 
