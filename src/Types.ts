@@ -93,3 +93,21 @@ export type CompiledStream = AsyncGenerator<CompilerOutput | PipelineError, void
 export type OutputStream   = AsyncGenerator<OutputToken,                    void, void>;
 
 // -----------------------------------------------------------------------------
+// Source & Sink
+// -----------------------------------------------------------------------------
+
+export interface OutputSink {
+    run(source: OutputStream) : Promise<void>;
+}
+
+export interface InputSource {
+    run() : SourceStream;
+}
+
+// -----------------------------------------------------------------------------
+
+
+
+
+
+

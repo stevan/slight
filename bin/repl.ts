@@ -1,9 +1,16 @@
-import { REPL } from '../src/REPL.js';
-import { Tokenizer } from '../src/Tokenizer.js';
-import { Parser } from '../src/Parser.js';
-import { Compiler } from '../src/Compiler.js';
-import { Interpreter } from '../src/Interpreter.js';
-import { Output } from '../src/Output.js';
+
+import { REPL, REPLOutput } from '../src/REPL.js';
+import { Tokenizer }        from '../src/Tokenizer.js';
+import { Parser }           from '../src/Parser.js';
+import { Compiler }         from '../src/Compiler.js';
+import { Interpreter }      from '../src/Interpreter.js';
+import {
+    MonitorOutputStream,
+    MonitorCompiledStream,
+    MonitorASTStream,
+    MonitorTokenStream,
+    MonitorSourceStream,
+} from '../src/Monitors.js'
 
 async function main() {
     const repl        = new REPL();
@@ -11,19 +18,19 @@ async function main() {
     const parser      = new Parser();
     const compiler    = new Compiler();
     const interpreter = new Interpreter();
-    const output      = new Output();
+    const output      = new REPLOutput();
 
     try {
         await output.run(
-            interpreter.run(
-                compiler.run(
-                    parser.run(
-                        tokenizer.run(
-                            repl.run()
-                        )
-                    )
-                )
-            )
+            MonitorOutputStream(interpreter.run(
+                MonitorCompiledStream(compiler.run(
+                    MonitorASTStream(parser.run(
+                        MonitorTokenStream(tokenizer.run(
+                            MonitorSourceStream(repl.run())
+                        ))
+                    ))
+                ))
+            ))
         );
     } catch (error) {
         console.error('Error:', error);

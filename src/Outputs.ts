@@ -1,11 +1,11 @@
 import {
-    PipelineError,
     isPipelineError,
     OutputStream,
+    OutputSink,
     OutputToken
 } from './Types.js';
 
-export class Output {
+export class ConsoleOutput implements OutputSink {
 
     async run(source: OutputStream): Promise<void> {
         for await (const result of source) {
