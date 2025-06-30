@@ -18,24 +18,16 @@ export class Compiler {
                     const firstElement = ast.elements[0];
                     if (firstElement.type === 'SYMBOL') {
                         switch (firstElement.name) {
-                            case 'def': {
-                                const defResult = this.compileFunctionDef(ast);
-                                if (isPipelineError(defResult)) {
-                                    yield defResult;
-                                } else {
-                                    yield defResult;
-                                }
+                            case 'def':
+                                yield this.compileFunctionDef(ast);
                                 break;
-                            }
-                            default: {
+                            default:
                                 const exprResult = this.compileExpression(ast);
                                 if (isPipelineError(exprResult)) {
                                     yield exprResult;
                                 } else {
                                     yield { type: 'EXPRESSION', ast: exprResult };
                                 }
-                                break;
-                            }
                         }
                     } else {
                         const exprResult = this.compileExpression(ast);
@@ -58,24 +50,29 @@ export class Compiler {
         if (ast.type !== 'LIST' || ast.elements.length !== 4) {
             return { type: 'ERROR', stage: 'Compiler', message: 'Invalid def syntax: expected (def name (params...) body)' };
         }
+
         const [defSymbol, nameNode, paramsNode, bodyNode] = ast.elements;
-        if (nameNode.type !== 'SYMBOL') {
+
+        if (nameNode.type !== 'SYMBOL')
             return { type: 'ERROR', stage: 'Compiler', message: 'Function name must be a symbol' };
-        }
-        if (paramsNode.type !== 'LIST') {
+
+        if (paramsNode.type !== 'LIST')
             return { type: 'ERROR', stage: 'Compiler', message: 'Parameters must be a list' };
-        }
+
+
         const params: string[] = [];
         for (const param of paramsNode.elements) {
-            if (param.type !== 'SYMBOL') {
+            if (param.type !== 'SYMBOL')
                 return { type: 'ERROR', stage: 'Compiler', message: 'All parameters must be symbols' };
-            }
             params.push(param.name);
         }
+
         const compiledBody = this.compileExpression(bodyNode);
+
         if (isPipelineError(compiledBody)) {
             return compiledBody;
         }
+
         return {
             type   : 'FUNCTION_DEF',
             name   : nameNode.name,
@@ -86,23 +83,15 @@ export class Compiler {
 
     private compileExpression(ast: ASTNode): ASTNode | PipelineError {
         if (ast.type === 'LIST' && ast.elements.length > 0) {
+
             const firstElement = ast.elements[0];
+
             if (firstElement.type === 'SYMBOL') {
                 switch (firstElement.name) {
-                    case 'cond': {
-                        const condResult = this.compileCond(ast);
-                        if (isPipelineError(condResult)) {
-                            return condResult;
-                        }
-                        return condResult;
-                    }
-                    case 'quote': {
-                        const quoteResult = this.compileQuote(ast);
-                        if (isPipelineError(quoteResult)) {
-                            return quoteResult;
-                        }
-                        return quoteResult;
-                    }
+                    case 'cond':
+                        return this.compileCond(ast);
+                    case 'quote':
+                        return this.compileQuote(ast);
                     default:
                         return {
                             type     : 'LIST',
@@ -130,18 +119,24 @@ export class Compiler {
         if (ast.type !== 'LIST' || ast.elements.length < 2) {
             return { type: 'ERROR', stage: 'Compiler', message: 'Invalid cond syntax' };
         }
+
         const clauses: any[] = [];
         let elseClause: ASTNode | undefined;
+
         for (let i = 1; i < ast.elements.length; i++) {
             const clause = ast.elements[i];
             if (clause.type !== 'LIST' || clause.elements.length !== 2) {
                 return { type: 'ERROR', stage: 'Compiler', message: 'Each cond clause must be (test result)' };
             }
+
             const [test, result] = clause.elements;
+
             const testCompiled = this.compileExpression(test);
             if (isPipelineError(testCompiled)) return testCompiled;
+
             const resultCompiled = this.compileExpression(result);
             if (isPipelineError(resultCompiled)) return resultCompiled;
+
             if (test.type === 'SYMBOL' && test.name === 'else') {
                 elseClause = resultCompiled;
             } else {
