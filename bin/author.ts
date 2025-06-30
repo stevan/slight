@@ -1,8 +1,7 @@
 
 import { Slight }        from '../src/Slight.js'
-import { REPL } from '../src/Slight/REPL.js'
 import { ConsoleOutput } from '../src/Slight/Outputs.js'
-import { InputSource, SourceStream }   from '../src/Slight/Types.js'
+import { InputSource, SourceStream } from '../src/Slight/Types.js'
 
 class MockInput implements InputSource {
     async *run(): SourceStream {
