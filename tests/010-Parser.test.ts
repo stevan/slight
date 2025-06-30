@@ -53,31 +53,18 @@ test('parses a cond expression into AST', async () => {
   for await (const ast of gen) asts.push(ast);
   assert.deepStrictEqual(asts, [
     {
-      type: 'LIST',
-      elements: [
-        { type: 'SYMBOL', name: 'cond' },
-        {
-          type: 'LIST',
-          elements: [
-            { type: 'SYMBOL', name: 'a' },
-            { type: 'NUMBER', value: 1 }
-          ]
-        },
-        {
-          type: 'LIST',
-          elements: [
-            { type: 'SYMBOL', name: 'b' },
-            { type: 'NUMBER', value: 2 }
-          ]
-        },
-        {
-          type: 'LIST',
-          elements: [
-            { type: 'SYMBOL', name: 'else' },
-            { type: 'NUMBER', value: 3 }
-          ]
-        }
-      ]
+        type: 'COND',
+        clauses: [
+          {
+            test: { type: 'SYMBOL', name: 'a' },
+            result: { type: 'NUMBER', value: 1 }
+          },
+          {
+            test: { type: 'SYMBOL', name: 'b' },
+            result: { type: 'NUMBER', value: 2 }
+          }
+        ],
+        elseClause: { type: 'NUMBER', value: 3 }
     }
   ]);
 });

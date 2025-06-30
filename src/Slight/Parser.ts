@@ -44,7 +44,7 @@ export class Parser {
                         }
                         const expr = stack.pop()!;
                         if (stack.length === 0) {
-                            yield expr as ASTNode;
+                            yield this.resolveExpression(expr as ASTNode);
                         } else {
                             stack[stack.length - 1].elements.push(expr as ASTNode);
                         }
@@ -67,5 +67,81 @@ export class Parser {
         } else {
             stack[stack.length - 1].elements.push(node);
         }
+    }
+
+    private resolveExpression(ast: ASTNode): ASTNode | PipelineError {
+        if (ast.type === 'LIST' && ast.elements.length > 0) {
+
+            const firstElement = ast.elements[0];
+
+            if (firstElement.type === 'SYMBOL') {
+                switch (firstElement.name) {
+                    case 'cond':
+                        return this.resolveCond(ast);
+                    case 'quote':
+                        return this.resolveQuote(ast);
+                    default:
+                        return {
+                            type     : 'LIST',
+                            elements : ast.elements.map(elem => {
+                                const res = this.resolveExpression(elem);
+                                if (isPipelineError(res)) throw new Error(res.message);
+                                return res;
+                            })
+                        };
+                }
+            }
+            return {
+                type     : 'LIST',
+                elements : ast.elements.map(elem => {
+                    const res = this.resolveExpression(elem);
+                    if (isPipelineError(res)) throw new Error(res.message);
+                    return res;
+                })
+            };
+        }
+        return ast;
+    }
+
+    private resolveCond(ast: ASTNode): ASTNode | PipelineError {
+        if (ast.type !== 'LIST' || ast.elements.length < 2) {
+            return { type: 'ERROR', stage: 'Compiler', message: 'Invalid cond syntax' };
+        }
+
+        const clauses: any[] = [];
+        let elseClause: ASTNode | undefined;
+
+        for (let i = 1; i < ast.elements.length; i++) {
+            const clause = ast.elements[i];
+            if (clause.type !== 'LIST' || clause.elements.length !== 2) {
+                return { type: 'ERROR', stage: 'Compiler', message: 'Each cond clause must be (test result)' };
+            }
+
+            const [test, result] = clause.elements;
+
+            const testCompiled = this.resolveExpression(test);
+            if (isPipelineError(testCompiled)) return testCompiled;
+
+            const resultCompiled = this.resolveExpression(result);
+            if (isPipelineError(resultCompiled)) return resultCompiled;
+
+            if (test.type === 'SYMBOL' && test.name === 'else') {
+                elseClause = resultCompiled;
+            } else {
+                clauses.push({
+                    test   : testCompiled,
+                    result : resultCompiled
+                });
+            }
+        }
+        return { type: 'COND', clauses, elseClause };
+    }
+
+    private resolveQuote(ast: ASTNode): ASTNode | PipelineError {
+        if (ast.type !== 'LIST' || ast.elements.length !== 2) {
+            return { type: 'ERROR', stage: 'Compiler', message: 'Invalid quote syntax: expected (quote expr)' };
+        }
+        const [quoteSymbol, expr] = ast.elements;
+        return { type : 'QUOTE', expr : expr };
     }
 }
