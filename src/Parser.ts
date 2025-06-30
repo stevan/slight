@@ -1,18 +1,14 @@
-import { PipelineError, isPipelineError } from './PipelineError.js';
 
-export type CaseClause = { test : ASTNode, result : ASTNode };
-
-export type ASTNode =
-  | { type: 'NUMBER',  value    : number }
-  | { type: 'STRING',  value    : string }
-  | { type: 'BOOLEAN', value    : boolean }
-  | { type: 'SYMBOL',  name     : string }
-  | { type: 'LIST',    elements : ASTNode[] }
-  | { type: 'QUOTE',   expr     : ASTNode }
-  | { type: 'COND',    clauses  : CaseClause[], elseClause?: ASTNode | undefined };
+import {
+    TokenStream,
+    ASTStream,
+    PipelineError,
+    isPipelineError,
+    ASTNode
+} from './Types.js';
 
 export class Parser {
-    async *run(source: AsyncGenerator<any, void, void>): AsyncGenerator<ASTNode | PipelineError, void, void> {
+    async *run(source: TokenStream): ASTStream {
         let stack: { type: 'LIST', elements: ASTNode[] }[] = [];
         for await (const token of source) {
             if (isPipelineError(token)) {
@@ -64,6 +60,7 @@ export class Parser {
             yield { type: 'ERROR', stage: 'Parser', message: `Unbalanced parentheses - ${stack.length} unclosed expressions` };
         }
     }
+
     private addNode(node: ASTNode, stack: { type: 'LIST', elements: ASTNode[] }[]): void {
         if (stack.length === 0) {
             throw new Error("Cannot have a literal outside of an expression");

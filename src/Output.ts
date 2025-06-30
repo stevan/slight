@@ -1,33 +1,40 @@
-import { PipelineError, isPipelineError } from './PipelineError.js';
+import {
+    PipelineError,
+    isPipelineError,
+    OutputStream,
+    OutputToken
+} from './Types.js';
 
 export class Output {
-    async run(source: AsyncGenerator<any | PipelineError, void, void>): Promise<void> {
+
+    async run(source: OutputStream): Promise<void> {
         for await (const result of source) {
-            console.log(this.prettyPrint(result));
+            console.log(result.type, this.prettyPrint(result));
         }
     }
-    private prettyPrint(value: any): string {
-        if (isPipelineError(value)) {
-            return `[${value.stage} Error] ${value.message}`;
+
+    private prettyPrint(token: OutputToken): string {
+        if (isPipelineError(token.value)) {
+            return `[${token.value.stage} Error] ${token.value.message}`;
         }
-        if (value === null || value === undefined) {
+        if (token.value === null || token.value === undefined) {
             return '()';
         }
-        if (typeof value === 'boolean') {
-            return value ? 'true' : 'false';
+        if (typeof token.value === 'boolean') {
+            return token.value ? 'true' : 'false';
         }
-        if (typeof value === 'number') {
-            return value.toString();
+        if (typeof token.value === 'number') {
+            return token.value.toString();
         }
-        if (typeof value === 'string') {
-            return `"${value}"`;
+        if (typeof token.value === 'string') {
+            return `"${token.value}"`;
         }
-        if (Array.isArray(value)) {
-            if (value.length === 0) {
+        if (Array.isArray(token.value)) {
+            if (token.value.length === 0) {
                 return '()';
             }
-            return `(${value.map(v => this.prettyPrint(v)).join(' ')})`;
+            return `(${token.value.map(v => this.prettyPrint(v)).join(' ')})`;
         }
-        return value.toString();
+        return token.value.toString();
     }
 }

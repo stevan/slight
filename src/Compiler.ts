@@ -1,22 +1,13 @@
-import { ASTNode } from './Parser.js';
-import { PipelineError, isPipelineError } from './PipelineError.js';
 
-export interface FunctionDef {
-  type   : 'FUNCTION_DEF';
-  name   : string;
-  params : string[];
-  body   : ASTNode;
-}
-
-export interface Expression {
-  type : 'EXPRESSION';
-  ast  : ASTNode;
-}
-
-export type CompilerOutput = FunctionDef | Expression;
+import {
+    PipelineError, isPipelineError,
+    ASTNode, ASTStream,
+    CompiledStream, FunctionDef
+} from './Types.js';
 
 export class Compiler {
-    async *run(source: AsyncGenerator<ASTNode | PipelineError, void, void>): AsyncGenerator<CompilerOutput | PipelineError, void, void> {
+
+    async *run(source: ASTStream): CompiledStream {
         for await (const ast of source) {
             if (isPipelineError(ast)) {
                 yield ast;
@@ -62,6 +53,7 @@ export class Compiler {
             }
         }
     }
+
     private compileFunctionDef(ast: ASTNode): FunctionDef | PipelineError {
         if (ast.type !== 'LIST' || ast.elements.length !== 4) {
             return { type: 'ERROR', stage: 'Compiler', message: 'Invalid def syntax: expected (def name (params...) body)' };
@@ -91,6 +83,7 @@ export class Compiler {
             body   : compiledBody
         };
     }
+
     private compileExpression(ast: ASTNode): ASTNode | PipelineError {
         if (ast.type === 'LIST' && ast.elements.length > 0) {
             const firstElement = ast.elements[0];
@@ -132,6 +125,7 @@ export class Compiler {
         }
         return ast;
     }
+
     private compileCond(ast: ASTNode): ASTNode | PipelineError {
         if (ast.type !== 'LIST' || ast.elements.length < 2) {
             return { type: 'ERROR', stage: 'Compiler', message: 'Invalid cond syntax' };
@@ -159,6 +153,7 @@ export class Compiler {
         }
         return { type: 'COND', clauses, elseClause };
     }
+
     private compileQuote(ast: ASTNode): ASTNode | PipelineError {
         if (ast.type !== 'LIST' || ast.elements.length !== 2) {
             return { type: 'ERROR', stage: 'Compiler', message: 'Invalid quote syntax: expected (quote expr)' };

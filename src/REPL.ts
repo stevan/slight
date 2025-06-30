@@ -1,5 +1,7 @@
 import * as readline from 'readline';
 
+import { SourceStream } from './Types.js'
+
 export class REPL {
     private $readline : readline.ReadLine;
     private $running  : boolean;
@@ -12,7 +14,7 @@ export class REPL {
         });
     }
 
-    async *run(): AsyncGenerator<string, void, void> {
+    async *run(): SourceStream {
         this.$running = true;
         let buffer = '';
         let parenCount = 0;

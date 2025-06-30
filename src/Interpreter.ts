@@ -1,6 +1,14 @@
-import { FunctionDef, CompilerOutput } from './Compiler.js';
-import { ASTNode } from './Parser.js';
-import { PipelineError, isPipelineError } from './PipelineError.js';
+
+import {
+    ASTNode,
+    PipelineError, isPipelineError,
+    FunctionDef,
+    CompilerOutput,
+    CompiledStream,
+    OutputToken,
+    OutputStream,
+    OutputHandle
+} from './Types.js';
 
 export class Interpreter {
     private functions : Map<string, FunctionDef> = new Map();
@@ -10,24 +18,32 @@ export class Interpreter {
         this.initBuiltins();
     }
 
-    async *run(source: AsyncGenerator<CompilerOutput | PipelineError, void, void>): AsyncGenerator<any | PipelineError, void, void> {
+    async *run(source: CompiledStream): OutputStream {
         for await (const compiled of source) {
             if (isPipelineError(compiled)) {
-                yield compiled;
+                yield { type: OutputHandle.ERROR, value : compiled };
                 continue;
             }
             try {
                 if (compiled.type === 'FUNCTION_DEF') {
                     this.functions.set(compiled.name, compiled);
-                    yield true;
+                    yield { type: OutputHandle.INFO, value : true };
                 } else {
-                    yield this.evaluate(compiled.ast, new Map());
+                    yield { type: OutputHandle.STDOUT, value : this.evaluate(compiled.ast, new Map()) };
                 }
             } catch (e) {
-                yield { type: 'ERROR', stage: 'Interpreter', message: (e as Error).message };
+                yield {
+                    type  : OutputHandle.ERROR,
+                    value : {
+                        type    : 'ERROR',
+                        stage   : 'Interpreter',
+                        message : (e as Error).message
+                    }
+                };
             }
         }
     }
+
     private evaluate(node: ASTNode, params: Map<string, any>): any {
         switch (node.type) {
             case 'NUMBER':
@@ -75,6 +91,7 @@ export class Interpreter {
                 throw new Error(`Unknown AST node type: ${(node as any).type}`);
         }
     }
+
     private callUserFunction(func: FunctionDef, args: any[]): any {
         if (args.length !== func.params.length) {
             throw new Error(`Wrong number of arguments for ${func.name}: expected ${func.params.length}, got ${args.length}`);
@@ -85,6 +102,7 @@ export class Interpreter {
         }
         return this.evaluate(func.body, localParams);
     }
+
     private astToValue(ast: ASTNode): any {
         switch (ast.type) {
             case 'NUMBER':
@@ -99,6 +117,7 @@ export class Interpreter {
                 return ast;
         }
     }
+
     private initBuiltins(): void {
         this.builtins.set('+', (...args: number[]) => args.reduce((a, b) => a + b, 0));
         this.builtins.set('-', (a: number, ...rest: number[]) => rest.length === 0 ? -a : rest.reduce((acc, b) => acc - b, a));

@@ -31,5 +31,5 @@ test('full pipeline evaluates mutually recursive and nested function calls', asy
   const compiled = compiler.run(asts);
   const results = [];
   for await (const result of interpreter.run(compiled)) results.push(result);
-  assert.deepStrictEqual(results, [true, true, true, true, false, false, true, 6, 30]);
+  assert.deepStrictEqual(results.map((x) => x.value), [true, true, true, true, false, false, true, 6, 30]);
 });

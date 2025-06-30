@@ -4,10 +4,7 @@ import { Tokenizer } from '../src/Tokenizer.js';
 import { Parser } from '../src/Parser.js';
 import { Compiler } from '../src/Compiler.js';
 import { Interpreter } from '../src/Interpreter.js';
-import { isPipelineError } from '../src/PipelineError.js';
-import type { Token } from '../src/Tokenizer.js';
-import type { ASTNode } from '../src/Parser.js';
-import type { CompilerOutput } from '../src/Compiler.js';
+import { CompilerOutput, isPipelineError, Token, ASTNode } from '../src/Types.js';
 
 test('Tokenizer yields error for invalid token @', async () => {
   async function* mockAsyncGen(items: string[]) { for (const i of items) yield i; }
@@ -76,7 +73,7 @@ test('Interpreter yields error for undefined symbol', async () => {
   const gen = interpreter.run(mockAsyncGen(outputs));
   let errorFound = false;
   for await (const result of gen) {
-    if (isPipelineError(result) && result.stage === 'Interpreter') errorFound = true;
+    if (isPipelineError(result.value) && result.value.stage === 'Interpreter') errorFound = true;
   }
   assert(errorFound, 'Should yield a PipelineError from Interpreter');
 });
