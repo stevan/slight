@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Interpreter } from '../src/Interpreter.js';
-import type { CompilerOutput } from '../src/Types.js';
+import { Interpreter } from '../src/Slight/Interpreter.js';
+import type { CompilerOutput } from '../src/Slight/Types.js';
 
 test('interprets a simple addition expression', async () => {
   async function* mockAsyncGen(items: CompilerOutput[]) { for (const i of items) yield i; }

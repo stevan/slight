@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Compiler } from '../src/Compiler.js';
-import { CompilerOutput, ASTNode, isPipelineError } from '../src/Types.js';
+import { Compiler } from '../src/Slight/Compiler.js';
+import { CompilerOutput, ASTNode, isPipelineError } from '../src/Slight/Types.js';
 
 test('compiles a simple AST into CompilerOutput', async () => {
   async function* mockAsyncGen(items: ASTNode[]) { for (const i of items) yield i; }

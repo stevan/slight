@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Tokenizer } from '../src/Tokenizer.js';
-import { Parser } from '../src/Parser.js';
-import { Compiler } from '../src/Compiler.js';
-import { Interpreter } from '../src/Interpreter.js';
+import { Tokenizer } from '../src/Slight/Tokenizer.js';
+import { Parser } from '../src/Slight/Parser.js';
+import { Compiler } from '../src/Slight/Compiler.js';
+import { Interpreter } from '../src/Slight/Interpreter.js';
 
 test('full pipeline evaluates a simple expression', async () => {
   async function* mockAsyncGen(items: string[]) { for (const i of items) yield i; }

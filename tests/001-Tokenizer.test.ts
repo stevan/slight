@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Tokenizer } from '../src/Tokenizer.js';
-import { PipelineError, isPipelineError } from '../src/Types.js';
+import { Tokenizer } from '../src/Slight/Tokenizer.js';
+import { PipelineError, isPipelineError } from '../src/Slight/Types.js';
 
 test('tokenizes a simple expression', async () => {
   async function* mockAsyncGen(items: string[]) { for (const i of items) yield i; }

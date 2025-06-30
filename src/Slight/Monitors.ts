@@ -5,7 +5,7 @@ import {
     ASTStream,
     CompiledStream,
     OutputStream
-} from '../src/Types.js';
+} from './Types.js';
 
 
 export async function* MonitorOutputStream (source: OutputStream) : OutputStream {

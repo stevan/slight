@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Parser } from '../src/Parser.js';
-import { Token, PipelineError, isPipelineError } from '../src/Types.js';
+import { Parser } from '../src/Slight/Parser.js';
+import { Token, PipelineError, isPipelineError } from '../src/Slight/Types.js';
 
 test('parses a simple token list into AST', async () => {
   async function* mockAsyncGen(items: Token[]) { for (const i of items) yield i; }
