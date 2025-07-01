@@ -1,16 +1,19 @@
 
+import { Console } from 'console';
+
 import { Tokenizer }               from './Slight/Tokenizer.js';
 import { Parser }                  from './Slight/Parser.js';
 import { Compiler }                from './Slight/Compiler.js';
 import { Interpreter }             from './Slight/Interpreter.js';
-import { InputSource, OutputSink } from './Slight/Types.js';
 import {
-    MonitorOutputStream,
-    MonitorCompiledStream,
-    MonitorASTStream,
-    MonitorTokenStream,
-    MonitorSourceStream,
-} from './Slight/Monitors.js'
+    InputSource,
+    OutputSink,
+    SourceStream,
+    TokenStream,
+    ASTStream,
+    CompiledStream,
+    OutputStream
+} from './Slight/Types.js';
 
 export class Slight {
     public input       : InputSource;
@@ -19,6 +22,17 @@ export class Slight {
     public compiler    : Compiler;
     public interpreter : Interpreter;
     public output      : OutputSink;
+
+    private logger : Console  = new Console({
+        stdout           : process.stdout,
+        stderr           : process.stderr,
+        inspectOptions   : {
+            compact      : true,
+            breakLength  : Infinity,
+            depth        : 2,
+        },
+        groupIndentation : 4,
+    });
 
     constructor (input : InputSource, output : OutputSink) {
         this.input       = input;
@@ -45,11 +59,11 @@ export class Slight {
 
     monitor () : Promise<void> {
         return this.output.run(
-            MonitorOutputStream(this.interpreter.run(
-                MonitorCompiledStream(this.compiler.run(
-                    MonitorASTStream(this.parser.run(
-                        MonitorTokenStream(this.tokenizer.run(
-                            MonitorSourceStream(this.input.run())
+            this.monitorOutputStream(this.interpreter.run(
+                this.monitorCompiledStream(this.compiler.run(
+                    this.monitorASTStream(this.parser.run(
+                        this.monitorTokenStream(this.tokenizer.run(
+                            this.monitorSourceStream(this.input.run())
                         ))
                     ))
                 ))
@@ -57,6 +71,63 @@ export class Slight {
         );
     }
 
+    async *monitorOutputStream (source: OutputStream) : OutputStream {
+        let label = '*OUTPUT*';
+        for await (const src of source) {
+            this.logger.group(`<${label}> ╰───╮`);
+            this.logger.log(`  ${label} : ${JSON.stringify(src)}`);
+            yield src;
+            this.logger.groupEnd();
+            this.logger.log(  `<${label}> ╭───╯`);
+        }
+    }
+
+    async *monitorCompiledStream (source: CompiledStream) : CompiledStream {
+        let label = 'COMPILER';
+        for await (const src of source) {
+            this.logger.group(`<${label}> ╰───╮`);
+            this.logger.log(`  ${label} ${JSON.stringify([src], null, 4).replaceAll("\n", "\n           ")}`);
+            yield src;
+            this.logger.groupEnd();
+            this.logger.log(  `<${label}> ╭───╯`);
+        }
+    }
+
+    async *monitorASTStream (source: ASTStream) : ASTStream {
+        let label = 'AST_NODE';
+        for await (const src of source) {
+            this.logger.group(`<${label}> ╰───╮`);
+            this.logger.log(`  ${label} ${JSON.stringify([src], null, 4).replaceAll("\n", "\n           ")}`);
+            yield src;
+            this.logger.groupEnd();
+            this.logger.log(  `<${label}> ╭───╯`);
+        }
+    }
+
+    async *monitorTokenStream (source: TokenStream) : TokenStream {
+        let label = 'TOKENIZE';
+        for await (const src of source) {
+            this.logger.group(`<${label}> ╰───╮`);
+            this.logger.log(`  ${label} : ${JSON.stringify(src)}`);
+            yield src;
+            this.logger.groupEnd();
+            this.logger.log(  `<${label}> ╭───╯`);
+        }
+    }
+
+    async *monitorSourceStream (source: SourceStream) : SourceStream {
+        let label = '*SOURCE*';
+        for await (const src of source) {
+            this.logger.group(`<${label}> ▶───╮`);
+            this.logger.log(`  ${label} : ${JSON.stringify(src)}`);
+            yield src;
+            this.logger.groupEnd();
+            this.logger.log(  `<${label}> ◀───╯`);
+        }
+    }
+
+
 }
+
 
 
