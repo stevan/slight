@@ -26,6 +26,17 @@ export class REPL implements InputSource {
         let buffer = '';
         let parenCount = 0;
         let prompt = '? ';
+        process.stdout.write([
+"   _____ ___       __    __",
+"  / ___// (_)___ _/ /_  / /_",
+"  \\__ \\/ / / __ `/ __ \\\/ __/",
+" ___/ / / / /_/ / / / / /_",
+"/____/_/_/\\__, /_/ /_/\\__/",
+"         /____/ v0.0.1",
+"",
+"Type :q to quit",
+"",
+        ].join('\n') + '\n');
         while (this.$running) {
             const line = await new Promise<string>((resolve) => {
                 this.$readline.question(prompt, (answer: string) => {

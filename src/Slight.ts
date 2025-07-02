@@ -1,9 +1,7 @@
-
 import { Console } from 'console';
 
 import { Tokenizer }               from './Slight/Tokenizer.js';
 import { Parser }                  from './Slight/Parser.js';
-import { Compiler }                from './Slight/Compiler.js';
 import { Interpreter }             from './Slight/Interpreter.js';
 import {
     InputSource,
@@ -11,7 +9,6 @@ import {
     SourceStream,
     TokenStream,
     ASTStream,
-    CompiledStream,
     OutputStream
 } from './Slight/Types.js';
 
@@ -19,7 +16,6 @@ export class Slight {
     public input       : InputSource;
     public tokenizer   : Tokenizer;
     public parser      : Parser;
-    public compiler    : Compiler;
     public interpreter : Interpreter;
     public output      : OutputSink;
 
@@ -38,7 +34,6 @@ export class Slight {
         this.input       = input;
         this.tokenizer   = new Tokenizer();
         this.parser      = new Parser();
-        this.compiler    = new Compiler();
         this.interpreter = new Interpreter();
         this.output      = output;
     }
@@ -46,11 +41,9 @@ export class Slight {
     run () : Promise<void> {
         return this.output.run(
             this.interpreter.run(
-                this.compiler.run(
-                    this.parser.run(
-                        this.tokenizer.run(
-                            this.input.run()
-                        )
+                this.parser.run(
+                    this.tokenizer.run(
+                        this.input.run()
                     )
                 )
             )
@@ -60,11 +53,9 @@ export class Slight {
     monitor () : Promise<void> {
         return this.output.run(
             this.monitorOutputStream(this.interpreter.run(
-                this.monitorCompiledStream(this.compiler.run(
-                    this.monitorASTStream(this.parser.run(
-                        this.monitorTokenStream(this.tokenizer.run(
-                            this.monitorSourceStream(this.input.run())
-                        ))
+                this.monitorASTStream(this.parser.run(
+                    this.monitorTokenStream(this.tokenizer.run(
+                        this.monitorSourceStream(this.input.run())
                     ))
                 ))
             ))
@@ -82,22 +73,11 @@ export class Slight {
         }
     }
 
-    async *monitorCompiledStream (source: CompiledStream) : CompiledStream {
-        let label = 'COMPILER';
-        for await (const src of source) {
-            this.logger.group(`<${label}> ╰───╮`);
-            this.logger.log(`  ${label} ${JSON.stringify([src], null, 4).replaceAll("\n", "\n           ")}`);
-            yield src;
-            this.logger.groupEnd();
-            this.logger.log(  `<${label}> ╭───╯`);
-        }
-    }
-
     async *monitorASTStream (source: ASTStream) : ASTStream {
         let label = 'AST_NODE';
         for await (const src of source) {
             this.logger.group(`<${label}> ╰───╮`);
-            this.logger.log(`  ${label} ${JSON.stringify([src], null, 4).replaceAll("\n", "\n           ")}`);
+            this.logger.log(`  ${label} ${JSON.stringify([src], null, 4).replace(/\n/g, "\n           ")}`);
             yield src;
             this.logger.groupEnd();
             this.logger.log(  `<${label}> ╭───╯`);
@@ -125,8 +105,6 @@ export class Slight {
             this.logger.log(  `<${label}> ◀───╯`);
         }
     }
-
-
 }
 
 

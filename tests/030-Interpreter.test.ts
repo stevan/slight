@@ -1,22 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Interpreter } from '../src/Slight/Interpreter.js';
-import type { CompilerOutput } from '../src/Slight/Types.js';
 
 test('interprets a simple addition expression', async () => {
-  async function* mockAsyncGen(items: CompilerOutput[]) { for (const i of items) yield i; }
+  async function* mockAsyncGen(items: any[]) { for (const i of items) yield i; }
   const interpreter = new Interpreter();
-  const outputs: CompilerOutput[] = [
+  const outputs = [
     {
-      type: 'EXPRESSION',
-      ast: {
-        type: 'LIST',
-        elements: [
-          { type: 'SYMBOL', name: '+' },
-          { type: 'NUMBER', value: 1 },
-          { type: 'NUMBER', value: 2 }
-        ]
-      }
+      type: 'LIST',
+      elements: [
+        { type: 'SYMBOL', name: '+' },
+        { type: 'NUMBER', value: 1 },
+        { type: 'NUMBER', value: 2 }
+      ]
     }
   ];
   const gen = interpreter.run(mockAsyncGen(outputs));

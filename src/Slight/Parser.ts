@@ -1,4 +1,3 @@
-
 import {
     TokenStream,
     ASTStream,
@@ -76,6 +75,8 @@ export class Parser {
 
             if (firstElement.type === 'SYMBOL') {
                 switch (firstElement.name) {
+                    case 'def':
+                        return this.resolveDef(ast);
                     case 'cond':
                         return this.resolveCond(ast);
                     case 'quote':
@@ -103,9 +104,34 @@ export class Parser {
         return ast;
     }
 
+    private resolveDef(ast: ASTNode): ASTNode | PipelineError {
+        if (ast.type !== 'LIST' || ast.elements.length !== 4) {
+            return { type: 'ERROR', stage: 'Parser', message: 'Invalid def syntax: expected (def name (params...) body)' };
+        }
+        const [defSymbol, nameNode, paramsNode, bodyNode] = ast.elements;
+        if (nameNode.type !== 'SYMBOL')
+            return { type: 'ERROR', stage: 'Parser', message: 'Function name must be a symbol' };
+        if (paramsNode.type !== 'LIST')
+            return { type: 'ERROR', stage: 'Parser', message: 'Parameters must be a list' };
+        const params: string[] = [];
+        for (const param of paramsNode.elements) {
+            if (param.type !== 'SYMBOL')
+                return { type: 'ERROR', stage: 'Parser', message: 'All parameters must be symbols' };
+            params.push(param.name);
+        }
+        const resolvedBody = this.resolveExpression(bodyNode);
+        if (isPipelineError(resolvedBody)) return resolvedBody;
+        return {
+            type: 'DEF',
+            name: nameNode.name,
+            params: params,
+            body: resolvedBody
+        };
+    }
+
     private resolveCond(ast: ASTNode): ASTNode | PipelineError {
         if (ast.type !== 'LIST' || ast.elements.length < 2) {
-            return { type: 'ERROR', stage: 'Compiler', message: 'Invalid cond syntax' };
+            return { type: 'ERROR', stage: 'Parser', message: 'Invalid cond syntax' };
         }
 
         const clauses: any[] = [];
@@ -114,7 +140,7 @@ export class Parser {
         for (let i = 1; i < ast.elements.length; i++) {
             const clause = ast.elements[i];
             if (clause.type !== 'LIST' || clause.elements.length !== 2) {
-                return { type: 'ERROR', stage: 'Compiler', message: 'Each cond clause must be (test result)' };
+                return { type: 'ERROR', stage: 'Parser', message: 'Each cond clause must be (test result)' };
             }
 
             const [test, result] = clause.elements;
@@ -139,7 +165,7 @@ export class Parser {
 
     private resolveQuote(ast: ASTNode): ASTNode | PipelineError {
         if (ast.type !== 'LIST' || ast.elements.length !== 2) {
-            return { type: 'ERROR', stage: 'Compiler', message: 'Invalid quote syntax: expected (quote expr)' };
+            return { type: 'ERROR', stage: 'Parser', message: 'Invalid quote syntax: expected (quote expr)' };
         }
         const [quoteSymbol, expr] = ast.elements;
         return { type : 'QUOTE', expr : expr };

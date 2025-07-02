@@ -1,4 +1,3 @@
-
 // -----------------------------------------------------------------------------
 // Pipeline errors
 // -----------------------------------------------------------------------------
@@ -45,25 +44,12 @@ export type ASTNode =
   | { type: 'SYMBOL',  name     : string }
   | { type: 'LIST',    elements : ASTNode[] }
   | { type: 'QUOTE',   expr     : ASTNode }
-  | { type: 'COND',    clauses  : CaseClause[], elseClause?: ASTNode | undefined };
+  | { type: 'COND',    clauses  : CaseClause[], elseClause?: ASTNode | undefined }
+  | { type: 'DEF',     name     : string, params: string[], body: ASTNode };
 
 // -----------------------------------------------------------------------------
 // Compiler types
 // -----------------------------------------------------------------------------
-
-export interface FunctionDef {
-  type   : 'FUNCTION_DEF';
-  name   : string;
-  params : string[];
-  body   : ASTNode;
-}
-
-export interface Expression {
-  type : 'EXPRESSION';
-  ast  : ASTNode;
-}
-
-export type CompilerOutput = FunctionDef | Expression;
 
 // -----------------------------------------------------------------------------
 // Interpreter types
@@ -89,7 +75,6 @@ export interface OutputToken {
 export type SourceStream   = AsyncGenerator<string,                         void, void>;
 export type TokenStream    = AsyncGenerator<Token          | PipelineError, void, void>;
 export type ASTStream      = AsyncGenerator<ASTNode        | PipelineError, void, void>;
-export type CompiledStream = AsyncGenerator<CompilerOutput | PipelineError, void, void>;
 export type OutputStream   = AsyncGenerator<OutputToken,                    void, void>;
 
 // -----------------------------------------------------------------------------

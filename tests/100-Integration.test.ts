@@ -2,22 +2,19 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Tokenizer } from '../src/Slight/Tokenizer.js';
 import { Parser } from '../src/Slight/Parser.js';
-import { Compiler } from '../src/Slight/Compiler.js';
 import { Interpreter } from '../src/Slight/Interpreter.js';
 
 test('full pipeline evaluates a simple expression', async () => {
   async function* mockAsyncGen(items: string[]) { for (const i of items) yield i; }
   const tokenizer = new Tokenizer();
   const parser = new Parser();
-  const compiler = new Compiler();
   const interpreter = new Interpreter();
 
   const input = ['(+ 1 2)'];
   const tokens = tokenizer.run(mockAsyncGen(input));
   const asts = parser.run(tokens);
-  const compiled = compiler.run(asts);
   const results = [];
-  for await (const result of interpreter.run(compiled)) results.push(result);
+  for await (const result of interpreter.run(asts)) results.push(result);
   assert.deepStrictEqual(results.map((x) => x.value), [3]);
 });
 
@@ -25,7 +22,6 @@ test('full pipeline evaluates function definition and call', async () => {
   async function* mockAsyncGen(items: string[]) { for (const i of items) yield i; }
   const tokenizer = new Tokenizer();
   const parser = new Parser();
-  const compiler = new Compiler();
   const interpreter = new Interpreter();
 
   const input = [
@@ -34,9 +30,8 @@ test('full pipeline evaluates function definition and call', async () => {
   ];
   const tokens = tokenizer.run(mockAsyncGen(input));
   const asts = parser.run(tokens);
-  const compiled = compiler.run(asts);
   const results = [];
-  for await (const result of interpreter.run(compiled)) results.push(result);
+  for await (const result of interpreter.run(asts)) results.push(result);
   assert.deepStrictEqual(results.map((x) => x.value), [true, 3]);
 });
 
@@ -44,7 +39,6 @@ test('full pipeline evaluates recursive factorial function', async () => {
   async function* mockAsyncGen(items: string[]) { for (const i of items) yield i; }
   const tokenizer = new Tokenizer();
   const parser = new Parser();
-  const compiler = new Compiler();
   const interpreter = new Interpreter();
 
   const input = [
@@ -53,9 +47,8 @@ test('full pipeline evaluates recursive factorial function', async () => {
   ];
   const tokens = tokenizer.run(mockAsyncGen(input));
   const asts = parser.run(tokens);
-  const compiled = compiler.run(asts);
   const results = [];
-  for await (const result of interpreter.run(compiled)) results.push(result);
+  for await (const result of interpreter.run(asts)) results.push(result);
   assert.deepStrictEqual(results.map((x) => x.value), [true, 120]);
 });
 
@@ -63,7 +56,6 @@ test('full pipeline evaluates arithmetic builtins', async () => {
   async function* mockAsyncGen(items: string[]) { for (const i of items) yield i; }
   const tokenizer = new Tokenizer();
   const parser = new Parser();
-  const compiler = new Compiler();
   const interpreter = new Interpreter();
 
   const input = [
@@ -76,9 +68,8 @@ test('full pipeline evaluates arithmetic builtins', async () => {
   ];
   const tokens = tokenizer.run(mockAsyncGen(input));
   const asts = parser.run(tokens);
-  const compiled = compiler.run(asts);
   const results = [];
-  for await (const result of interpreter.run(compiled)) results.push(result);
+  for await (const result of interpreter.run(asts)) results.push(result);
   assert.deepStrictEqual(results.map((x) => x.value), [6, 5, 24, 4, 2, -5]);
 });
 
@@ -86,7 +77,6 @@ test('full pipeline evaluates comparison builtins', async () => {
   async function* mockAsyncGen(items: string[]) { for (const i of items) yield i; }
   const tokenizer = new Tokenizer();
   const parser = new Parser();
-  const compiler = new Compiler();
   const interpreter = new Interpreter();
 
   const input = [
@@ -107,9 +97,8 @@ test('full pipeline evaluates comparison builtins', async () => {
   ];
   const tokens = tokenizer.run(mockAsyncGen(input));
   const asts = parser.run(tokens);
-  const compiled = compiler.run(asts);
   const results = [];
-  for await (const result of interpreter.run(compiled)) results.push(result);
+  for await (const result of interpreter.run(asts)) results.push(result);
   assert.deepStrictEqual(results.map((x) => x.value), [true, false, true, false, true, false, true, false, true, true, false, true, true, false]);
 });
 
@@ -117,7 +106,6 @@ test('full pipeline evaluates list builtins', async () => {
   async function* mockAsyncGen(items: string[]) { for (const i of items) yield i; }
   const tokenizer = new Tokenizer();
   const parser = new Parser();
-  const compiler = new Compiler();
   const interpreter = new Interpreter();
 
   const input = [
@@ -130,9 +118,8 @@ test('full pipeline evaluates list builtins', async () => {
   ];
   const tokens = tokenizer.run(mockAsyncGen(input));
   const asts = parser.run(tokens);
-  const compiled = compiler.run(asts);
   const results = [];
-  for await (const result of interpreter.run(compiled)) results.push(result);
+  for await (const result of interpreter.run(asts)) results.push(result);
   assert.deepStrictEqual(results.map((x) => x.value), [
     [1, 2, 3],
     1,
@@ -147,7 +134,6 @@ test('full pipeline evaluates logical builtins', async () => {
   async function* mockAsyncGen(items: string[]) { for (const i of items) yield i; }
   const tokenizer = new Tokenizer();
   const parser = new Parser();
-  const compiler = new Compiler();
   const interpreter = new Interpreter();
 
   const input = [
@@ -162,9 +148,8 @@ test('full pipeline evaluates logical builtins', async () => {
   ];
   const tokens = tokenizer.run(mockAsyncGen(input));
   const asts = parser.run(tokens);
-  const compiled = compiler.run(asts);
   const results = [];
-  for await (const result of interpreter.run(compiled)) results.push(result);
+  for await (const result of interpreter.run(asts)) results.push(result);
   assert.deepStrictEqual(results.map((x) => x.value), [true, false, false, true, false, true, true, false]);
 });
 
@@ -172,7 +157,6 @@ test('full pipeline evaluates quoting', async () => {
   async function* mockAsyncGen(items: string[]) { for (const i of items) yield i; }
   const tokenizer = new Tokenizer();
   const parser = new Parser();
-  const compiler = new Compiler();
   const interpreter = new Interpreter();
 
   const input = [
@@ -182,9 +166,8 @@ test('full pipeline evaluates quoting', async () => {
   ];
   const tokens = tokenizer.run(mockAsyncGen(input));
   const asts = parser.run(tokens);
-  const compiled = compiler.run(asts);
   const results = [];
-  for await (const result of interpreter.run(compiled)) results.push(result);
+  for await (const result of interpreter.run(asts)) results.push(result);
   assert.deepStrictEqual(results.map((x) => x.value), [
     [1, 2, 3],
     'foo',
@@ -196,7 +179,6 @@ test('full pipeline evaluates recursive sum-list', async () => {
   async function* mockAsyncGen(items: string[]) { for (const i of items) yield i; }
   const tokenizer = new Tokenizer();
   const parser = new Parser();
-  const compiler = new Compiler();
   const interpreter = new Interpreter();
 
   const input = [
@@ -205,9 +187,8 @@ test('full pipeline evaluates recursive sum-list', async () => {
   ];
   const tokens = tokenizer.run(mockAsyncGen(input));
   const asts = parser.run(tokens);
-  const compiled = compiler.run(asts);
   const results = [];
-  for await (const result of interpreter.run(compiled)) results.push(result);
+  for await (const result of interpreter.run(asts)) results.push(result);
   assert.deepStrictEqual(results.map((x) => x.value), [true, 15]);
 });
 
@@ -215,7 +196,6 @@ test('full pipeline evaluates complex cond', async () => {
   async function* mockAsyncGen(items: string[]) { for (const i of items) yield i; }
   const tokenizer = new Tokenizer();
   const parser = new Parser();
-  const compiler = new Compiler();
   const interpreter = new Interpreter();
 
   const input = [
@@ -224,9 +204,8 @@ test('full pipeline evaluates complex cond', async () => {
   ];
   const tokens = tokenizer.run(mockAsyncGen(input));
   const asts = parser.run(tokens);
-  const compiled = compiler.run(asts);
   const results = [];
-  for await (const result of interpreter.run(compiled)) results.push(result);
+  for await (const result of interpreter.run(asts)) results.push(result);
   assert.deepStrictEqual(results.map((x) => x.value), [200, 300]);
 });
 
@@ -234,7 +213,6 @@ test('full pipeline evaluates boolean logic chains', async () => {
   async function* mockAsyncGen(items: string[]) { for (const i of items) yield i; }
   const tokenizer = new Tokenizer();
   const parser = new Parser();
-  const compiler = new Compiler();
   const interpreter = new Interpreter();
 
   const input = [
@@ -247,9 +225,8 @@ test('full pipeline evaluates boolean logic chains', async () => {
   ];
   const tokens = tokenizer.run(mockAsyncGen(input));
   const asts = parser.run(tokens);
-  const compiled = compiler.run(asts);
   const results = [];
-  for await (const result of interpreter.run(compiled)) results.push(result);
+  for await (const result of interpreter.run(asts)) results.push(result);
   assert.deepStrictEqual(results.map((x) => x.value), [true, false, true, false, true, true]);
 });
 
@@ -257,7 +234,6 @@ test('full pipeline evaluates string handling', async () => {
   async function* mockAsyncGen(items: string[]) { for (const i of items) yield i; }
   const tokenizer = new Tokenizer();
   const parser = new Parser();
-  const compiler = new Compiler();
   const interpreter = new Interpreter();
 
   const input = [
@@ -267,8 +243,7 @@ test('full pipeline evaluates string handling', async () => {
   ];
   const tokens = tokenizer.run(mockAsyncGen(input));
   const asts = parser.run(tokens);
-  const compiled = compiler.run(asts);
   const results = [];
-  for await (const result of interpreter.run(compiled)) results.push(result);
+  for await (const result of interpreter.run(asts)) results.push(result);
   assert.deepStrictEqual(results.map((x) => x.value), [["a", "b", "c"], "foo", "baz"]);
 });

@@ -1,35 +1,31 @@
-
 import {
     ASTNode,
     PipelineError, isPipelineError,
-    FunctionDef,
-    CompilerOutput,
-    CompiledStream,
     OutputToken,
     OutputStream,
     OutputHandle
 } from './Types.js';
 
 export class Interpreter {
-    private functions : Map<string, FunctionDef> = new Map();
+    private functions : Map<string, { params: string[], body: ASTNode }> = new Map();
     private builtins  : Map<string, Function>    = new Map();
 
     constructor() {
         this.initBuiltins();
     }
 
-    async *run(source: CompiledStream): OutputStream {
-        for await (const compiled of source) {
-            if (isPipelineError(compiled)) {
-                yield { type: OutputHandle.ERROR, value : compiled };
+    async *run(source: AsyncGenerator<ASTNode | PipelineError, void, void>): OutputStream {
+        for await (const node of source) {
+            if (isPipelineError(node)) {
+                yield { type: OutputHandle.ERROR, value : node };
                 continue;
             }
             try {
-                if (compiled.type === 'FUNCTION_DEF') {
-                    this.functions.set(compiled.name, compiled);
+                if (node.type === 'DEF') {
+                    this.functions.set(node.name, { params: node.params, body: node.body });
                     yield { type: OutputHandle.INFO, value : true };
                 } else {
-                    yield { type: OutputHandle.STDOUT, value : this.evaluate(compiled.ast, new Map()) };
+                    yield { type: OutputHandle.STDOUT, value : this.evaluate(node, new Map()) };
                 }
             } catch (e) {
                 yield {
@@ -71,7 +67,7 @@ export class Interpreter {
                 const args = node.elements.slice(1).map(arg => this.evaluate(arg, params));
                 if (typeof func === 'function') {
                     return func(...args);
-                } else if (func && typeof func === 'object' && func.type === 'FUNCTION_DEF') {
+                } else if (func && typeof func === 'object' && 'params' in func && 'body' in func) {
                     return this.callUserFunction(func, args);
                 } else {
                     throw new Error(`Not a function: ${node.elements[0]}`);
@@ -87,14 +83,17 @@ export class Interpreter {
                     return this.evaluate(node.elseClause, params);
                 }
                 return false;
+            case 'DEF':
+                // DEF nodes should not be evaluated directly
+                return undefined;
             default:
                 throw new Error(`Unknown AST node type: ${(node as any).type}`);
         }
     }
 
-    private callUserFunction(func: FunctionDef, args: any[]): any {
+    private callUserFunction(func: { params: string[], body: ASTNode }, args: any[]): any {
         if (args.length !== func.params.length) {
-            throw new Error(`Wrong number of arguments for ${func.name}: expected ${func.params.length}, got ${args.length}`);
+            throw new Error(`Wrong number of arguments: expected ${func.params.length}, got ${args.length}`);
         }
         const localParams = new Map<string, any>();
         for (let i = 0; i < func.params.length; i++) {
