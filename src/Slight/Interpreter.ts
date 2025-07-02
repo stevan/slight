@@ -1,14 +1,26 @@
 import {
-    ASTNode,
     PipelineError, isPipelineError,
     OutputToken,
     OutputStream,
     OutputHandle
 } from './Types.js';
+import {
+    ASTNode,
+    NumberNode,
+    StringNode,
+    BooleanNode,
+    SymbolNode,
+    CallNode,
+    QuoteNode,
+    CondNode,
+    DefNode,
+    // LetNode (not used yet)
+} from './AST.js';
 
 export class Interpreter {
-    private functions : Map<string, { params: string[], body: ASTNode }> = new Map();
-    private builtins  : Map<string, Function>    = new Map();
+    public functions : Map<string, { params: string[], body: ASTNode }> = new Map();
+    public builtins  : Map<string, Function>    = new Map();
+    public bindings  : Map<string, any>         = new Map();
 
     constructor() {
         this.initBuiltins();
@@ -21,11 +33,11 @@ export class Interpreter {
                 continue;
             }
             try {
-                if (node.type === 'DEF') {
-                    this.functions.set(node.name, { params: node.params, body: node.body });
-                    yield { type: OutputHandle.INFO, value : true };
+                const result = await node.evaluate(this, new Map());
+                if (node instanceof DefNode) {
+                    yield { type: OutputHandle.INFO, value: result };
                 } else {
-                    yield { type: OutputHandle.STDOUT, value : this.evaluate(node, new Map()) };
+                    yield { type: OutputHandle.STDOUT, value: result };
                 }
             } catch (e) {
                 yield {
@@ -40,58 +52,7 @@ export class Interpreter {
         }
     }
 
-    private evaluate(node: ASTNode, params: Map<string, any>): any {
-        switch (node.type) {
-            case 'NUMBER':
-            case 'STRING':
-            case 'BOOLEAN':
-                return node.value;
-            case 'SYMBOL':
-                if (params.has(node.name)) {
-                    return params.get(node.name);
-                }
-                if (this.builtins.has(node.name)) {
-                    return this.builtins.get(node.name);
-                }
-                if (this.functions.has(node.name)) {
-                    return this.functions.get(node.name);
-                }
-                throw new Error(`Undefined symbol: ${node.name}`);
-            case 'QUOTE':
-                return this.astToValue(node.expr);
-            case 'CALL':
-                if (node.elements.length === 0) {
-                    return [];
-                }
-                const func = this.evaluate(node.elements[0], params);
-                const args = node.elements.slice(1).map(arg => this.evaluate(arg, params));
-                if (typeof func === 'function') {
-                    return func(...args);
-                } else if (func && typeof func === 'object' && 'params' in func && 'body' in func) {
-                    return this.callUserFunction(func, args);
-                } else {
-                    throw new Error(`Not a function: ${node.elements[0]}`);
-                }
-            case 'COND':
-                for (const clause of node.clauses) {
-                    const testResult = this.evaluate(clause.test, params);
-                    if (testResult) {
-                        return this.evaluate(clause.result, params);
-                    }
-                }
-                if (node.elseClause) {
-                    return this.evaluate(node.elseClause, params);
-                }
-                return false;
-            case 'DEF':
-                // DEF nodes should not be evaluated directly
-                return undefined;
-            default:
-                throw new Error(`Unknown AST node type: ${(node as any).type}`);
-        }
-    }
-
-    private callUserFunction(func: { params: string[], body: ASTNode }, args: any[]): any {
+    public callUserFunction(func: { params: string[], body: ASTNode }, args: any[]): any {
         if (args.length !== func.params.length) {
             throw new Error(`Wrong number of arguments: expected ${func.params.length}, got ${args.length}`);
         }
@@ -99,22 +60,11 @@ export class Interpreter {
         for (let i = 0; i < func.params.length; i++) {
             localParams.set(func.params[i], args[i]);
         }
-        return this.evaluate(func.body, localParams);
+        return func.body.evaluate(this, localParams);
     }
 
-    private astToValue(ast: ASTNode): any {
-        switch (ast.type) {
-            case 'NUMBER':
-            case 'STRING':
-            case 'BOOLEAN':
-                return ast.value;
-            case 'SYMBOL':
-                return ast.name;
-            case 'CALL':
-                return ast.elements.map(elem => this.astToValue(elem));
-            default:
-                return ast;
-        }
+    public bind(name: string, value: any) {
+        this.bindings.set(name, value);
     }
 
     private initBuiltins(): void {

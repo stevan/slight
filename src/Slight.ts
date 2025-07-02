@@ -8,7 +8,6 @@ import {
     OutputSink,
     SourceStream,
     TokenStream,
-    ASTStream,
     OutputStream
 } from './Slight/Types.js';
 
@@ -53,11 +52,11 @@ export class Slight {
     monitor () : Promise<void> {
         return this.output.run(
             this.monitorOutputStream(this.interpreter.run(
-                this.monitorASTStream(this.parser.run(
+                this.parser.run(
                     this.monitorTokenStream(this.tokenizer.run(
                         this.monitorSourceStream(this.input.run())
                     ))
-                ))
+                )
             ))
         );
     }
@@ -67,17 +66,6 @@ export class Slight {
         for await (const src of source) {
             this.logger.group(`<${label}> ╰───╮`);
             this.logger.log(`  ${label} : ${JSON.stringify(src)}`);
-            yield src;
-            this.logger.groupEnd();
-            this.logger.log(  `<${label}> ╭───╯`);
-        }
-    }
-
-    async *monitorASTStream (source: ASTStream) : ASTStream {
-        let label = 'AST_NODE';
-        for await (const src of source) {
-            this.logger.group(`<${label}> ╰───╮`);
-            this.logger.log(`  ${label} ${JSON.stringify([src], null, 4).replace(/\n/g, "\n           ")}`);
             yield src;
             this.logger.groupEnd();
             this.logger.log(  `<${label}> ╭───╯`);

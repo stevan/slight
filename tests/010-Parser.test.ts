@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Parser } from '../src/Slight/Parser.js';
 import { Token, PipelineError, isPipelineError } from '../src/Slight/Types.js';
+import { astToPlainObject } from './utils/astToPlainObject.js';
 
 test('parses a simple token list into AST', async () => {
   async function* mockAsyncGen(items: Token[]) { for (const i of items) yield i; }
@@ -16,7 +17,7 @@ test('parses a simple token list into AST', async () => {
   const gen = parser.run(mockAsyncGen(tokens));
   const asts = [];
   for await (const ast of gen) asts.push(ast);
-  assert.deepStrictEqual(asts, [
+  assert.deepStrictEqual(asts.map(astToPlainObject), [
     {
       type: 'CALL',
       elements: [
@@ -25,7 +26,7 @@ test('parses a simple token list into AST', async () => {
         { type: 'NUMBER', value: 2 }
       ]
     }
-  ]);
+  ].map(astToPlainObject));
 });
 
 test('parses a cond expression into AST', async () => {
@@ -51,7 +52,7 @@ test('parses a cond expression into AST', async () => {
   const gen = parser.run(mockAsyncGen(tokens));
   const asts = [];
   for await (const ast of gen) asts.push(ast);
-  assert.deepStrictEqual(asts, [
+  assert.deepStrictEqual(asts.map(astToPlainObject), [
     {
         type: 'COND',
         clauses: [
@@ -66,5 +67,5 @@ test('parses a cond expression into AST', async () => {
         ],
         elseClause: { type: 'NUMBER', value: 3 }
     }
-  ]);
+  ].map(astToPlainObject));
 });

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { Tokenizer } from '../src/Slight/Tokenizer.js';
 import { Parser } from '../src/Slight/Parser.js';
 import { Interpreter } from '../src/Slight/Interpreter.js';
+import { astToPlainObject } from './utils/astToPlainObject.js';
 
 test('full pipeline evaluates a simple expression', async () => {
   async function* mockAsyncGen(items: string[]) { for (const i of items) yield i; }
@@ -15,7 +16,7 @@ test('full pipeline evaluates a simple expression', async () => {
   const asts = parser.run(tokens);
   const results = [];
   for await (const result of interpreter.run(asts)) results.push(result);
-  assert.deepStrictEqual(results.map((x) => x.value), [3]);
+  assert.deepStrictEqual(results.map(x => astToPlainObject(x.value)), [3]);
 });
 
 test('full pipeline evaluates function definition and call', async () => {
@@ -32,7 +33,7 @@ test('full pipeline evaluates function definition and call', async () => {
   const asts = parser.run(tokens);
   const results = [];
   for await (const result of interpreter.run(asts)) results.push(result);
-  assert.deepStrictEqual(results.map((x) => x.value), [true, 3]);
+  assert.deepStrictEqual(results.map(x => astToPlainObject(x.value)), [true, 3]);
 });
 
 test('full pipeline evaluates recursive factorial function', async () => {
@@ -49,7 +50,7 @@ test('full pipeline evaluates recursive factorial function', async () => {
   const asts = parser.run(tokens);
   const results = [];
   for await (const result of interpreter.run(asts)) results.push(result);
-  assert.deepStrictEqual(results.map((x) => x.value), [true, 120]);
+  assert.deepStrictEqual(results.map(x => astToPlainObject(x.value)), [true, 120]);
 });
 
 test('full pipeline evaluates arithmetic builtins', async () => {
@@ -70,7 +71,7 @@ test('full pipeline evaluates arithmetic builtins', async () => {
   const asts = parser.run(tokens);
   const results = [];
   for await (const result of interpreter.run(asts)) results.push(result);
-  assert.deepStrictEqual(results.map((x) => x.value), [6, 5, 24, 4, 2, -5]);
+  assert.deepStrictEqual(results.map(x => astToPlainObject(x.value)), [6, 5, 24, 4, 2, -5]);
 });
 
 test('full pipeline evaluates comparison builtins', async () => {
@@ -99,7 +100,7 @@ test('full pipeline evaluates comparison builtins', async () => {
   const asts = parser.run(tokens);
   const results = [];
   for await (const result of interpreter.run(asts)) results.push(result);
-  assert.deepStrictEqual(results.map((x) => x.value), [true, false, true, false, true, false, true, false, true, true, false, true, true, false]);
+  assert.deepStrictEqual(results.map(x => astToPlainObject(x.value)), [true, false, true, false, true, false, true, false, true, true, false, true, true, false]);
 });
 
 test('full pipeline evaluates list builtins', async () => {
@@ -120,7 +121,7 @@ test('full pipeline evaluates list builtins', async () => {
   const asts = parser.run(tokens);
   const results = [];
   for await (const result of interpreter.run(asts)) results.push(result);
-  assert.deepStrictEqual(results.map((x) => x.value), [
+  assert.deepStrictEqual(results.map(x => astToPlainObject(x.value)), [
     [1, 2, 3],
     1,
     [2, 3],
@@ -150,7 +151,7 @@ test('full pipeline evaluates logical builtins', async () => {
   const asts = parser.run(tokens);
   const results = [];
   for await (const result of interpreter.run(asts)) results.push(result);
-  assert.deepStrictEqual(results.map((x) => x.value), [true, false, false, true, false, true, true, false]);
+  assert.deepStrictEqual(results.map(x => astToPlainObject(x.value)), [true, false, false, true, false, true, true, false]);
 });
 
 test('full pipeline evaluates quoting', async () => {
@@ -168,7 +169,7 @@ test('full pipeline evaluates quoting', async () => {
   const asts = parser.run(tokens);
   const results = [];
   for await (const result of interpreter.run(asts)) results.push(result);
-  assert.deepStrictEqual(results.map((x) => x.value), [
+  assert.deepStrictEqual(results.map(x => astToPlainObject(x.value)), [
     [1, 2, 3],
     'foo',
     ['a', ['b', 'c']]
@@ -189,7 +190,7 @@ test('full pipeline evaluates recursive sum-list', async () => {
   const asts = parser.run(tokens);
   const results = [];
   for await (const result of interpreter.run(asts)) results.push(result);
-  assert.deepStrictEqual(results.map((x) => x.value), [true, 15]);
+  assert.deepStrictEqual(results.map(x => x.value), [true, 15]);
 });
 
 test('full pipeline evaluates complex cond', async () => {
@@ -206,7 +207,7 @@ test('full pipeline evaluates complex cond', async () => {
   const asts = parser.run(tokens);
   const results = [];
   for await (const result of interpreter.run(asts)) results.push(result);
-  assert.deepStrictEqual(results.map((x) => x.value), [200, 300]);
+  assert.deepStrictEqual(results.map(x => x.value), [200, 300]);
 });
 
 test('full pipeline evaluates boolean logic chains', async () => {
@@ -227,7 +228,7 @@ test('full pipeline evaluates boolean logic chains', async () => {
   const asts = parser.run(tokens);
   const results = [];
   for await (const result of interpreter.run(asts)) results.push(result);
-  assert.deepStrictEqual(results.map((x) => x.value), [true, false, true, false, true, true]);
+  assert.deepStrictEqual(results.map(x => x.value), [true, false, true, false, true, true]);
 });
 
 test('full pipeline evaluates string handling', async () => {
@@ -245,5 +246,5 @@ test('full pipeline evaluates string handling', async () => {
   const asts = parser.run(tokens);
   const results = [];
   for await (const result of interpreter.run(asts)) results.push(result);
-  assert.deepStrictEqual(results.map((x) => x.value), [["a", "b", "c"], "foo", "baz"]);
+  assert.deepStrictEqual(results.map(x => x.value), [["a", "b", "c"], "foo", "baz"]);
 });

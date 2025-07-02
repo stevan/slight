@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { Tokenizer } from '../src/Slight/Tokenizer.js';
 import { Parser } from '../src/Slight/Parser.js';
 import { Interpreter } from '../src/Slight/Interpreter.js';
-import { isPipelineError, Token, ASTNode } from '../src/Slight/Types.js';
+import { isPipelineError, Token } from '../src/Slight/Types.js';
+import { ASTNode, NumberNode, StringNode, BooleanNode, SymbolNode, CallNode, QuoteNode, CondNode, DefNode } from '../src/Slight/AST.js';
 
 test('Tokenizer yields error for invalid token @', async () => {
   async function* mockAsyncGen(items: string[]) { for (const i of items) yield i; }
@@ -62,7 +63,7 @@ test('Interpreter yields error for undefined symbol', async () => {
   async function* mockAsyncGen(items: ASTNode[]) { for (const i of items) yield i; }
   const interpreter = new Interpreter();
   const outputs: ASTNode[] = [
-    { type: 'SYMBOL', name: 'not_defined' }
+    new SymbolNode('not_defined')
   ];
   const gen = interpreter.run(mockAsyncGen(outputs));
   let errorFound = false;

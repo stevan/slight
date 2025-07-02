@@ -35,18 +35,6 @@ export interface Token {
 // Parser Types
 // -----------------------------------------------------------------------------
 
-export type CaseClause = { test : ASTNode, result : ASTNode };
-
-export type ASTNode =
-  | { type: 'NUMBER',  value    : number }
-  | { type: 'STRING',  value    : string }
-  | { type: 'BOOLEAN', value    : boolean }
-  | { type: 'SYMBOL',  name     : string }
-  | { type: 'CALL',    elements : ASTNode[] }
-  | { type: 'QUOTE',   expr     : ASTNode }
-  | { type: 'COND',    clauses  : CaseClause[], elseClause?: ASTNode | undefined }
-  | { type: 'DEF',     name     : string, params: string[], body: ASTNode };
-
 // -----------------------------------------------------------------------------
 // Compiler types
 // -----------------------------------------------------------------------------
@@ -74,7 +62,6 @@ export interface OutputToken {
 
 export type SourceStream   = AsyncGenerator<string,                         void, void>;
 export type TokenStream    = AsyncGenerator<Token          | PipelineError, void, void>;
-export type ASTStream      = AsyncGenerator<ASTNode        | PipelineError, void, void>;
 export type OutputStream   = AsyncGenerator<OutputToken,                    void, void>;
 
 // -----------------------------------------------------------------------------
