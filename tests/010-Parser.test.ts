@@ -18,7 +18,7 @@ test('parses a simple token list into AST', async () => {
   for await (const ast of gen) asts.push(ast);
   assert.deepStrictEqual(asts, [
     {
-      type: 'LIST',
+      type: 'CALL',
       elements: [
         { type: 'SYMBOL', name: '+' },
         { type: 'NUMBER', value: 1 },

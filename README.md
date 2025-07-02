@@ -37,7 +37,7 @@ Slight is a mini-LISP like interpreter written in TypeScript. The interpreter fe
 ---
 
 ## Features
-- **Lisp-like syntax**: Supports arithmetic, logic, lists, quoting, conditionals, user functions, and recursion.
+- **Lisp-like syntax**: Supports arithmetic, logic, function calls, quoting, conditionals, user functions, and recursion.
 - **Pipeline architecture**: Each stage (Tokenizer, Parser, Interpreter, Output) is an independent async generator.
 - **REPL**: Interactive, multi-line, paren-balanced input.
 - **Comprehensive tests**: Unit and integration tests for all stages.

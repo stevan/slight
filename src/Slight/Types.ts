@@ -42,7 +42,7 @@ export type ASTNode =
   | { type: 'STRING',  value    : string }
   | { type: 'BOOLEAN', value    : boolean }
   | { type: 'SYMBOL',  name     : string }
-  | { type: 'LIST',    elements : ASTNode[] }
+  | { type: 'CALL',    elements : ASTNode[] }
   | { type: 'QUOTE',   expr     : ASTNode }
   | { type: 'COND',    clauses  : CaseClause[], elseClause?: ASTNode | undefined }
   | { type: 'DEF',     name     : string, params: string[], body: ASTNode };

@@ -59,7 +59,7 @@ export class Interpreter {
                 throw new Error(`Undefined symbol: ${node.name}`);
             case 'QUOTE':
                 return this.astToValue(node.expr);
-            case 'LIST':
+            case 'CALL':
                 if (node.elements.length === 0) {
                     return [];
                 }
@@ -110,7 +110,7 @@ export class Interpreter {
                 return ast.value;
             case 'SYMBOL':
                 return ast.name;
-            case 'LIST':
+            case 'CALL':
                 return ast.elements.map(elem => this.astToValue(elem));
             default:
                 return ast;

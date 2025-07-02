@@ -7,7 +7,7 @@ test('interprets a simple addition expression', async () => {
   const interpreter = new Interpreter();
   const outputs = [
     {
-      type: 'LIST',
+      type: 'CALL',
       elements: [
         { type: 'SYMBOL', name: '+' },
         { type: 'NUMBER', value: 1 },
