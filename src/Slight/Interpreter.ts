@@ -1,5 +1,6 @@
 import {
     PipelineError, isPipelineError,
+    ASTStream,
     OutputToken,
     OutputStream,
     OutputHandle
@@ -26,7 +27,7 @@ export class Interpreter {
         this.initBuiltins();
     }
 
-    async *run(source: AsyncGenerator<ASTNode | PipelineError, void, void>): OutputStream {
+    async *run(source: ASTStream): OutputStream {
         for await (const node of source) {
             if (isPipelineError(node)) {
                 yield { type: OutputHandle.ERROR, value : node };

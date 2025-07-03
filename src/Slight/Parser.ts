@@ -1,9 +1,10 @@
 import {
     TokenStream,
-    PipelineError,
+    ASTStream,
     isPipelineError
 } from './Types.js';
 import {
+    ASTNode,
     NumberNode,
     StringNode,
     BooleanNode,
@@ -15,8 +16,8 @@ import {
 } from './AST.js';
 
 export class Parser {
-    async *run(source: TokenStream): AsyncGenerator<any, void, void> {
-        let stack: { type: 'CALL', elements: any[] }[] = [];
+    async *run(source: TokenStream): ASTStream {
+        let stack: { type: 'CALL', elements: ASTNode[] }[] = [];
         for await (const token of source) {
             if (isPipelineError(token)) {
                 yield token;
@@ -70,7 +71,7 @@ export class Parser {
         }
     }
 
-    private addNode(node: any, stack: { type: 'CALL', elements: any[] }[]): void {
+    private addNode(node: ASTNode, stack: { type: 'CALL', elements: ASTNode[] }[]): void {
         if (stack.length === 0) {
             throw new Error('Cannot have a literal outside of an expression');
         } else {
@@ -78,7 +79,7 @@ export class Parser {
         }
     }
 
-    private nodeFromCall(elements: any[]): any {
+    private nodeFromCall(elements: ASTNode[]): ASTNode {
         // Special forms: quote, cond, def
         if (elements.length > 0 && elements[0] instanceof SymbolNode) {
             const sym = elements[0].name;
@@ -110,11 +111,7 @@ export class Parser {
                     const params = elements[2].elements.map((el: any) => el instanceof SymbolNode ? el.name : undefined).filter((n: string | undefined) => n !== undefined);
                     return new DefNode(name, params, elements[3]);
                 } else {
-                    return {
-                        type: 'ERROR',
-                        stage: 'Parser',
-                        message: 'Invalid def syntax: expected (def name (params...) body)'
-                    };
+                    throw new Error('Invalid def syntax: expected (def name (params...) body)')
                 }
             }
         }

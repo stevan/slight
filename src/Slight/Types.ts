@@ -1,3 +1,5 @@
+import { ASTNode } from './AST.js';
+
 // -----------------------------------------------------------------------------
 // Pipeline errors
 // -----------------------------------------------------------------------------
@@ -60,9 +62,10 @@ export interface OutputToken {
 // Pipeline stages
 // -----------------------------------------------------------------------------
 
-export type SourceStream   = AsyncGenerator<string,                         void, void>;
-export type TokenStream    = AsyncGenerator<Token          | PipelineError, void, void>;
-export type OutputStream   = AsyncGenerator<OutputToken,                    void, void>;
+export type SourceStream   = AsyncGenerator<string, void, void>;
+export type TokenStream    = AsyncGenerator<Token | PipelineError, void, void>;
+export type ASTStream      = AsyncGenerator<ASTNode | PipelineError, void, void>
+export type OutputStream   = AsyncGenerator<OutputToken, void, void>;
 
 // -----------------------------------------------------------------------------
 // Source & Sink
