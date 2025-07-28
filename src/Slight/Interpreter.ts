@@ -53,7 +53,7 @@ export class Interpreter {
         }
     }
 
-    public callUserFunction(func: { params: string[], body: ASTNode }, args: any[]): any {
+    public callUserFunction(func: { params: string[], body: ASTNode }, args: ASTNode[]): Promise<any> {
         if (args.length !== func.params.length) {
             throw new Error(`Wrong number of arguments: expected ${func.params.length}, got ${args.length}`);
         }

@@ -1,8 +1,23 @@
+
+// interface Environment {
+//     bindings
+//     builtins
+//     functions
+//     callUserFunction(func, args)
+// }
+
+// -----------------------------------------------------------------------------
 // AST node base type
+// -----------------------------------------------------------------------------
+
 export abstract class ASTNode {
     abstract type: string;
     abstract evaluate(interpreter: any, params: Map<string, any>): Promise<any>;
 }
+
+// -----------------------------------------------------------------------------
+// Literals
+// -----------------------------------------------------------------------------
 
 export class NumberNode extends ASTNode {
     type = 'NUMBER';
@@ -28,6 +43,10 @@ export class BooleanNode extends ASTNode {
     }
 }
 
+// -----------------------------------------------------------------------------
+// Symbols
+// -----------------------------------------------------------------------------
+
 export class SymbolNode extends ASTNode {
     type = 'SYMBOL';
     constructor(public name: string) { super(); }
@@ -49,6 +68,10 @@ export class SymbolNode extends ASTNode {
         throw new Error(`Undefined symbol: ${this.name}`);
     }
 }
+
+// -----------------------------------------------------------------------------
+// Function calls
+// -----------------------------------------------------------------------------
 
 export class CallNode extends ASTNode {
     type = 'CALL';
@@ -89,6 +112,10 @@ export class CallNode extends ASTNode {
     }
 }
 
+// -----------------------------------------------------------------------------
+// Quoted values
+// -----------------------------------------------------------------------------
+
 export class QuoteNode extends ASTNode {
     type = 'QUOTE';
     constructor(public expr: ASTNode) { super(); }
@@ -111,6 +138,10 @@ export class QuoteNode extends ASTNode {
     }
 }
 
+// -----------------------------------------------------------------------------
+// Conditional
+// -----------------------------------------------------------------------------
+
 export class CondNode extends ASTNode {
     type = 'COND';
     constructor(
@@ -131,6 +162,10 @@ export class CondNode extends ASTNode {
     }
 }
 
+// -----------------------------------------------------------------------------
+// Definitions
+// -----------------------------------------------------------------------------
+
 export class DefNode extends ASTNode {
     type = 'DEF';
     constructor(
@@ -144,6 +179,10 @@ export class DefNode extends ASTNode {
         return true;
     }
 }
+
+// -----------------------------------------------------------------------------
+// Bindings
+// -----------------------------------------------------------------------------
 
 export class LetNode extends ASTNode {
     type = 'LET';
