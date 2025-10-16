@@ -1,0 +1,7 @@
+(def math/pi () 3.14159)
+(def math/e () 2.71828)
+(def math/tau () (* 2 (math/pi)))
+(def math/square (x) (* x x))
+(def math/cube (x) (* x (* x x)))
+(def math/area-of-circle (r) (* (math/pi) (* r r)))
+(def math/circumference (r) (* (math/tau) r))
