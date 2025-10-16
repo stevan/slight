@@ -8,6 +8,26 @@ All notable changes to Slight will be documented in this file.
 
 #### Core Language Features
 
+- **Error Handling** - Try/catch/throw mechanism for exception handling
+  - Syntax: `(try expr... (catch var expr...))`
+  - Error objects with `message` and `type` fields accessible via dot notation
+  - `throw` can throw strings or arbitrary values
+  - Supports nested try/catch, re-throwing, and multiple expressions in both blocks
+  - Errors propagate up the call stack until caught
+
+- **Variable Mutation** - Set! form for mutating existing variables
+  - Syntax: `(set! var value)`
+  - Mutates variables in local or global scope (searches local first)
+  - Errors if variable doesn't exist (safe by default)
+  - Works with function parameters and let-bound variables
+  - Enables imperative programming patterns
+
+- **Sequential Evaluation** - Begin form for evaluating multiple expressions
+  - Syntax: `(begin expr1 expr2 ... exprN)`
+  - Evaluates expressions in order, returns last value
+  - Essential for side effects in single-expression contexts
+  - Works seamlessly with `set!` and other mutating operations
+
 - **Let Bindings** - Lexically-scoped local bindings with sequential evaluation
   - Syntax: `(let ((var1 val1) (var2 val2) ...) body)`
   - Variables are evaluated sequentially, allowing later bindings to reference earlier ones
@@ -128,7 +148,11 @@ All notable changes to Slight will be documented in this file.
 ### Testing
 
 - Added comprehensive test suites:
-  - `110-Let.test.ts` - Let binding tests
+  - `020-Let.test.ts` - Let binding tests
+  - `025-Set.test.ts` - Variable mutation tests with set!
+  - `026-TryCatch.test.ts` - Error handling tests with try/catch/throw
+  - `100-Integration.test.ts` - Full pipeline integration tests
+  - `110-FunctionsIntegration.test.ts` - Function integration tests
   - `120-Include.test.ts` - File inclusion tests
   - `130-Closures.test.ts` - Closure behavior tests
   - `140-AnonymousFunctions.test.ts` - Anonymous function tests
@@ -137,7 +161,7 @@ All notable changes to Slight will be documented in this file.
   - `170-Processes.test.ts` - Process creation, messaging, and lifecycle tests
 
 - Test fixtures organized in `tests/fixtures/` directory
-- Total test count: 106 tests, all passing
+- Total test count: 143 tests, all passing
 
 ### Examples
 
@@ -169,7 +193,7 @@ All notable changes to Slight will be documented in this file.
 
 ### Known Limitations
 
-- No mutable variables (except Maps)
+- Limited mutability: Only `set!` for variables and Maps are mutable
 - No module/namespace system (convention-based with symbol prefixes)
 - Mutual recursion requires careful function ordering
 - No tail call optimization
@@ -204,9 +228,10 @@ If upgrading from a previous version:
 ## Future Considerations
 
 - Tail call optimization for better recursion performance
-- Mutable variables with `set!`
 - Module system with proper namespaces
 - Quasiquote and unquote for easier macro writing
 - Gensym for hygenic macros
 - Async/await support for async operations
 - Better error messages with line/column information
+- Finally clauses for try/catch cleanup
+- Custom error types

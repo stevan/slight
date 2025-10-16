@@ -59,7 +59,7 @@ The main orchestrator (`src/Slight.ts`) composes these stages and provides `run(
 The OO interpreter implements each AST node class with its own `evaluate()` method:
 
 - **Base class**: `ASTNode` in `src/Slight/AST.ts`
-- **Node types**: `NumberNode`, `StringNode`, `BooleanNode`, `SymbolNode`, `CallNode`, `QuoteNode`, `CondNode`, `DefNode`, `DefMacroNode`, `LetNode`, `FunNode`
+- **Node types**: `NumberNode`, `StringNode`, `BooleanNode`, `SymbolNode`, `CallNode`, `QuoteNode`, `CondNode`, `DefNode`, `DefMacroNode`, `BeginNode`, `SetNode`, `TryNode`, `ThrowNode`, `LetNode`, `FunNode`
 - **Evaluation**: Each node implements `evaluate(interpreter, params)`
 - **Context**: Interpreter maintains function definitions, macro definitions, and builtin operations
 
@@ -69,8 +69,9 @@ The OO interpreter implements each AST node class with its own `evaluate()` meth
 2. **Error Propagation**: `PipelineError` type flows through all stages without interrupting the pipeline
 3. **Parenthesis Balancing**: REPL accumulates multi-line input until parentheses balance
 4. **Lexical Scoping**: Function parameters use `Map<string, any>` for local bindings
-5. **Special Forms**: `quote`, `cond`, `def`, `defmacro`, `let`, `fun` have dedicated AST node types
+5. **Special Forms**: `quote`, `cond`, `def`, `defmacro`, `begin`, `set!`, `try`, `throw`, `let`, `fun` have dedicated AST node types
 6. **Macro Hygiene**: Macros expand to proper AST nodes (not raw data), preserving special form semantics
+7. **Error Handling**: Try/catch mechanism with error objects containing `message` and `type` fields
 
 ## Testing Strategy
 
@@ -84,6 +85,20 @@ Tests use Node.js native test runner (`node:test`) with no external dependencies
 ## Current Implementation Notes
 
 ### Recent Changes
+- **Error Handling**: Added `try/catch` and `throw` for exception handling (2025-10-16)
+  - `try` blocks execute expressions and catch errors
+  - `catch` blocks receive error objects with `message` and `type` fields accessible via dot notation
+  - `throw` can throw strings or error objects
+  - Supports nested try/catch, re-throwing, and multiple expressions in both blocks
+- **Mutation**: Added `set!` special form for variable mutation (2025-10-16)
+  - Mutates existing variables in local or global scope
+  - Searches local scope first, then global bindings
+  - Errors if variable doesn't exist (safe by default)
+  - Works with function parameters and let-bound variables
+- **Sequencing**: Added `begin` special form for sequential evaluation (2025-10-16)
+  - Evaluates multiple expressions in sequence
+  - Returns the value of the last expression
+  - Essential for using `set!` and side effects in single-expression contexts
 - **Function-Based Spawn**: `spawn` now accepts named functions with arguments (e.g., `(spawn worker 42)`)
   - Child processes automatically inherit parent's functions, macros, and bindings
   - Share-nothing concurrency via cloned interpreter state at spawn time

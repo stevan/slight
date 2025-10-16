@@ -196,6 +196,136 @@ Create compile-time code transformations:
 (add2 5)  ; Expands to: (+ 5 2), returns 7
 ```
 
+### `begin` - Sequential Evaluation
+
+Evaluate multiple expressions in sequence:
+
+```lisp
+; Multiple side effects
+(begin
+  (print "First")
+  (print "Second")
+  42)  ; Returns 42
+
+; With variable mutation
+(def x 10)
+(begin
+  (set! x 20)
+  (set! x 30)
+  x)  ; Returns 30
+
+; In function body
+(def update-counter (c)
+  (begin
+    (set! c (+ c 1))
+    (print c)
+    c))
+```
+
+### `set!` - Variable Mutation
+
+Mutate existing variables:
+
+```lisp
+; Mutate global variable
+(def x 10)
+(set! x 20)
+x  ; Returns 20
+
+; Mutate local variable
+(let ((y 5))
+  (begin
+    (set! y 99)
+    y))  ; Returns 99
+
+; Mutate function parameter
+(def increment (x)
+  (begin
+    (set! x (+ x 1))
+    x))
+(increment 10)  ; Returns 11
+
+; Error if undefined
+(set! undefined-var 42)  ; Error: Cannot set! undefined variable
+```
+
+### `try`/`catch` - Error Handling
+
+Handle exceptions gracefully:
+
+```lisp
+; Basic error catching
+(try
+  (throw "Something went wrong")
+  (catch e
+    (print e.message)
+    "recovered"))  ; Returns "recovered"
+
+; No error - returns try result
+(try
+  (+ 1 2)
+  (catch e
+    "error"))  ; Returns 3
+
+; Access error details
+(try
+  (throw "Bad input")
+  (catch e
+    (begin
+      (print e.type)     ; "Error"
+      (print e.message)  ; "Bad input"
+      false)))
+
+; Nested try/catch
+(try
+  (try
+    (throw "inner")
+    (catch e1
+      (throw "outer")))
+  (catch e2
+    e2.message))  ; Returns "outer"
+
+; Re-throw errors
+(try
+  (try
+    (throw "error")
+    (catch e
+      (throw e)))
+  (catch e2
+    "caught again"))
+
+; In functions
+(def safe-divide (a b)
+  (try
+    (/ a b)
+    (catch e
+      "division error")))
+```
+
+### `throw` - Throw Errors
+
+Throw exceptions to be caught:
+
+```lisp
+; Throw string error
+(throw "Error message")
+
+; Conditional throwing
+(def validate (x)
+  (cond
+    ((< x 0) (throw "negative value"))
+    ((> x 100) (throw "value too large"))
+    (else x)))
+
+; Throw in expressions
+(def risky-op (x)
+  (try
+    (cond
+      ((== x 0) (throw "zero not allowed"))
+      (else (/ 100 x)))
+    (catch e
+      -1)))
+
 ## Built-in Functions
 
 ### Arithmetic
@@ -539,17 +669,20 @@ Compile-time metaprogramming for creating new syntax:
 1. **No Comments** - The tokenizer doesn't support comment syntax
 2. **No Variadic Functions** - Functions must have fixed arity
 3. **No Tail Call Optimization** - Deep recursion may stack overflow
-4. **Limited Mutability** - Only Maps are mutable
+4. **Limited Mutability** - Only variables (via `set!`) and Maps are mutable
 5. **No Module System** - Use naming conventions for namespaces
 6. **No Quasiquote/Unquote** - Macro writing is more verbose
-7. **No Error Handling** - No try/catch mechanism
+7. **No Finally Clause** - Try/catch doesn't support cleanup blocks
 
 ## Best Practices
 
 1. **Use `fun` for anonymous functions** - More flexible than nested `def`
 2. **Use `let` for local bindings** - Cleaner than nested `def`
-3. **Prefer immutability** - Use Maps only when mutation is necessary
-4. **Name predicates with `?`** - e.g., `empty?`, `even?`
-5. **Name mutating functions with `!`** - e.g., `map-set!`, `delete-file!`
-6. **Use higher-order functions** - `map`, `filter`, `compose` for cleaner code
-7. **Organize with files** - Use `include` to split large programs
+3. **Prefer immutability** - Use `set!` only when mutation is necessary
+4. **Use `begin` for side effects** - Group multiple expressions with side effects
+5. **Handle errors gracefully** - Use `try/catch` for operations that may fail
+6. **Name predicates with `?`** - e.g., `empty?`, `even?`
+7. **Name mutating functions with `!`** - e.g., `map-set!`, `set!`, `delete-file!`
+8. **Use higher-order functions** - `map`, `filter`, `compose` for cleaner code
+9. **Organize with files** - Use `include` to split large programs
+10. **Validate inputs** - Use `throw` to signal invalid arguments early
