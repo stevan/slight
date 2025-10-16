@@ -283,6 +283,70 @@ export class BeginNode extends ASTNode {
 }
 
 // -----------------------------------------------------------------------------
+// Error Handling
+// -----------------------------------------------------------------------------
+
+export class TryNode extends ASTNode {
+    type = 'TRY';
+    constructor(
+        public tryBody: ASTNode[],
+        public catchVar: string,
+        public catchBody: ASTNode[]
+    ) { super(); }
+    async evaluate(interpreter: any, params: Map<string, any>): Promise<any> {
+        try {
+            let result: any = null;
+            for (const expr of this.tryBody) {
+                result = await expr.evaluate(interpreter, params);
+            }
+            return result;
+        } catch (error) {
+            // Create a new scope with the error bound to catchVar
+            const catchParams = new Map(params);
+
+            // Format error for Slight - make it accessible as an object
+            const errorObj = {
+                message: error instanceof Error ? error.message : String(error),
+                type: error instanceof Error ? error.constructor.name : 'Error'
+            };
+
+            catchParams.set(this.catchVar, errorObj);
+
+            let result: any = null;
+            for (const expr of this.catchBody) {
+                result = await expr.evaluate(interpreter, catchParams);
+            }
+            return result;
+        }
+    }
+}
+
+export class ThrowNode extends ASTNode {
+    type = 'THROW';
+    constructor(public value: ASTNode) { super(); }
+    async evaluate(interpreter: any, params: Map<string, any>): Promise<any> {
+        const val = await this.value.evaluate(interpreter, params);
+
+        // If it's a string, throw as Error message
+        if (typeof val === 'string') {
+            throw new Error(val);
+        }
+
+        // If it's an object with message, throw as Error
+        if (val && typeof val === 'object' && 'message' in val) {
+            const err = new Error(val.message);
+            if ('type' in val) {
+                err.name = val.type;
+            }
+            throw err;
+        }
+
+        // Otherwise throw the value directly
+        throw val;
+    }
+}
+
+// -----------------------------------------------------------------------------
 // Mutation
 // -----------------------------------------------------------------------------
 

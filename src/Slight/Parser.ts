@@ -16,6 +16,8 @@ import {
     DefMacroNode,
     BeginNode,
     SetNode,
+    TryNode,
+    ThrowNode,
     LetNode,
     FunNode
 } from './AST.js';
@@ -99,7 +101,7 @@ export class Parser {
     }
 
     private nodeFromCall(elements: ASTNode[]): ASTNode {
-        // Special forms: quote, cond, def, defmacro, begin, set!, let, fun
+        // Special forms: quote, cond, def, defmacro, begin, set!, try, throw, let, fun
         if (elements.length > 0 && elements[0] instanceof SymbolNode) {
             const sym = elements[0].name;
             if (sym === 'quote' && elements.length === 2) {
@@ -111,6 +113,53 @@ export class Parser {
                     throw new Error('Invalid begin syntax: expected (begin expr ...)');
                 }
                 return new BeginNode(elements.slice(1));
+            }
+            if (sym === 'throw') {
+                // (throw expr)
+                if (elements.length !== 2) {
+                    throw new Error('Invalid throw syntax: expected (throw expr)');
+                }
+                return new ThrowNode(elements[1]);
+            }
+            if (sym === 'try') {
+                // (try expr1 expr2 ... (catch var expr3 expr4 ...))
+                if (elements.length < 3) {
+                    throw new Error('Invalid try syntax: expected (try expr ... (catch var expr ...))');
+                }
+
+                // Find the catch clause - it should be a CallNode with 'catch' as first element
+                let catchIndex = -1;
+                for (let i = 1; i < elements.length; i++) {
+                    if (elements[i] instanceof CallNode) {
+                        const callNode = elements[i] as CallNode;
+                        if (callNode.elements.length > 0 &&
+                            callNode.elements[0] instanceof SymbolNode &&
+                            (callNode.elements[0] as SymbolNode).name === 'catch') {
+                            catchIndex = i;
+                            break;
+                        }
+                    }
+                }
+
+                if (catchIndex === -1) {
+                    throw new Error('Invalid try syntax: missing catch clause');
+                }
+
+                const tryBody = elements.slice(1, catchIndex);
+                const catchClause = elements[catchIndex] as CallNode;
+
+                // Parse catch clause: (catch var expr1 expr2 ...)
+                if (catchClause.elements.length < 3) {
+                    throw new Error('Invalid catch syntax: expected (catch var expr ...)');
+                }
+                if (!(catchClause.elements[1] instanceof SymbolNode)) {
+                    throw new Error('Invalid catch syntax: error variable must be a symbol');
+                }
+
+                const catchVar = (catchClause.elements[1] as SymbolNode).name;
+                const catchBody = catchClause.elements.slice(2);
+
+                return new TryNode(tryBody, catchVar, catchBody);
             }
             if (sym === 'cond') {
                 // cond clauses: (cond (test1 result1) (test2 result2) ... [else result])
