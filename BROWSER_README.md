@@ -33,13 +33,13 @@ tsc
 - Exception handling (try/catch/throw)
 - JSON operations (json-parse, json-stringify)
 - Macros (defmacro) - Note: Macros only persist within single evaluation
+- **Process/actor system (spawn, send, recv, self, kill, processes)** - Full Erlang-style concurrency!
 
 ### ❌ Not Available in Browser
 These Node.js-specific features have been removed:
 - File operations (read-file, write-file!, delete-file!, file-exists?)
 - Path operations (resolve-path)
 - System operations (get-env, exit)
-- Process/actor system (spawn, send, recv, self, kill, processes)
 - Include functionality
 
 ## Architecture
@@ -49,13 +49,25 @@ The browser implementation consists of:
 1. **`src/Slight/CoreInterpreter.ts`** - Base interpreter with common functionality
 2. **`src/Slight/BrowserInterpreter.ts`** - Browser interpreter extending CoreInterpreter
 3. **`src/Slight/MacroExpander.ts`** - Shared macro expander with parameterized interpreter
-4. **`src/browser.ts`** - Browser entry point and convenience functions
-5. **`index.html`** - Interactive web interface
+4. **`src/Slight/ProcessRuntime.ts`** - Promise-based process system (works in browser!)
+5. **`src/Slight/AsyncQueue.ts`** - Async message queue for process communication
+6. **`src/browser.ts`** - Browser entry point and convenience functions
+7. **`index.html`** - Interactive web interface
 
 The core pipeline architecture remains unchanged:
 ```
 Code → Tokenizer → Parser → MacroExpander → Interpreter → Output
 ```
+
+### Process System in Browser
+
+The browser version now includes the full Erlang-style actor model process system:
+- **Concurrent processes** - Multiple interpreters running in parallel using Promise-based scheduling
+- **Message passing** - Send and receive messages between processes
+- **Process isolation** - Each process has its own interpreter state (share-nothing model)
+- **Process management** - Spawn, kill, and monitor processes
+
+Note: Browser processes are concurrent but not parallel (they run in the same JavaScript thread). This is still useful for I/O-bound operations and building reactive systems.
 
 ## Usage in Your Own Projects
 

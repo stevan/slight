@@ -12,14 +12,14 @@ export class BrowserInterpreter extends CoreInterpreter {
         // Call parent to get core builtins
         super.initBuiltins();
 
-        // Add map and JSON builtins
+        // Add map, JSON, and process builtins
         this.addMapBuiltins();
         this.addJSONBuiltins();
+        this.addProcessBuiltins(); // Processes work in browser too!
 
         // Note: Node.js specific operations not included:
         // - File operations (read-file, write-file!, file-exists?, delete-file!, resolve-path)
         // - System operations (get-env, exit)
-        // - Process operations (spawn, send, recv, self, is-alive?, kill, processes)
         // - Include functionality (requires file system access)
     }
 }

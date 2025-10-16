@@ -2,6 +2,7 @@ import { Tokenizer } from './Slight/Tokenizer.js';
 import { Parser } from './Slight/Parser.js';
 import { MacroExpander } from './Slight/MacroExpander.js';
 import { BrowserInterpreter } from './Slight/BrowserInterpreter.js';
+import { ProcessRuntime } from './Slight/ProcessRuntime.js';
 import {
     InputSource,
     OutputSink,
@@ -57,6 +58,10 @@ export class BrowserSlight {
         this.macroExpander = new MacroExpander(() => new BrowserInterpreter());
         this.interpreter = new BrowserInterpreter();
         this.output = output;
+
+        // Set up ProcessRuntime to use BrowserSlight for spawning
+        const runtime = ProcessRuntime.getInstance();
+        runtime.setSlightFactory((input, output) => new BrowserSlight(input, output));
     }
 
     getInterpreter(): BrowserInterpreter {

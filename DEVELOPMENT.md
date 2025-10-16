@@ -43,23 +43,31 @@ export class FunNode extends ASTNode {
 ```
 slight/
 ├── src/
-│   └── Slight/
-│       ├── AST.ts           # AST node definitions
-│       ├── Parser.ts        # Token to AST parsing
-│       ├── Tokenizer.ts     # String to token conversion
-│       ├── Interpreter.ts   # AST evaluation
-│       ├── REPL.ts          # Interactive REPL
-│       └── Types.ts         # Type definitions
+│   ├── Slight/
+│   │   ├── AST.ts                # AST node definitions
+│   │   ├── Parser.ts             # Token to AST parsing
+│   │   ├── Tokenizer.ts          # String to token conversion
+│   │   ├── CoreInterpreter.ts    # Base interpreter with common functionality
+│   │   ├── Interpreter.ts        # Node.js interpreter (extends Core)
+│   │   ├── BrowserInterpreter.ts # Browser interpreter (extends Core)
+│   │   ├── MacroExpander.ts      # Parameterized macro expansion
+│   │   ├── ProcessRuntime.ts     # Process/actor system
+│   │   ├── REPL.ts               # Interactive REPL
+│   │   └── Types.ts              # Type definitions
+│   ├── Slight.ts                 # Node.js entry point
+│   └── browser.ts                # Browser entry point
 ├── tests/
-│   ├── fixtures/            # Test fixture files
-│   ├── 100-Pipeline.test.ts # Core pipeline tests
-│   ├── 110-Let.test.ts      # Let binding tests
-│   ├── 120-Include.test.ts  # File inclusion tests
-│   ├── 130-Closures.test.ts # Closure tests
+│   ├── fixtures/                 # Test fixture files
+│   ├── 100-Pipeline.test.ts      # Core pipeline tests
+│   ├── 110-Let.test.ts           # Let binding tests
+│   ├── 120-Include.test.ts       # File inclusion tests
+│   ├── 130-Closures.test.ts      # Closure tests
 │   └── 140-AnonymousFunctions.test.ts # Anonymous function tests
-├── examples/                # Example Slight programs
-└── bin/
-    └── slight.ts            # CLI entry point
+├── examples/                     # Example Slight programs
+├── bin/
+│   └── slight.ts                 # CLI entry point
+├── index.html                    # Browser interface
+└── js/                           # Compiled JavaScript (gitignored)
 ```
 
 ## Testing Guidelines
@@ -106,6 +114,76 @@ npm test -- --grep "Closures"
 # Run tests matching a pattern
 npm test -- --grep "anonymous"
 ```
+
+## Browser Development
+
+### Building for Browser
+
+```bash
+# Compile TypeScript to JavaScript
+npm run build
+# or
+tsc
+
+# Open in browser
+open index.html
+```
+
+### Browser-Specific Components
+
+The browser implementation uses inheritance to share code:
+
+```typescript
+// CoreInterpreter has all platform-agnostic functionality
+export class CoreInterpreter {
+    protected initBuiltins(): void {
+        // Core builtins (arithmetic, lists, etc.)
+    }
+    protected addMapBuiltins(): void { /* ... */ }
+    protected addJSONBuiltins(): void { /* ... */ }
+    protected addProcessBuiltins(): void { /* ... */ }
+}
+
+// BrowserInterpreter adds only browser-safe builtins
+export class BrowserInterpreter extends CoreInterpreter {
+    protected override initBuiltins(): void {
+        super.initBuiltins();
+        this.addMapBuiltins();
+        this.addJSONBuiltins();
+        this.addProcessBuiltins();
+        // No file or system operations
+    }
+}
+
+// Node.js Interpreter adds file and system operations
+export class Interpreter extends CoreInterpreter {
+    protected override initBuiltins(): void {
+        super.initBuiltins();
+        this.addMapBuiltins();
+        this.addJSONBuiltins();
+        this.addProcessBuiltins();
+        this.addFileBuiltins();    // Node.js only
+        this.addSystemBuiltins();  // Node.js only
+    }
+}
+```
+
+### Testing Browser Code
+
+1. **Manual Testing**: Open `index.html` and use the interactive editor
+2. **Console Testing**: Use browser DevTools console
+   ```javascript
+   import { evaluate } from './js/src/browser.js';
+   const { results, errors } = await evaluate('(+ 1 2)');
+   ```
+3. **Visual Testing**: The HTML interface includes example programs
+
+### Browser Compatibility Notes
+
+- Requires ES2020+ support (async/await, generators)
+- ES Modules must be supported
+- Tested on Chrome 90+, Firefox 88+, Safari 14+
+- Processes use Promise-based scheduling (concurrent but not parallel)
 
 ## Adding New Features
 

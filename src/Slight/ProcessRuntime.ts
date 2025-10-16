@@ -1,5 +1,4 @@
 import { AsyncQueue } from './AsyncQueue.js';
-import { Slight } from '../Slight.js';
 import { InputSource, SourceStream, OutputSink, OutputStream, OutputHandle } from './Types.js';
 
 /**
@@ -57,12 +56,21 @@ export interface ParentState {
 }
 
 /**
+ * Factory function to create a Slight instance
+ */
+export type SlightFactory = (input: InputSource, output: OutputSink) => {
+    interpreter: any;
+    run(): Promise<void>;
+};
+
+/**
  * Global process runtime managing all concurrent processes
  */
 export class ProcessRuntime {
     private static instance: ProcessRuntime;
     private processes = new Map<number, ProcessHandle>();
     private nextPid = 1;
+    private slightFactory?: SlightFactory;
 
     private constructor() {}
 
@@ -74,18 +82,31 @@ export class ProcessRuntime {
     }
 
     /**
+     * Set the factory function for creating Slight instances
+     */
+    setSlightFactory(factory: SlightFactory): void {
+        this.slightFactory = factory;
+    }
+
+    /**
      * Spawn a new process running the given code
      * Returns the new process ID
      * Optionally accepts parent interpreter state to clone
      */
-    spawn(code: string, parentState?: ParentState): number {
+    async spawn(code: string, parentState?: ParentState): Promise<number> {
+        if (!this.slightFactory) {
+            // Default to Node.js Slight if no factory is set
+            const { Slight } = await import('../Slight.js');
+            this.slightFactory = (input, output) => new Slight(input, output);
+        }
+
         const pid = this.nextPid++;
         const mailbox = new AsyncQueue<Message>();
 
         // Create a new Slight instance for this process
         const input = new CodeInputSource(code);
         const output = new SilentOutputSink();
-        const slight = new Slight(input, output);
+        const slight = this.slightFactory(input, output);
 
         // Clone parent state if provided (share-nothing concurrency)
         if (parentState) {

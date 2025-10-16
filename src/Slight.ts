@@ -2,6 +2,7 @@ import { Tokenizer }               from './Slight/Tokenizer.js';
 import { Parser }                  from './Slight/Parser.js';
 import { MacroExpander }           from './Slight/MacroExpander.js';
 import { Interpreter }             from './Slight/Interpreter.js';
+import { ProcessRuntime }          from './Slight/ProcessRuntime.js';
 import {
     InputSource,
     OutputSink
@@ -22,6 +23,10 @@ export class Slight {
         this.macroExpander = new MacroExpander();
         this.interpreter = new Interpreter();
         this.output      = output;
+
+        // Set up ProcessRuntime to use Slight for spawning
+        const runtime = ProcessRuntime.getInstance();
+        runtime.setSlightFactory((input, output) => new Slight(input, output));
     }
 
     getInterpreter() : Interpreter {

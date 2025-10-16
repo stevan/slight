@@ -124,6 +124,65 @@ slight --help
 
 ---
 
+## Browser Support
+
+Slight now runs in modern web browsers! The browser implementation includes all core features including the **full process/actor system**.
+
+### Quick Start
+
+```bash
+# Build the TypeScript code
+npm run build
+
+# Open index.html in your browser
+```
+
+### Browser-Specific Files
+- `src/browser.ts` - Browser entry point with StringSource and ArrayOutput
+- `src/Slight/BrowserInterpreter.ts` - Browser-compatible interpreter
+- `index.html` - Interactive web interface with code editor
+
+### What Works in Browser
+✅ All core language features (arithmetic, comparisons, boolean operations)
+✅ Functions, closures, and lexical scoping
+✅ List and Map operations
+✅ Macros and metaprogramming
+✅ **Process/actor system with message passing**
+✅ JSON operations
+✅ Exception handling (try/catch/throw)
+
+### What Doesn't Work in Browser
+❌ File operations (read-file, write-file!, etc.)
+❌ System operations (get-env, exit)
+❌ Include functionality
+
+### Browser Usage Example
+
+```html
+<!DOCTYPE html>
+<html>
+<body>
+    <script type="module">
+        import { evaluate } from './js/src/browser.js';
+
+        const { results, errors } = await evaluate(`
+            (def factorial (fun (n)
+                (cond
+                    ((== n 0) 1)
+                    (true (* n (factorial (- n 1)))))))
+            (factorial 5)
+        `);
+
+        console.log('Results:', results); // [true, 120]
+    </script>
+</body>
+</html>
+```
+
+See [BROWSER_README.md](BROWSER_README.md) for detailed browser documentation.
+
+---
+
 ## Example: Programmatic Usage
 
 ```ts

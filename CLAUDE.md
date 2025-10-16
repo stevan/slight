@@ -34,6 +34,20 @@ Each stage is an async generator that:
 
 The main orchestrator (`src/Slight.ts`) composes these stages and provides `run()` for execution.
 
+### Interpreter Architecture
+The interpreter uses an inheritance hierarchy to share code between Node.js and browser implementations:
+
+```
+        CoreInterpreter (base class)
+       /                \
+  Interpreter      BrowserInterpreter
+  (Node.js)          (Browser)
+```
+
+- **CoreInterpreter** (`src/Slight/CoreInterpreter.ts`): Contains all platform-agnostic functionality including basic operators, list operations, boolean logic, and the core evaluation methods
+- **Interpreter** (`src/Slight/Interpreter.ts`): Extends CoreInterpreter with Node.js-specific features (file I/O, system operations)
+- **BrowserInterpreter** (`src/Slight/BrowserInterpreter.ts`): Extends CoreInterpreter for browser compatibility
+
 **MacroExpander Stage** (`src/Slight/MacroExpander.ts`):
 - Inserted between Parser and Interpreter for compile-time transformations
 - Registers macro definitions via `DefMacroNode`

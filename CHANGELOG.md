@@ -6,6 +6,24 @@ All notable changes to Slight will be documented in this file.
 
 ### Added
 
+#### Browser Support
+
+- **Full Browser Compatibility** - Slight now runs entirely in modern web browsers
+  - Created `BrowserInterpreter` extending `CoreInterpreter` for browser-safe operations
+  - Parameterized `MacroExpander` to accept interpreter factory for flexibility
+  - Parameterized `ProcessRuntime` to use configurable Slight factory
+  - Browser entry point (`browser.ts`) with `StringSource`, `ArrayOutput`, and `BrowserSlight`
+  - Interactive HTML interface with syntax-highlighted editor and example programs
+  - **Full process/actor system works in browser** using Promise-based scheduling
+  - All core language features available except Node.js-specific operations
+
+- **Architecture Refactoring** - Eliminated code duplication through inheritance
+  - Created `CoreInterpreter` base class with all platform-agnostic functionality
+  - `Interpreter` extends `CoreInterpreter` adding Node.js-specific builtins
+  - `BrowserInterpreter` extends `CoreInterpreter` with browser-safe operations only
+  - Reduced BrowserInterpreter from ~140 lines to 25 lines
+  - Eliminated 344 lines of duplicate code in BrowserMacroExpander
+
 #### Core Language Features
 
 - **Error Handling** - Try/catch/throw mechanism for exception handling
