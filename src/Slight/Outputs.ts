@@ -35,7 +35,7 @@ export class ConsoleOutput implements OutputSink {
             if (token.value.length === 0) {
                 return '()';
             }
-            return `(${token.value.map(v => this.prettyPrint(v)).join(' ')})`;
+            return `(${token.value.map(v => this.prettyPrint({ type: token.type, value: v })).join(' ')})`;
         }
         return token.value.toString();
     }

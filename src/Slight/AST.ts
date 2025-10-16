@@ -102,7 +102,7 @@ export class CallNode extends ASTNode {
         }
         // If it's a JS function
         if (typeof func === 'function') {
-            return func(...args);
+            return await func(...args);
         }
         // If it's a user-defined function
         if (func && typeof func === 'object' && 'params' in func && 'body' in func) {

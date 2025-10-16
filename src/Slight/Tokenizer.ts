@@ -7,7 +7,7 @@ export class Tokenizer {
     private readonly IS_NUMBER  = /^-?[0-9][0-9_]*(\.[0-9]+)?$/;
     private readonly IS_STRING  = /^"[^"\n]*"|'[^'\n]*'$/;
     private readonly IS_BOOLEAN = /^(true|false)$/;
-    private readonly IS_SYMBOL  = /^[a-zA-Z_+\-*/?!<>=][a-zA-Z0-9_+\-*/?!<>=]*$/;
+    private readonly IS_SYMBOL  = /^[a-zA-Z_+\-*/?!<>=:.][a-zA-Z0-9_+\-*/?!<>=:.]*$/;
     private readonly SPLITTER   = /\(|\)|"[^"\n]*"|'[^'\n]*'|[^\s\(\)#]+/g;
 
     async *run(source: SourceStream): TokenStream {

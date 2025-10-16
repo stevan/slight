@@ -37,6 +37,10 @@ export class Slight {
         this.output      = output;
     }
 
+    getInterpreter() : Interpreter {
+        return this.interpreter;
+    }
+
     run () : Promise<void> {
         return this.output.run(
             this.interpreter.run(

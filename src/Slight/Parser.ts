@@ -106,13 +106,18 @@ export class Parser {
                 return new CondNode(clauses, elseClause);
             }
             if (sym === 'def') {
-                if (elements.length === 4 && elements[1] instanceof SymbolNode && elements[2] instanceof CallNode) {
+                if (elements.length === 3 && elements[1] instanceof SymbolNode) {
+                    // (def name value) - simple value definition
+                    const name = elements[1].name;
+                    // Create a lambda with no params that returns the value
+                    return new DefNode(name, [], elements[2]);
+                } else if (elements.length === 4 && elements[1] instanceof SymbolNode && elements[2] instanceof CallNode) {
                     // (def name (params...) body)
                     const name = elements[1].name;
                     const params = elements[2].elements.map((el: any) => el instanceof SymbolNode ? el.name : undefined).filter((n: string | undefined) => n !== undefined);
                     return new DefNode(name, params, elements[3]);
                 } else {
-                    throw new Error('Invalid def syntax: expected (def name (params...) body)')
+                    throw new Error('Invalid def syntax: expected (def name value) or (def name (params...) body)')
                 }
             }
             if (sym === 'let') {

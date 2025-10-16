@@ -9,7 +9,7 @@ async function main() {
     );
 
     try {
-        await slight.monitor();
+        await slight.run();
     } catch (error) {
         console.error('Error:', error);
         process.exit(1);
