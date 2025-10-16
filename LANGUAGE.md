@@ -276,6 +276,70 @@ Create compile-time code transformations:
 (exit 0)                        ; Exit program
 ```
 
+### Processes
+
+Erlang-style actor model for concurrent programming:
+
+```lisp
+; Spawn a new process (returns PID)
+(def pid (spawn "(+ 1 2)"))
+
+; Get current process ID
+(self)  ; Returns 0 for main process
+
+; Send a message to a process
+(send pid 42)  ; Returns true
+
+; Receive a message (with optional timeout in ms)
+(recv)         ; Blocks until message arrives
+(recv 1000)    ; Returns null if timeout expires
+
+; Message format: [sender-pid data]
+(def msg (recv 1000))
+(head msg)          ; Sender PID
+(head (tail msg))   ; Message data
+
+; Check if process is running
+(is-alive? pid)  ; Returns true or false
+
+; Terminate a process
+(kill pid)  ; Returns true if successful
+
+; Get list of all process PIDs
+(processes)  ; Returns list of PIDs
+```
+
+**Example: Echo Server**
+
+```lisp
+; Server receives a message and echoes it back
+(def echo (spawn "(let ((msg (recv))) (send (head msg) (head (tail msg))))"))
+
+; Send message to server
+(send echo 42)
+
+; Receive response
+(def response (recv 1000))
+(head (tail response))  ; Returns 42
+```
+
+**Example: Concurrent Fibonacci**
+
+```lisp
+(def fib (n)
+  (cond
+    ((< n 2) n)
+    (else (+ (fib (- n 1)) (fib (- n 2))))))
+
+; Calculate fibonacci in parallel
+(def p1 (spawn "(def fib (n) (cond ((< n 2) n) (else (+ (fib (- n 1)) (fib (- n 2)))))) (send 0 (fib 10))"))
+(def p2 (spawn "(def fib (n) (cond ((< n 2) n) (else (+ (fib (- n 1)) (fib (- n 2)))))) (send 0 (fib 8))"))
+
+(def r1 (recv 5000))
+(def r2 (recv 5000))
+(+ (head (tail r1)) (head (tail r2)))  ; Returns 76 (55 + 21)
+```
+
 ## Advanced Features
 
 ### Closures

@@ -28,19 +28,31 @@ export class Parser {
             }
             try {
                 switch (token.type) {
-                    case 'STRING':
-                        this.addNode(new StringNode(token.source), stack);
+                    case 'STRING': {
+                        const node = new StringNode(token.source);
+                        const yielded = this.addNode(node, stack);
+                        if (yielded) yield node;
                         break;
-                    case 'NUMBER':
+                    }
+                    case 'NUMBER': {
                         const numValue = token.source.includes('.') ? parseFloat(token.source) : parseInt(token.source);
-                        this.addNode(new NumberNode(numValue), stack);
+                        const node = new NumberNode(numValue);
+                        const yielded = this.addNode(node, stack);
+                        if (yielded) yield node;
                         break;
-                    case 'BOOLEAN':
-                        this.addNode(new BooleanNode(token.source === 'true'), stack);
+                    }
+                    case 'BOOLEAN': {
+                        const node = new BooleanNode(token.source === 'true');
+                        const yielded = this.addNode(node, stack);
+                        if (yielded) yield node;
                         break;
-                    case 'SYMBOL':
-                        this.addNode(new SymbolNode(token.source), stack);
+                    }
+                    case 'SYMBOL': {
+                        const node = new SymbolNode(token.source);
+                        const yielded = this.addNode(node, stack);
+                        if (yielded) yield node;
                         break;
+                    }
                     case 'LPAREN':
                         stack.push({ type: 'CALL', elements: [] });
                         break;
@@ -74,11 +86,13 @@ export class Parser {
         }
     }
 
-    private addNode(node: ASTNode, stack: { type: 'CALL', elements: ASTNode[] }[]): void {
+    private addNode(node: ASTNode, stack: { type: 'CALL', elements: ASTNode[] }[]): boolean {
         if (stack.length === 0) {
-            throw new Error('Cannot have a literal outside of an expression');
+            // Top-level node - should be yielded
+            return true;
         } else {
             stack[stack.length - 1].elements.push(node);
+            return false;
         }
     }
 

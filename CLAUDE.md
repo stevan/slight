@@ -41,6 +41,16 @@ The main orchestrator (`src/Slight.ts`) composes these stages and provides `run(
 - Converts expansion results back to AST (handling special forms like `cond`)
 - Recursively expands nested macros with depth limits for safety
 
+**Process System** (`src/Slight/ProcessRuntime.ts`, `src/Slight/AsyncQueue.ts`):
+- Erlang-style actor model for concurrent programming
+- `ProcessRuntime` singleton manages all spawned processes globally
+- Each process runs in isolated `Slight` instance with separate `Interpreter`
+- `AsyncQueue` provides blocking message queues using Promise-based dequeue
+- Process PIDs start at 1 (main process is PID 0)
+- Messages are `[sender_pid, data]` tuples for easy destructuring
+- Automatic registration of PID 0 when spawned processes send to main
+- Test isolation via `ProcessRuntime.reset()` to avoid inter-test pollution
+
 ### Object-Oriented AST
 The OO interpreter implements each AST node class with its own `evaluate()` method:
 
@@ -70,7 +80,10 @@ Tests use Node.js native test runner (`node:test`) with no external dependencies
 ## Current Implementation Notes
 
 ### Recent Changes
-- Added macro system with `defmacro` and MacroExpander pipeline stage
+- **Process System**: Added Erlang-style actor model with `spawn`, `send`, `recv`, `self`, `is-alive?`, `kill`, `processes`
+- **Parser Fix**: Top-level literals (symbols, numbers, strings) now work correctly outside expressions
+- **Tokenizer Fix**: Escaped quotes in strings now handled properly (`"(?:[^"\\]|\\.)*"`)
+- **Macro System**: Added `defmacro` and MacroExpander pipeline stage for compile-time metaprogramming
 - Macro expansion happens at compile-time before interpretation
 - Macros can generate special forms (`cond`, `quote`, etc.) correctly
 - Previously: Refactored from functional to OO interpreter design

@@ -20,6 +20,7 @@ import {
 } from './AST.js';
 import * as fs from 'fs';
 import * as path from 'path';
+import { ProcessRuntime } from './ProcessRuntime.js';
 
 export class Interpreter {
     public functions : Map<string, { params: string[], body: ASTNode }> = new Map();
@@ -163,6 +164,46 @@ export class Interpreter {
         // System operations
         this.builtins.set('get-env', (name: string) => process.env[name] ?? null);
         this.builtins.set('exit', (code: number = 0) => process.exit(code));
+
+        // Process operations
+        const runtime = ProcessRuntime.getInstance();
+
+        this.builtins.set('spawn', (code: string) => {
+            return runtime.spawn(code);
+        });
+
+        this.builtins.set('send', (pid: number, data: any) => {
+            const currentPid = runtime.getCurrentPid(this);
+            runtime.send(currentPid, pid, data);
+            return true;
+        });
+
+        this.builtins.set('recv', async (timeout?: number) => {
+            const currentPid = runtime.getCurrentPid(this);
+            const message = await runtime.recv(currentPid, timeout);
+            if (message === null) {
+                // Timeout
+                return null;
+            }
+            // Return a list [from data] for easy pattern matching
+            return [message.from, message.data];
+        });
+
+        this.builtins.set('self', () => {
+            return runtime.getCurrentPid(this);
+        });
+
+        this.builtins.set('is-alive?', (pid: number) => {
+            return runtime.isAlive(pid);
+        });
+
+        this.builtins.set('kill', (pid: number) => {
+            return runtime.kill(pid);
+        });
+
+        this.builtins.set('processes', () => {
+            return runtime.getProcesses();
+        });
 
         // Include - special async builtin
         this.builtins.set('include', async (filepath: string) => {

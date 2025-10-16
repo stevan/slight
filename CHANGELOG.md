@@ -31,6 +31,15 @@ All notable changes to Slight will be documented in this file.
   - Full support for code generation and syntax transformations
   - Separate MacroExpander pipeline stage ensures clean expansion
 
+- **Process System** - Erlang-style actor model for concurrent programming
+  - Lightweight processes with message-passing communication
+  - Each process has its own isolated interpreter instance
+  - Non-blocking message queues with optional timeouts
+  - Process lifecycle management (spawn, kill, is-alive?)
+  - Built-in primitives: `spawn`, `send`, `recv`, `self`, `is-alive?`, `kill`, `processes`
+  - Processes can spawn other processes for nested concurrency
+  - Safe inter-process communication with automatic mailbox management
+
 #### Built-in Functions
 
 - **Map Operations**
@@ -58,6 +67,15 @@ All notable changes to Slight will be documented in this file.
 - **System Operations**
   - `get-env` - Get environment variable
   - `exit` - Exit program with code
+
+- **Process Operations**
+  - `spawn` - Create a new process running given code, returns PID
+  - `send` - Send a message from current process to target PID
+  - `recv` - Receive a message (optionally with timeout in ms)
+  - `self` - Get current process ID
+  - `is-alive?` - Check if a process is still running
+  - `kill` - Terminate a process
+  - `processes` - Get list of all process PIDs
 
 #### CLI Features
 
@@ -88,6 +106,18 @@ All notable changes to Slight will be documented in this file.
   - More straightforward execution model
   - Better error propagation
 
+### Bug Fixes
+
+- **Parser** - Fixed top-level literal handling
+  - Bare symbols, numbers, strings, and booleans can now be evaluated at the top level
+  - Previously only expressions in parentheses were allowed
+  - Fixes evaluation of simple variable references like `pid` or standalone values
+
+- **Tokenizer** - Fixed string escape sequence handling
+  - Properly handles escaped quotes (`\"`) inside strings
+  - Enables nested process spawn with quoted code: `(spawn "(spawn \"...\"))`
+  - String regex updated to support backslash escapes: `"(?:[^"\\]|\\.)*"`
+
 ### Development Process
 
 - **Test-Driven Development** - Established TDD as the standard development methodology
@@ -104,8 +134,10 @@ All notable changes to Slight will be documented in this file.
   - `140-AnonymousFunctions.test.ts` - Anonymous function tests
   - `150-ComprehensiveClosure.test.ts` - Advanced closure patterns
   - `160-Macros.test.ts` - Macro expansion and transformation tests
+  - `170-Processes.test.ts` - Process creation, messaging, and lifecycle tests
 
 - Test fixtures organized in `tests/fixtures/` directory
+- Total test count: 106 tests, all passing
 
 ### Examples
 

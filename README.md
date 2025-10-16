@@ -44,6 +44,12 @@ Slight is a mini-LISP like interpreter written in TypeScript. The interpreter fe
   (list (quote cond) (list test body)))
 
 (when (> x 10) (print "big"))  ; Expands to: (cond ((> x 10) (print "big")))
+
+; Concurrent processes with message passing
+(def echo-server (spawn "(let ((msg (recv))) (send (head msg) (head (tail msg))))"))
+(send echo-server 42)
+(def response (recv 1000))  ; Returns [pid 42]
+(head (tail response))       ; Returns 42
 ```
 
 ---
@@ -59,6 +65,7 @@ Slight is a mini-LISP like interpreter written in TypeScript. The interpreter fe
 - **Recursion**: Full support for recursive and mutually recursive functions
 - **Quoting**: Quote expressions to treat them as data
 - **Macros**: Compile-time metaprogramming with `defmacro` for syntax transformations
+- **Processes**: Erlang-style actor model for concurrent programming with message passing
 
 ### Built-in Operations
 - **Arithmetic**: `+`, `-`, `*`, `/`, `mod`
@@ -69,6 +76,7 @@ Slight is a mini-LISP like interpreter written in TypeScript. The interpreter fe
 - **Files**: `read-file`, `write-file!`, `file-exists?`, `delete-file!`, `include`
 - **JSON**: `json-parse`, `json-stringify`
 - **System**: `get-env`, `exit`
+- **Processes**: `spawn`, `send`, `recv`, `self`, `is-alive?`, `kill`, `processes`
 
 ### Architecture
 - **Pipeline architecture**: Each stage (Tokenizer, Parser, MacroExpander, Interpreter, Output) is an independent async generator
