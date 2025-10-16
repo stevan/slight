@@ -168,6 +168,34 @@ Prevent evaluation:
 (quote x)          ; Returns the symbol x, not its value
 ```
 
+### `defmacro` - Define Macros
+
+Create compile-time code transformations:
+
+```lisp
+; Define a 'when' macro
+(defmacro when (test body)
+  (list (quote cond) (list test body)))
+
+; Usage
+(when (> x 5) (print "big"))
+; Expands to: (cond ((> x 5) (print "big")))
+
+; Define an 'unless' macro
+(defmacro unless (test body)
+  (list (quote cond) (list (list (quote not) test) body)))
+
+; Usage
+(unless (< x 0) (print "positive"))
+; Expands to: (cond ((not (< x 0)) (print "positive")))
+
+; Macros receive unevaluated arguments
+(defmacro add2 (x)
+  (list (quote +) x 2))
+
+(add2 5)  ; Expands to: (+ 5 2), returns 7
+```
+
 ## Built-in Functions
 
 ### Arithmetic
@@ -345,6 +373,36 @@ Split code across multiple files:
 (square 5)  ; Returns 25
 ```
 
+### Macros
+
+Compile-time metaprogramming for creating new syntax:
+
+```lisp
+; Basic macro - when conditional
+(defmacro when (test body)
+  (list (quote cond) (list test body)))
+
+(when (> x 10) (* x 2))  ; Expands at compile-time
+
+; Macro for arithmetic shortcuts
+(defmacro incr (x)
+  (list (quote +) x 1))
+
+(incr 5)  ; Returns 6
+
+; Macro with multiple parameters
+(defmacro swap (a b)
+  (list (quote let)
+        (list (list (quote temp) a))
+        b
+        (list (quote set!) a (quote temp))))
+
+; Macros work with function definitions
+(def process (x)
+  (when (> x 0)
+    (* x 2)))
+```
+
 ## Examples
 
 ### QuickSort
@@ -419,7 +477,7 @@ Split code across multiple files:
 3. **No Tail Call Optimization** - Deep recursion may stack overflow
 4. **Limited Mutability** - Only Maps are mutable
 5. **No Module System** - Use naming conventions for namespaces
-6. **No Macros** - No compile-time metaprogramming
+6. **No Quasiquote/Unquote** - Macro writing is more verbose
 7. **No Error Handling** - No try/catch mechanism
 
 ## Best Practices

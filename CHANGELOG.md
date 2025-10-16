@@ -24,6 +24,13 @@ All notable changes to Slight will be documented in this file.
   - Support for higher-order functions and currying
   - Y combinator and other advanced functional patterns work correctly
 
+- **Macro System** - Compile-time metaprogramming with hygenic macro expansion
+  - Syntax: `(defmacro name (params...) body)`
+  - Macros receive unevaluated AST as arguments
+  - Macro bodies are evaluated to produce new code
+  - Full support for code generation and syntax transformations
+  - Separate MacroExpander pipeline stage ensures clean expansion
+
 #### Built-in Functions
 
 - **Map Operations**
@@ -75,8 +82,9 @@ All notable changes to Slight will be documented in this file.
   - Cleaner separation of concerns
   - Easier to extend with new node types
 
-- **Simplified Pipeline** - Removed compiler stage, direct AST interpretation
-  - Tokenizer → Parser → Interpreter → Output
+- **Simplified Pipeline** - Clean separation of concerns with specialized stages
+  - Tokenizer → Parser → MacroExpander → Interpreter → Output
+  - MacroExpander stage handles compile-time code transformations
   - More straightforward execution model
   - Better error propagation
 
@@ -95,6 +103,7 @@ All notable changes to Slight will be documented in this file.
   - `130-Closures.test.ts` - Closure behavior tests
   - `140-AnonymousFunctions.test.ts` - Anonymous function tests
   - `150-ComprehensiveClosure.test.ts` - Advanced closure patterns
+  - `160-Macros.test.ts` - Macro expansion and transformation tests
 
 - Test fixtures organized in `tests/fixtures/` directory
 
@@ -132,6 +141,7 @@ All notable changes to Slight will be documented in this file.
 - No module/namespace system (convention-based with symbol prefixes)
 - Mutual recursion requires careful function ordering
 - No tail call optimization
+- Macros do not support variable-argument syntax (use lists explicitly)
 
 ## Migration Guide
 
@@ -164,6 +174,7 @@ If upgrading from a previous version:
 - Tail call optimization for better recursion performance
 - Mutable variables with `set!`
 - Module system with proper namespaces
-- Macro system for metaprogramming
+- Quasiquote and unquote for easier macro writing
+- Gensym for hygenic macros
 - Async/await support for async operations
 - Better error messages with line/column information

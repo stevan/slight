@@ -38,6 +38,12 @@ Slight is a mini-LISP like interpreter written in TypeScript. The interpreter fe
     (else (cons (f (head lst)) (map f (tail lst))))))
 
 (map (fun (x) (* x x)) (list 1 2 3))  ; Returns (1 4 9)
+
+; Macros for metaprogramming
+(defmacro when (test body)
+  (list (quote cond) (list test body)))
+
+(when (> x 10) (print "big"))  ; Expands to: (cond ((> x 10) (print "big")))
 ```
 
 ---
@@ -52,6 +58,7 @@ Slight is a mini-LISP like interpreter written in TypeScript. The interpreter fe
 - **Conditionals**: `cond` expressions with multiple clauses and `else`
 - **Recursion**: Full support for recursive and mutually recursive functions
 - **Quoting**: Quote expressions to treat them as data
+- **Macros**: Compile-time metaprogramming with `defmacro` for syntax transformations
 
 ### Built-in Operations
 - **Arithmetic**: `+`, `-`, `*`, `/`, `mod`
@@ -64,7 +71,8 @@ Slight is a mini-LISP like interpreter written in TypeScript. The interpreter fe
 - **System**: `get-env`, `exit`
 
 ### Architecture
-- **Pipeline architecture**: Each stage (Tokenizer, Parser, Interpreter, Output) is an independent async generator
+- **Pipeline architecture**: Each stage (Tokenizer, Parser, MacroExpander, Interpreter, Output) is an independent async generator
+- **Macro expansion stage**: Separate pipeline stage for compile-time code transformations
 - **Object-oriented AST**: Each AST node knows how to evaluate itself
 - **REPL**: Interactive, multi-line, paren-balanced input
 - **CLI**: Command-line interface with file execution, expression evaluation, and include paths
@@ -75,10 +83,11 @@ Slight is a mini-LISP like interpreter written in TypeScript. The interpreter fe
 ## Pipeline Architecture
 
 ```
-Input → Tokenizer → Parser → Interpreter → Output
+Input → Tokenizer → Parser → MacroExpander → Interpreter → Output
 ```
 - **Tokenizer**: Converts input strings to tokens.
-- **Parser**: Converts tokens to AST nodes, including a dedicated DEF node for function definitions.
+- **Parser**: Converts tokens to AST nodes, including special forms like `def`, `defmacro`, `let`, `fun`, etc.
+- **MacroExpander**: Expands macro calls at compile-time by evaluating macro bodies and transforming AST.
 - **Interpreter**: Evaluates AST nodes and user-defined functions.
 - **Output**: Pretty-prints results or errors.
 
@@ -121,6 +130,7 @@ await slight.run();
 // Or execute code directly
 import { Tokenizer } from './src/Slight/Tokenizer.js';
 import { Parser } from './src/Slight/Parser.js';
+import { MacroExpander } from './src/Slight/MacroExpander.js';
 import { Interpreter } from './src/Slight/Interpreter.js';
 
 async function* stringSource(code: string) {
@@ -129,11 +139,13 @@ async function* stringSource(code: string) {
 
 const tokenizer = new Tokenizer();
 const parser = new Parser();
+const macroExpander = new MacroExpander();
 const interpreter = new Interpreter();
 
 const tokens = tokenizer.run(stringSource("(+ 1 2)"));
 const asts = parser.run(tokens);
-for await (const result of interpreter.run(asts)) {
+const expanded = macroExpander.run(asts);
+for await (const result of interpreter.run(expanded)) {
   console.log(result);
 }
 ```

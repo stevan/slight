@@ -23,7 +23,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Slight uses async generators to create a composable pipeline where each stage yields results incrementally:
 
 ```
-Input → Tokenizer → Parser → Interpreter → Output
+Input → Tokenizer → Parser → MacroExpander → Interpreter → Output
 ```
 
 Each stage is an async generator that:
@@ -32,15 +32,22 @@ Each stage is an async generator that:
 - Yields results to the next stage
 - Propagates errors as `PipelineError` objects
 
-The main orchestrator (`src/Slight.ts`) composes these stages and provides `run()` for execution and `monitor()` for debugging with stage visibility.
+The main orchestrator (`src/Slight.ts`) composes these stages and provides `run()` for execution.
+
+**MacroExpander Stage** (`src/Slight/MacroExpander.ts`):
+- Inserted between Parser and Interpreter for compile-time transformations
+- Registers macro definitions via `DefMacroNode`
+- Expands macro calls by evaluating macro bodies with unevaluated AST arguments
+- Converts expansion results back to AST (handling special forms like `cond`)
+- Recursively expands nested macros with depth limits for safety
 
 ### Object-Oriented AST
-The current branch (`OO-guts`) implements an OO interpreter where each AST node class has its own `evaluate()` method:
+The OO interpreter implements each AST node class with its own `evaluate()` method:
 
 - **Base class**: `ASTNode` in `src/Slight/AST.ts`
-- **Node types**: `NumberNode`, `StringNode`, `BooleanNode`, `SymbolNode`, `CallNode`, `QuoteNode`, `CondNode`, `DefNode`, `LetNode`
+- **Node types**: `NumberNode`, `StringNode`, `BooleanNode`, `SymbolNode`, `CallNode`, `QuoteNode`, `CondNode`, `DefNode`, `DefMacroNode`, `LetNode`, `FunNode`
 - **Evaluation**: Each node implements `evaluate(interpreter, params)`
-- **Context**: Interpreter maintains function definitions and builtin operations
+- **Context**: Interpreter maintains function definitions, macro definitions, and builtin operations
 
 ### Key Design Patterns
 
@@ -48,7 +55,8 @@ The current branch (`OO-guts`) implements an OO interpreter where each AST node 
 2. **Error Propagation**: `PipelineError` type flows through all stages without interrupting the pipeline
 3. **Parenthesis Balancing**: REPL accumulates multi-line input until parentheses balance
 4. **Lexical Scoping**: Function parameters use `Map<string, any>` for local bindings
-5. **Special Forms**: `quote`, `cond`, `def`, `let` have dedicated AST node types
+5. **Special Forms**: `quote`, `cond`, `def`, `defmacro`, `let`, `fun` have dedicated AST node types
+6. **Macro Hygiene**: Macros expand to proper AST nodes (not raw data), preserving special form semantics
 
 ## Testing Strategy
 
@@ -61,17 +69,13 @@ Tests use Node.js native test runner (`node:test`) with no external dependencies
 
 ## Current Implementation Notes
 
-### Known Issues (from NOTES.md)
-1. `PipelineError` needs proper constructor implementation
-2. Parser and Tokenizer need cleanup/refactoring
-3. AST and Interpreter are tightly coupled causing `any` type usage
-4. Output implementation has type safety issues
-
-### Recent Changes (from git history)
-- Refactored from functional to OO interpreter design
-- Renamed LIST to CALL for semantic clarity
-- Removed compiler stage (direct interpretation only)
-- Added logo display to REPL startup
+### Recent Changes
+- Added macro system with `defmacro` and MacroExpander pipeline stage
+- Macro expansion happens at compile-time before interpretation
+- Macros can generate special forms (`cond`, `quote`, etc.) correctly
+- Previously: Refactored from functional to OO interpreter design
+- Previously: Renamed LIST to CALL for semantic clarity
+- Previously: Removed compiler stage (direct interpretation only)
 
 ### Type Safety Considerations
 The codebase uses strict TypeScript settings but has some intentional relaxations:
