@@ -13,7 +13,8 @@ import {
     QuoteNode,
     CondNode,
     DefNode,
-    LetNode
+    LetNode,
+    FunNode
 } from './AST.js';
 
 export class Parser {
@@ -81,7 +82,7 @@ export class Parser {
     }
 
     private nodeFromCall(elements: ASTNode[]): ASTNode {
-        // Special forms: quote, cond, def
+        // Special forms: quote, cond, def, fun
         if (elements.length > 0 && elements[0] instanceof SymbolNode) {
             const sym = elements[0].name;
             if (sym === 'quote' && elements.length === 2) {
@@ -105,17 +106,33 @@ export class Parser {
                 }
                 return new CondNode(clauses, elseClause);
             }
+            if (sym === 'fun') {
+                // (fun (params...) body) - anonymous function
+                if (elements.length !== 3) {
+                    throw new Error('Invalid fun syntax: expected (fun (params...) body)');
+                }
+                if (!(elements[1] instanceof CallNode)) {
+                    throw new Error('Invalid fun syntax: parameters must be a list');
+                }
+                const params = elements[1].elements.map((el: any) => {
+                    if (!(el instanceof SymbolNode)) {
+                        throw new Error('Invalid fun syntax: all parameters must be symbols');
+                    }
+                    return el.name;
+                });
+                return new FunNode(params, elements[2]);
+            }
             if (sym === 'def') {
-                if (elements.length === 3 && elements[1] instanceof SymbolNode) {
-                    // (def name value) - simple value definition
-                    const name = elements[1].name;
-                    // Create a lambda with no params that returns the value
-                    return new DefNode(name, [], elements[2]);
-                } else if (elements.length === 4 && elements[1] instanceof SymbolNode && elements[2] instanceof CallNode) {
-                    // (def name (params...) body)
+                if (elements.length === 4 && elements[1] instanceof SymbolNode && elements[2] instanceof CallNode) {
+                    // (def name (params...) body) - function definition
                     const name = elements[1].name;
                     const params = elements[2].elements.map((el: any) => el instanceof SymbolNode ? el.name : undefined).filter((n: string | undefined) => n !== undefined);
                     return new DefNode(name, params, elements[3]);
+                } else if (elements.length === 3 && elements[1] instanceof SymbolNode) {
+                    // (def name value) - simple value definition
+                    const name = elements[1].name;
+                    // Use null params to indicate value definition (not function)
+                    return new DefNode(name, null as any, elements[2]);
                 } else {
                     throw new Error('Invalid def syntax: expected (def name value) or (def name (params...) body)')
                 }

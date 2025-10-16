@@ -66,11 +66,24 @@ export class Interpreter {
         }
     }
 
-    public callUserFunction(func: { params: string[], body: ASTNode }, args: ASTNode[]): Promise<any> {
+    public callUserFunction(func: { params: string[], body: ASTNode }, args: any[]): Promise<any> {
         if (args.length !== func.params.length) {
             throw new Error(`Wrong number of arguments: expected ${func.params.length}, got ${args.length}`);
         }
         const localParams = new Map<string, any>();
+        for (let i = 0; i < func.params.length; i++) {
+            localParams.set(func.params[i], args[i]);
+        }
+        return func.body.evaluate(this, localParams);
+    }
+
+    public callClosure(func: { params: string[], body: ASTNode, capturedEnv: Map<string, any> }, args: any[]): Promise<any> {
+        if (args.length !== func.params.length) {
+            throw new Error(`Wrong number of arguments: expected ${func.params.length}, got ${args.length}`);
+        }
+        // Start with the captured environment
+        const localParams = new Map(func.capturedEnv);
+        // Add the function arguments
         for (let i = 0; i < func.params.length; i++) {
             localParams.set(func.params[i], args[i]);
         }

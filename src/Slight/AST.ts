@@ -104,9 +104,14 @@ export class CallNode extends ASTNode {
         if (typeof func === 'function') {
             return await func(...args);
         }
-        // If it's a user-defined function
+        // If it's a user-defined function or closure
         if (func && typeof func === 'object' && 'params' in func && 'body' in func) {
-            return interpreter.callUserFunction(func, args);
+            // Check if it's a closure with captured environment
+            if ('capturedEnv' in func) {
+                return interpreter.callClosure(func, args);
+            } else {
+                return interpreter.callUserFunction(func, args);
+            }
         }
         throw new Error(`Not a function: ${this.elements[0]}`);
     }
@@ -163,6 +168,27 @@ export class CondNode extends ASTNode {
 }
 
 // -----------------------------------------------------------------------------
+// Anonymous Functions
+// -----------------------------------------------------------------------------
+
+export class FunNode extends ASTNode {
+    type = 'FUN';
+    constructor(
+        public params: string[],
+        public body: ASTNode
+    ) { super(); }
+    async evaluate(interpreter: any, params: Map<string, any>): Promise<any> {
+        // Create a closure that captures the current environment
+        const closure = {
+            params: this.params,
+            body: this.body,
+            capturedEnv: new Map(params) // Capture current lexical environment
+        };
+        return closure;
+    }
+}
+
+// -----------------------------------------------------------------------------
 // Definitions
 // -----------------------------------------------------------------------------
 
@@ -170,13 +196,50 @@ export class DefNode extends ASTNode {
     type = 'DEF';
     constructor(
         public name: string,
-        public params: string[],
+        public params: string[] | null,
         public body: ASTNode
     ) { super(); }
     async evaluate(interpreter: any, params: Map<string, any>): Promise<any> {
-        // Register the function in the interpreter's function map
-        interpreter.functions.set(this.name, { params: this.params, body: this.body });
-        return true;
+        // Check if this is a value definition (def name value) vs function definition
+        if (this.params === null) {
+            // Value definition (def name value)
+            const value = await this.body.evaluate(interpreter, params);
+
+            if (params.size > 0) {
+                // Local scope - store in local environment
+                params.set(this.name, value);
+                return value;
+            } else {
+                // Global scope - check if value is a function/closure
+                if (value && typeof value === 'object' && 'body' in value && 'params' in value) {
+                    // It's a function/closure, store in functions map
+                    interpreter.functions.set(this.name, value);
+                } else {
+                    // It's a regular value, store in bindings
+                    interpreter.bindings.set(this.name, value);
+                }
+                return true;
+            }
+        } else {
+            // Function definition (def name (params...) body)
+            // Create a closure that captures the current environment
+            const closure = {
+                params: this.params,
+                body: this.body,
+                capturedEnv: new Map(params) // Capture current lexical environment
+            };
+
+            // If we're in a local scope, return the function object
+            if (params.size > 0) {
+                // Still register it locally for recursive calls
+                params.set(this.name, closure);
+                return closure;
+            } else {
+                // Global scope - register the function globally
+                interpreter.functions.set(this.name, closure);
+                return true;
+            }
+        }
     }
 }
 
