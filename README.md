@@ -126,7 +126,7 @@ slight --help
 
 ## Browser Support
 
-Slight now runs in modern web browsers! The browser implementation includes all core features including the **full process/actor system**.
+Slight runs in modern web browsers with a **visual terminal UI** that displays multiple process windows! The browser implementation includes all core features including the **full process/actor system with visual windows**.
 
 ### Quick Start
 
@@ -134,20 +134,34 @@ Slight now runs in modern web browsers! The browser implementation includes all 
 # Build the TypeScript code
 npm run build
 
-# Open index.html in your browser
+# Serve with a local HTTP server
+npx http-server -p 8080
+
+# Open http://localhost:8080 in your browser
 ```
+
+### Interactive Terminal UI
+
+The browser interface features a retro-inspired terminal UI:
+- **Multiple windows**: Each process gets its own draggable, resizable terminal window
+- **Visual process tracking**: Window titles show PID and parent PID (e.g., "PID: 1 (Parent: 0)")
+- **Smart positioning**: Spawned windows appear to the right or below parent windows
+- **Mailbox indicators**: 📬 icon appears when messages are waiting
+- **Process state visualization**: Windows turn red when processes are terminated
+- **Command history**: Use ↑/↓ arrows to navigate previous commands
+- **Closeable windows**: Terminated windows can be closed with an "✕ Close" button
 
 ### Browser-Specific Files
 - `src/browser.ts` - Browser entry point with StringSource and ArrayOutput
 - `src/Slight/BrowserInterpreter.ts` - Browser-compatible interpreter
-- `index.html` - Interactive web interface with code editor
+- `index.html` - Interactive terminal UI with multi-window process visualization
 
 ### What Works in Browser
 ✅ All core language features (arithmetic, comparisons, boolean operations)
 ✅ Functions, closures, and lexical scoping
 ✅ List and Map operations
 ✅ Macros and metaprogramming
-✅ **Process/actor system with message passing**
+✅ **Process/actor system with message passing and visual windows**
 ✅ JSON operations
 ✅ Exception handling (try/catch/throw)
 
@@ -158,28 +172,26 @@ npm run build
 
 ### Browser Usage Example
 
-```html
-<!DOCTYPE html>
-<html>
-<body>
-    <script type="module">
-        import { evaluate } from './js/src/browser.js';
+Try this in the browser REPL to see multiple process windows:
 
-        const { results, errors } = await evaluate(`
-            (def factorial (fun (n)
-                (cond
-                    ((== n 0) 1)
-                    (true (* n (factorial (- n 1)))))))
-            (factorial 5)
-        `);
+```lisp
+; Define a worker function
+(def worker (fun () (begin (send 0 "Hello from worker!") (recv))))
 
-        console.log('Results:', results); // [true, 120]
-    </script>
-</body>
-</html>
+; Spawn it - a new window appears!
+(def pid (spawn worker))
+
+; Receive the message in main window
+(recv)
+
+; Send a reply back
+(send pid "Hello back!")
+
+; Check all running processes
+(processes)
 ```
 
-See [BROWSER_README.md](BROWSER_README.md) for detailed browser documentation.
+For programmatic usage, see [BROWSER_README.md](BROWSER_README.md).
 
 ---
 

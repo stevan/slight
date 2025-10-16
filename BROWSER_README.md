@@ -1,6 +1,6 @@
 # Slight LISP - Browser Version
 
-This is Phase 1 of the browser implementation of the Slight LISP interpreter.
+The browser implementation of Slight features a **visual multi-window terminal UI** that displays concurrent processes as interactive terminal windows.
 
 ## Quick Start
 
@@ -11,13 +11,22 @@ npm run build
 tsc
 ```
 
-2. Open `index.html` in a modern browser (Chrome 90+, Firefox 88+, Safari 14+)
+2. Serve with a local HTTP server:
+```bash
+npx http-server -p 8080
+# or
+python3 -m http.server 8080
+```
 
-3. Start writing LISP code! The browser interface includes:
-   - Interactive code editor
-   - Run button (or use Ctrl+Enter / Cmd+Enter)
-   - Example programs
-   - Syntax-highlighted output
+3. Open `http://localhost:8080` in a modern browser (Chrome 90+, Firefox 88+, Safari 14+)
+
+4. Start coding! The terminal UI features:
+   - **Multiple draggable windows** - One per process
+   - **Command history** - Use ↑/↓ arrow keys
+   - **Resizable windows** - Drag from bottom-right corner
+   - **Process visualization** - Window titles show PID and parent PID
+   - **Mailbox indicators** - 📬 appears when messages arrive
+   - **Process state** - Windows turn red when terminated
 
 ## What's Included
 
@@ -32,8 +41,8 @@ tsc
 - Variable mutation (set!)
 - Exception handling (try/catch/throw)
 - JSON operations (json-parse, json-stringify)
-- Macros (defmacro) - Note: Macros only persist within single evaluation
-- **Process/actor system (spawn, send, recv, self, kill, processes)** - Full Erlang-style concurrency!
+- Macros (defmacro) - Persists within each window's interpreter
+- **Process/actor system with visual windows** - Full Erlang-style concurrency with multi-window terminal UI!
 
 ### ❌ Not Available in Browser
 These Node.js-specific features have been removed:
@@ -130,14 +139,63 @@ The implementation has been tested with:
 - Error handling
 - The removal of Node.js-specific functions
 
+## Terminal UI Features
+
+### Window Management
+- **Draggable**: Click and drag window header to reposition
+- **Resizable**: Drag from bottom-right corner to resize
+- **Focus management**: Click any window to bring it to front
+- **Smart positioning**: Spawned windows appear to the right or below parent
+- **Window sizes**: Main window (600x450), spawned windows (450x300)
+
+### Process Visualization
+- **Window titles**: Shows `PID: X (Parent: Y)` for spawned processes, `PID: 0 (Main)` for main
+- **Mailbox indicator**: 📬 emoji pulses when messages are waiting in mailbox
+- **Process state**: Windows turn red when process is terminated/killed
+- **Close button**: ✕ Close button appears on terminated windows
+
+### REPL Features
+- **Command history**: ↑/↓ arrows to navigate previous commands per window
+- **Color-coded output**: Prompts (green), results (bright green), errors (red), info (yellow)
+- **Tight spacing**: Maximized log visibility with 1.3 line-height
+- **Scrollable output**: Automatic scrolling with custom styled scrollbar
+
+### Terminal UI Example
+
+```lisp
+; Main window starts at PID 0
+(self)  ; Returns 0
+
+; Define a worker that sends and waits
+(def worker (fun () (begin (send 0 "Started!") (recv))))
+
+; Spawn creates a new window!
+(def pid (spawn worker))
+
+; Notice the mailbox indicator 📬 appears
+(recv)  ; Returns (1 "Started!")
+
+; Send a reply
+(send pid "Continue!")
+
+; Check running processes
+(processes)  ; Returns (0 1)
+
+; Kill the worker
+(kill pid)
+; Worker window turns red and shows [PROCESS TERMINATED]
+; Click the ✕ Close button to remove it
+```
+
 ## Next Steps
 
-This is Phase 1 of the browser migration. Future phases could add:
+Future enhancements could include:
 
-- **Phase 2**: Persistent REPL state across evaluations
-- **Phase 3**: Web Workers for process/actor system
-- **Phase 4**: Virtual file system with localStorage/IndexedDB
-- **Phase 5**: Browser-based test suite
+- **Web Workers**: True parallel process execution
+- **Virtual file system**: localStorage/IndexedDB-backed file operations
+- **Output routing**: Display process output in its own window
+- **Process inspector**: Debug panel showing process state and messages
+- **Custom themes**: User-configurable terminal colors
 
 ## Browser Compatibility
 

@@ -1,15 +1,71 @@
 
-## UI Idea
+## Browser Terminal UI - IMPLEMENTED ✅
 
-Simple terminal like UI window, input at the bottom, log scrolling upwards. 
+A visual multi-window terminal interface for the browser process system.
 
-Very minimal UI, just a simple window. 
+### Implemented Features
 
-The window should be draggable and repositionable. 
+**Terminal Windows**
+- Terminal-style UI with input at bottom, log scrolling upward
+- Green-on-black color scheme (#00cc00 on #000000)
+- Modern monospace fonts (SF Mono, Monaco, Inconsolata, Fira Code, Consolas)
+- Clean, minimal design without excessive glow effects
+- Tight line spacing (1.3) for maximum log visibility
 
-Acts as a REPL in the browser. 
+**Window Management**
+- Draggable windows (drag from header bar)
+- Resizable windows (drag from bottom-right resize handle)
+- Main window: 600x450px
+- Spawned windows: 450x300px (smaller)
+- Smart positioning: new windows appear to the right or below parent
+- Click-to-focus with active state highlighting
 
-When `(spawn)` is called in the REPL, a new window appears which is attached to the new BrowserInterpreter instance. 
+**Process Visualization**
+- Window title shows: `PID: X (Parent: Y)` or `PID: 0 (Main)`
+- Each window connected to its own BrowserInterpreter instance
+- Mailbox indicator (📬) appears when messages are waiting
+- Windows turn red when process is killed/terminated
+- Close button (✕) appears on terminated windows
 
-Add the PID for the process to the window title, along with the parent pid. 
+**REPL Features**
+- Command history per window (↑/↓ arrow keys)
+- Color-coded output (prompts, results, errors, info)
+- Each window maintains independent interpreter state
+- Results and errors displayed inline with evaluation
 
+### Usage Example
+
+```lisp
+; In main window (PID: 0)
+(def worker (fun () (begin (send 0 "Hello!") (recv))))
+(def pid (spawn worker))
+
+; New window appears for PID: 1 (Parent: 0)
+; Mailbox indicator lights up on main window
+
+(recv)  ; Get message in main window
+(send pid "Reply!")  ; Send back to worker
+
+(kill pid)  ; Window turns red, shows [PROCESS TERMINATED]
+; Click "✕ Close" to remove the window
+```
+
+### Files Modified
+- `index.html` - Complete terminal UI implementation with WindowManager
+- Visual styles, drag/resize handlers, history support, mailbox polling
+
+---
+
+## Future Enhancement Ideas
+
+**Minimize Button**
+- Shrink window height to 3 lines of log output + input area
+- Clicking minimize again expands back to previous height
+- Useful for monitoring many processes at once
+
+**Other Ideas**
+- Window snapping/tiling
+- Saved window layouts
+- Minimize to taskbar
+- Window opacity controls
+- Custom color themes

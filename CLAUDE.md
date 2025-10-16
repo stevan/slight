@@ -99,6 +99,14 @@ Tests use Node.js native test runner (`node:test`) with no external dependencies
 ## Current Implementation Notes
 
 ### Recent Changes
+- **Browser Terminal UI**: Added visual multi-window terminal interface for browser processes (2025-10-16)
+  - Draggable, resizable terminal windows for each process
+  - Window titles show PID and parent PID
+  - Mailbox indicator (📬) shows when messages are waiting
+  - Terminated processes turn red and can be closed
+  - Command history with up/down arrow keys
+  - Smart window positioning (right or below parent)
+  - Spawned windows start smaller (450x300) vs main (600x450)
 - **Error Handling**: Added `try/catch` and `throw` for exception handling (2025-10-16)
   - `try` blocks execute expressions and catch errors
   - `catch` blocks receive error objects with `message` and `type` fields accessible via dot notation
