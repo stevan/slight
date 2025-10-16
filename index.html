@@ -3,437 +3,672 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Slight LISP Interpreter - Browser Version</title>
+    <title>Slight LISP - Browser REPL</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: 'Courier New', monospace;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #1e1e1e;
-            color: #d4d4d4;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Consolas', monospace;
+            background: #0a0a0a;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
         }
 
-        h1 {
-            color: #569cd6;
-            border-bottom: 2px solid #569cd6;
-            padding-bottom: 10px;
-        }
-
-        .container {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
-
-        @media (max-width: 768px) {
-            .container {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .panel {
-            background-color: #2d2d30;
-            padding: 15px;
-            border-radius: 5px;
-            border: 1px solid #3e3e42;
-        }
-
-        h2 {
-            color: #4ec9b0;
-            margin-top: 0;
-        }
-
-        textarea {
-            width: 100%;
-            height: 300px;
-            background-color: #1e1e1e;
-            color: #d4d4d4;
-            border: 1px solid #3e3e42;
-            border-radius: 3px;
-            padding: 10px;
-            font-family: 'Courier New', monospace;
-            font-size: 14px;
-            resize: vertical;
-        }
-
-        button {
-            background-color: #0e639c;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 3px;
-            cursor: pointer;
-            font-size: 14px;
-            margin-right: 10px;
-            margin-top: 10px;
-        }
-
-        button:hover {
-            background-color: #1177bb;
-        }
-
-        button:active {
-            background-color: #007acc;
-        }
-
-        #output {
-            background-color: #1e1e1e;
-            border: 1px solid #3e3e42;
-            border-radius: 3px;
-            padding: 10px;
+        .terminal-window {
+            position: absolute;
+            background: #000000;
+            border: 1px solid #00aa00;
+            border-radius: 2px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+            min-width: 400px;
             min-height: 300px;
-            max-height: 500px;
+            display: flex;
+            flex-direction: column;
+            z-index: 1;
+            resize: both;
+            overflow: hidden;
+        }
+
+        .terminal-window.terminated {
+            border-color: #cc0000;
+        }
+
+        .terminal-window.active {
+            z-index: 1000;
+            border-color: #00cc00;
+        }
+
+        .terminal-window.terminated.active {
+            border-color: #ff0000;
+        }
+
+        .terminal-header {
+            background: #0a0a0a;
+            padding: 6px 10px;
+            cursor: move;
+            border-bottom: 1px solid #00aa00;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+        }
+
+        .terminal-window.terminated .terminal-header {
+            background: #0a0a0a;
+            border-bottom-color: #cc0000;
+        }
+
+        .terminal-title {
+            color: #00cc00;
+            font-size: 13px;
+            font-weight: normal;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+        }
+
+        .terminal-window.terminated .terminal-title {
+            color: #cc0000;
+        }
+
+        .close-button {
+            color: #cc0000;
+            background: transparent;
+            border: 1px solid #cc0000;
+            padding: 2px 8px;
+            cursor: pointer;
+            font-size: 11px;
+            border-radius: 2px;
+            display: none;
+        }
+
+        .terminal-window.terminated .close-button {
+            display: block;
+        }
+
+        .close-button:hover {
+            background: #cc0000;
+            color: #000;
+        }
+
+        .resize-handle {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 20px;
+            height: 20px;
+            cursor: nwse-resize;
+            z-index: 10;
+        }
+
+        .resize-handle::after {
+            content: '';
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            width: 12px;
+            height: 12px;
+            border-right: 2px solid #00aa00;
+            border-bottom: 2px solid #00aa00;
+        }
+
+        .terminal-window.terminated .resize-handle::after {
+            border-color: #cc0000;
+        }
+
+        .mailbox-indicator {
+            font-size: 16px;
+            display: none;
+        }
+
+        .mailbox-indicator.has-messages {
+            display: inline;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .terminal-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .terminal-output {
+            flex: 1;
+            padding: 8px;
             overflow-y: auto;
-            white-space: pre-wrap;
+            color: #00cc00;
+            font-size: 13px;
+            line-height: 1.3;
+            display: flex;
+            flex-direction: column-reverse;
+        }
+
+        .terminal-output-inner {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .terminal-window.terminated .terminal-output {
+            color: #cc0000;
+        }
+
+        .output-line {
+            margin-bottom: 2px;
             word-wrap: break-word;
         }
 
-        .result {
-            margin: 5px 0;
-            padding: 5px;
-            border-left: 3px solid #4ec9b0;
-            padding-left: 10px;
+        .output-line.prompt {
+            color: #009900;
         }
 
-        .error {
-            color: #f48771;
-            border-left-color: #f48771;
+        .output-line.result {
+            color: #00cc00;
+            margin-left: 16px;
         }
 
-        .info {
-            color: #dcdcaa;
-            border-left-color: #dcdcaa;
+        .output-line.error {
+            color: #dd6666;
+            margin-left: 16px;
         }
 
-        .status {
-            color: #608b4e;
+        .output-line.info {
+            color: #cc9900;
             font-style: italic;
-            margin: 10px 0;
         }
 
-        .examples {
-            margin-top: 20px;
+        .terminal-input-container {
+            border-top: 1px solid #00aa00;
+            display: flex;
+            padding: 6px 8px;
+            background: #0a0a0a;
         }
 
-        .example-button {
-            background-color: #3e3e42;
-            font-size: 12px;
-            padding: 5px 10px;
-            margin: 5px 5px 5px 0;
+        .terminal-window.terminated .terminal-input-container {
+            border-top-color: #cc0000;
         }
 
-        .example-button:hover {
-            background-color: #4e4e52;
+        .input-prompt {
+            color: #009900;
+            margin-right: 6px;
+            user-select: none;
         }
 
-        .notice {
-            background-color: #3c3c00;
-            border: 1px solid #808000;
+        .terminal-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #00cc00;
+            font-family: inherit;
+            font-size: 13px;
+            outline: none;
+        }
+
+        .terminal-window.terminated .terminal-input {
+            color: #666;
+        }
+
+        .terminal-input:disabled {
+            cursor: not-allowed;
+        }
+
+        /* Scrollbar styling */
+        .terminal-output::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .terminal-output::-webkit-scrollbar-track {
+            background: #000;
+        }
+
+        .terminal-output::-webkit-scrollbar-thumb {
+            background: #00aa00;
             border-radius: 3px;
-            padding: 10px;
-            margin-bottom: 20px;
-            color: #dcdcaa;
         }
 
-        .notice strong {
-            color: #ffcc00;
+        .terminal-window.terminated .terminal-output::-webkit-scrollbar-thumb {
+            background: #cc0000;
+        }
+
+        .startup-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #00cc00;
+            font-size: 20px;
+            text-align: center;
+            animation: fadeOut 2s ease-out forwards;
+        }
+
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            80% { opacity: 1; }
+            100% { opacity: 0; }
         }
     </style>
 </head>
 <body>
-    <h1>Slight LISP Interpreter - Browser Version</h1>
-
-    <div class="notice">
-        <strong>Note:</strong> This is the browser version of Slight. File operations, process management (spawn/send/recv),
-        and system functions (get-env, exit) are not available in this environment. All core LISP functionality
-        including functions, macros, closures, and data structures work normally.
-    </div>
-
-    <div class="container">
-        <div class="panel">
-            <h2>Code Input</h2>
-            <textarea id="code" placeholder="Enter your LISP code here...">(def greet (fun (name)
-  (+ "Hello, " name "!")))
-
-(greet "World")
-
-; Try some examples:
-; - Click the example buttons below
-; - Or write your own LISP code!</textarea>
-
-            <button onclick="runCode()">▶ Run Code</button>
-            <button onclick="clearInput()">Clear Input</button>
-            <button onclick="clearOutput()">Clear Output</button>
-
-            <div class="examples">
-                <h3 style="color: #4ec9b0;">Examples:</h3>
-                <button class="example-button" onclick="loadExample('factorial')">Factorial</button>
-                <button class="example-button" onclick="loadExample('fibonacci')">Fibonacci</button>
-                <button class="example-button" onclick="loadExample('map')">Map & Filter</button>
-                <button class="example-button" onclick="loadExample('closure')">Closures</button>
-                <button class="example-button" onclick="loadExample('macro')">Macros</button>
-                <button class="example-button" onclick="loadExample('quicksort')">Quicksort</button>
-                <button class="example-button" onclick="loadExample('trycatch')">Try/Catch</button>
-            </div>
-        </div>
-
-        <div class="panel">
-            <h2>Output</h2>
-            <div id="output"></div>
-        </div>
-    </div>
+    <div class="startup-message">SLIGHT LISP INITIALIZED</div>
 
     <script type="module">
-        // Import the compiled browser module
-        import { evaluate } from './js/src/browser.js';
+        import { BrowserSlight, StringSource, ArrayOutput } from './js/src/browser.js';
+        import { ProcessRuntime } from './js/src/Slight/ProcessRuntime.js';
 
-        // Store evaluate function globally for button onclick handlers
-        window.slightEvaluate = evaluate;
+        // Window manager to handle all terminal windows
+        class WindowManager {
+            constructor() {
+                this.windows = new Map(); // pid -> window element and interpreter
+                this.nextZIndex = 1000;
+                this.processRuntime = ProcessRuntime.getInstance();
 
-        window.runCode = async function() {
-            const code = document.getElementById('code').value;
-            const outputDiv = document.getElementById('output');
+                // Override ProcessRuntime spawn to create windows
+                this.interceptSpawn();
 
-            // Add status message
-            outputDiv.innerHTML += '<div class="status">Running...</div>';
-            outputDiv.scrollTop = outputDiv.scrollHeight;
+                // Create main window (PID 0)
+                this.createWindow(0, null, 50, 50, false);
+            }
 
-            try {
-                const startTime = performance.now();
-                const { results, errors } = await evaluate(code);
-                const endTime = performance.now();
-                const duration = (endTime - startTime).toFixed(2);
+            interceptSpawn() {
+                const originalSpawn = this.processRuntime.spawn.bind(this.processRuntime);
+                const self = this;
 
-                // Clear the "Running..." message
-                const statusElements = outputDiv.getElementsByClassName('status');
-                if (statusElements.length > 0) {
-                    statusElements[statusElements.length - 1].remove();
-                }
+                this.processRuntime.spawn = async function(code, parentState) {
+                    // Call original spawn
+                    const pid = await originalSpawn(code, parentState);
 
-                // Display results
-                if (errors.length > 0) {
-                    errors.forEach(error => {
-                        const errorMessage = error.message || error;
-                        outputDiv.innerHTML += `<div class="result error">Error: ${escapeHtml(String(errorMessage))}</div>`;
-                    });
-                } else if (results.length > 0) {
-                    results.forEach(result => {
-                        const formattedResult = formatValue(result);
-                        if (result === undefined) {
-                            outputDiv.innerHTML += `<div class="result info">${formattedResult}</div>`;
-                        } else {
-                            outputDiv.innerHTML += `<div class="result">${formattedResult}</div>`;
+                    // Get parent PID from the interpreter that called spawn
+                    const parentPid = parentState ? (parentState._parentPid || 0) : 0;
+
+                    // Position spawned window to the right or below main window
+                    const parentWindow = self.windows.get(parentPid);
+                    let x, y;
+
+                    if (parentWindow) {
+                        const parentEl = parentWindow.element;
+                        const parentRect = parentEl.getBoundingClientRect();
+
+                        // Try to place to the right
+                        x = parentRect.right + 10;
+                        y = parentRect.top;
+
+                        // If too far right, place below
+                        if (x + 450 > window.innerWidth) {
+                            x = parentRect.left;
+                            y = parentRect.bottom + 10;
+
+                            // If too far down, cascade with offset
+                            if (y + 300 > window.innerHeight) {
+                                const offset = (self.windows.size - 1) * 30;
+                                x = 50 + offset;
+                                y = 50 + offset;
+                            }
                         }
-                    });
+                    } else {
+                        // Default positioning
+                        const offset = self.windows.size * 30;
+                        x = 50 + offset;
+                        y = 50 + offset;
+                    }
+
+                    self.createWindow(pid, parentPid, x, y, pid > 0);
+
+                    return pid;
+                };
+            }
+
+            createWindow(pid, parentPid, x, y, isSpawned = false) {
+                const windowEl = document.createElement('div');
+                windowEl.className = 'terminal-window';
+                windowEl.style.left = x + 'px';
+                windowEl.style.top = y + 'px';
+
+                // Spawned windows are smaller
+                if (isSpawned) {
+                    windowEl.style.width = '450px';
+                    windowEl.style.height = '300px';
                 } else {
-                    outputDiv.innerHTML += '<div class="result info">(no output)</div>';
+                    windowEl.style.width = '600px';
+                    windowEl.style.height = '450px';
                 }
 
-                outputDiv.innerHTML += `<div class="status">Completed in ${duration}ms</div>`;
+                const title = parentPid !== null
+                    ? `PID: ${pid} (Parent: ${parentPid})`
+                    : `PID: ${pid} (Main)`;
 
-            } catch (error) {
-                // Clear the "Running..." message
-                const statusElements = outputDiv.getElementsByClassName('status');
-                if (statusElements.length > 0) {
-                    statusElements[statusElements.length - 1].remove();
+                windowEl.innerHTML = `
+                    <div class="terminal-header">
+                        <div class="terminal-title">
+                            <span class="mailbox-indicator">📬</span>
+                            <span>${title}</span>
+                        </div>
+                        <button class="close-button">✕ Close</button>
+                    </div>
+                    <div class="terminal-body">
+                        <div class="terminal-output">
+                            <div class="terminal-output-inner"></div>
+                        </div>
+                        <div class="terminal-input-container">
+                            <span class="input-prompt">&gt;</span>
+                            <input type="text" class="terminal-input" autofocus>
+                        </div>
+                    </div>
+                    <div class="resize-handle"></div>
+                `;
+
+                document.body.appendChild(windowEl);
+
+                // Make draggable
+                this.makeDraggable(windowEl);
+
+                // Make resizable
+                this.makeResizable(windowEl);
+
+                // Make active on click
+                windowEl.addEventListener('mousedown', () => {
+                    this.setActive(windowEl);
+                });
+
+                // Close button handler
+                const closeBtn = windowEl.querySelector('.close-button');
+                closeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    windowEl.remove();
+                    this.windows.delete(pid);
+                });
+
+                // Create interpreter for this window
+                const input = new StringSource('');
+                const output = new ArrayOutput();
+                const slight = new BrowserSlight(input, output);
+                const interpreter = slight.getInterpreter();
+                interpreter._processPid = pid;
+
+                // Setup input handling
+                const inputEl = windowEl.querySelector('.terminal-input');
+                const outputInner = windowEl.querySelector('.terminal-output-inner');
+                const mailboxIndicator = windowEl.querySelector('.mailbox-indicator');
+
+                // Command history for this window
+                const commandHistory = [];
+                let historyIndex = -1;
+
+                // Welcome message
+                if (pid === 0) {
+                    this.addOutput(outputInner, 'info', 'Welcome to Slight LISP Browser REPL');
+                    this.addOutput(outputInner, 'info', '');
+                    this.addOutput(outputInner, 'info', 'Try spawning a process that waits for messages:');
+                    this.addOutput(outputInner, 'info', '  (def worker (fun () (begin (send 0 "Hello!") (recv))))');
+                    this.addOutput(outputInner, 'info', '  (def pid (spawn worker))');
+                    this.addOutput(outputInner, 'info', '');
+                    this.addOutput(outputInner, 'info', 'Then receive and reply:');
+                    this.addOutput(outputInner, 'info', '  (recv)');
+                    this.addOutput(outputInner, 'info', '  (send pid "Reply!")');
+                } else {
+                    this.addOutput(outputInner, 'info', `Process ${pid} started`);
                 }
 
-                outputDiv.innerHTML += `<div class="result error">Unexpected Error: ${escapeHtml(error.message)}</div>`;
+                inputEl.addEventListener('keydown', async (e) => {
+                    // Handle history navigation
+                    if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        if (commandHistory.length > 0) {
+                            if (historyIndex === -1) {
+                                historyIndex = commandHistory.length - 1;
+                            } else if (historyIndex > 0) {
+                                historyIndex--;
+                            }
+                            inputEl.value = commandHistory[historyIndex];
+                        }
+                        return;
+                    } else if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        if (historyIndex !== -1) {
+                            historyIndex++;
+                            if (historyIndex >= commandHistory.length) {
+                                historyIndex = -1;
+                                inputEl.value = '';
+                            } else {
+                                inputEl.value = commandHistory[historyIndex];
+                            }
+                        }
+                        return;
+                    }
+
+                    if (e.key === 'Enter') {
+                        const code = inputEl.value.trim();
+                        if (code) {
+                            // Add to history
+                            commandHistory.push(code);
+                            historyIndex = -1;
+
+                            // Show input
+                            this.addOutput(outputInner, 'prompt', `> ${code}`);
+                            inputEl.value = '';
+
+                            // Evaluate
+                            try {
+                                const input = new StringSource(code);
+                                const output = new ArrayOutput();
+                                const slight = new BrowserSlight(input, output);
+
+                                // Copy current interpreter state
+                                slight.interpreter.functions = interpreter.functions;
+                                slight.interpreter.macros = interpreter.macros;
+                                slight.interpreter.bindings = interpreter.bindings;
+                                slight.interpreter._processPid = pid;
+
+                                await slight.run();
+
+                                // Update interpreter state
+                                interpreter.functions = slight.interpreter.functions;
+                                interpreter.macros = slight.interpreter.macros;
+                                interpreter.bindings = slight.interpreter.bindings;
+
+                                // Display results
+                                if (output.errors.length > 0) {
+                                    output.errors.forEach(err => {
+                                        const msg = err.message || err;
+                                        this.addOutput(outputInner, 'error', `Error: ${msg}`);
+                                    });
+                                } else if (output.results.length > 0) {
+                                    output.results.forEach(result => {
+                                        this.addOutput(outputInner, 'result', this.formatValue(result));
+                                    });
+                                } else {
+                                    this.addOutput(outputInner, 'info', '(no output)');
+                                }
+                            } catch (error) {
+                                this.addOutput(outputInner, 'error', `Error: ${error.message}`);
+                            }
+                        }
+                    }
+                });
+
+                // Store window info
+                this.windows.set(pid, {
+                    element: windowEl,
+                    interpreter,
+                    outputInner,
+                    inputEl,
+                    mailboxIndicator
+                });
+
+                // Set as active
+                this.setActive(windowEl);
+
+                // Poll for messages
+                this.pollMessages(pid);
+
+                // Check if process is alive
+                this.monitorProcess(pid);
             }
 
-            // Scroll to bottom
-            outputDiv.scrollTop = outputDiv.scrollHeight;
-        };
+            async pollMessages(pid) {
+                const window = this.windows.get(pid);
+                if (!window) return;
 
-        window.clearInput = function() {
-            document.getElementById('code').value = '';
-        };
+                // Check mailbox size periodically
+                const checkMailbox = () => {
+                    if (!this.windows.has(pid)) return;
 
-        window.clearOutput = function() {
-            document.getElementById('output').innerHTML = '';
-        };
+                    const handle = this.processRuntime['processes'].get(pid);
+                    if (!handle || !handle.mailbox) {
+                        setTimeout(checkMailbox, 100);
+                        return;
+                    }
 
-        window.loadExample = function(example) {
-            const examples = {
-                factorial: `; Factorial function using recursion
-(def factorial (fun (n)
-  (cond
-    ((== n 0) 1)
-    (true (* n (factorial (- n 1)))))))
+                    const queueSize = handle.mailbox['queue'] ? handle.mailbox['queue'].length : 0;
+                    if (queueSize > 0) {
+                        window.mailboxIndicator.classList.add('has-messages');
+                    } else {
+                        window.mailboxIndicator.classList.remove('has-messages');
+                    }
 
-(factorial 5)  ; Should return 120
-(factorial 10) ; Should return 3628800`,
+                    setTimeout(checkMailbox, 100);
+                };
 
-                fibonacci: `; Fibonacci sequence
-(def fib (fun (n)
-  (cond
-    ((< n 2) n)
-    (true (+ (fib (- n 1)) (fib (- n 2)))))))
+                checkMailbox();
+            }
 
-; Calculate first 10 Fibonacci numbers
-(def fib-list (fun (n)
-  (cond
-    ((== n 0) (list))
-    (true (cons (fib (- n 1)) (fib-list (- n 1)))))))
+            async monitorProcess(pid) {
+                if (pid === 0) return; // Main process never dies
 
-(fib 10)  ; 10th Fibonacci number
-(fib-list 10)  ; First 10 Fibonacci numbers`,
+                const checkStatus = () => {
+                    if (!this.windows.has(pid)) return;
 
-                map: `; Map and filter operations
-(def map (fun (f lst)
-  (cond
-    ((empty? lst) (list))
-    (true (cons (f (head lst)) (map f (tail lst)))))))
+                    const isAlive = this.processRuntime.isAlive(pid);
+                    const window = this.windows.get(pid);
 
-(def filter (fun (pred lst)
-  (cond
-    ((empty? lst) (list))
-    ((pred (head lst)) (cons (head lst) (filter pred (tail lst))))
-    (true (filter pred (tail lst))))))
+                    if (!isAlive && !window.element.classList.contains('terminated')) {
+                        window.element.classList.add('terminated');
+                        window.inputEl.disabled = true;
+                        this.addOutput(window.outputInner, 'error', '[PROCESS TERMINATED]');
+                        return;
+                    }
 
-(def square (fun (x) (* x x)))
-(def is-even? (fun (x) (== (mod x 2) 0)))
+                    setTimeout(checkStatus, 100);
+                };
 
-(def numbers (list 1 2 3 4 5 6 7 8 9 10))
+                setTimeout(checkStatus, 100);
+            }
 
-(map square numbers)
-(filter is-even? numbers)
-(map square (filter is-even? numbers))`,
+            addOutput(outputInner, type, text) {
+                const line = document.createElement('div');
+                line.className = `output-line ${type}`;
+                line.textContent = text;
+                outputInner.appendChild(line);
+            }
 
-                closure: `; Demonstrating closures
-(def make-counter (fun ()
-  (let ((count 0))
-    (fun ()
-      (begin
-        (set! count (+ count 1))
-        count)))))
+            formatValue(value) {
+                if (value === null) return 'null';
+                if (value === undefined) return 'undefined';
+                if (typeof value === 'string') return `"${value}"`;
+                if (Array.isArray(value)) {
+                    return '(' + value.map(v => this.formatValue(v)).join(' ') + ')';
+                }
+                if (typeof value === 'object' && value.params && value.body) {
+                    return `<function>`;
+                }
+                return String(value);
+            }
 
-(def counter1 (make-counter))
-(def counter2 (make-counter))
+            makeDraggable(element) {
+                const header = element.querySelector('.terminal-header');
+                let isDragging = false;
+                let currentX;
+                let currentY;
+                let initialX;
+                let initialY;
 
-(counter1)  ; 1
-(counter1)  ; 2
-(counter1)  ; 3
-(counter2)  ; 1 (independent counter)
-(counter1)  ; 4
-(counter2)  ; 2`,
+                header.addEventListener('mousedown', (e) => {
+                    if (e.target === header || e.target.closest('.terminal-title')) {
+                        initialX = e.clientX - element.offsetLeft;
+                        initialY = e.clientY - element.offsetTop;
+                        isDragging = true;
+                    }
+                });
 
-                macro: `; Macro demonstration
-(defmacro when (condition body)
-  (list 'cond
-    (list condition body)
-    (list 'true 'null)))
+                document.addEventListener('mousemove', (e) => {
+                    if (isDragging) {
+                        e.preventDefault();
+                        currentX = e.clientX - initialX;
+                        currentY = e.clientY - initialY;
 
-(defmacro unless (condition body)
-  (list 'when (list 'not condition) body))
+                        element.style.left = currentX + 'px';
+                        element.style.top = currentY + 'px';
+                    }
+                });
 
-(def x 5)
+                document.addEventListener('mouseup', () => {
+                    isDragging = false;
+                });
+            }
 
-(when (> x 3)
-  "x is greater than 3")
+            makeResizable(element) {
+                const resizeHandle = element.querySelector('.resize-handle');
+                let isResizing = false;
+                let startX, startY, startWidth, startHeight;
 
-(unless (< x 3)
-  "x is not less than 3")
+                resizeHandle.addEventListener('mousedown', (e) => {
+                    e.stopPropagation();
+                    isResizing = true;
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    startWidth = parseInt(getComputedStyle(element).width, 10);
+                    startHeight = parseInt(getComputedStyle(element).height, 10);
+                });
 
-; Macro for timing expressions
-(defmacro time (expr)
-  (list 'let (list (list 'result expr))
-    'result))
+                document.addEventListener('mousemove', (e) => {
+                    if (isResizing) {
+                        e.preventDefault();
+                        const width = startWidth + (e.clientX - startX);
+                        const height = startHeight + (e.clientY - startY);
 
-(time (+ 1 2 3 4 5))`,
+                        if (width > 400) {
+                            element.style.width = width + 'px';
+                        }
+                        if (height > 300) {
+                            element.style.height = height + 'px';
+                        }
+                    }
+                });
 
-                quicksort: `; Quicksort implementation
-(def quicksort (fun (lst)
-  (cond
-    ((empty? lst) (list))
-    (true
-      (let ((pivot (head lst))
-            (rest (tail lst)))
-        (let ((smaller (filter (fun (x) (<= x pivot)) rest))
-              (larger (filter (fun (x) (> x pivot)) rest)))
-          (append (quicksort smaller)
-                  (cons pivot (quicksort larger)))))))))
+                document.addEventListener('mouseup', () => {
+                    isResizing = false;
+                });
+            }
 
-(def append (fun (lst1 lst2)
-  (cond
-    ((empty? lst1) lst2)
-    (true (cons (head lst1) (append (tail lst1) lst2))))))
+            setActive(element) {
+                // Remove active from all windows
+                document.querySelectorAll('.terminal-window').forEach(w => {
+                    w.classList.remove('active');
+                    w.style.zIndex = 1;
+                });
 
-(def filter (fun (pred lst)
-  (cond
-    ((empty? lst) (list))
-    ((pred (head lst)) (cons (head lst) (filter pred (tail lst))))
-    (true (filter pred (tail lst))))))
+                // Set active
+                element.classList.add('active');
+                element.style.zIndex = this.nextZIndex++;
 
-(def unsorted (list 3 1 4 1 5 9 2 6 5 3 5))
-(quicksort unsorted)`,
-
-                trycatch: `; Exception handling with try/catch
-(def safe-divide (fun (a b)
-  (try
-    (/ a b)
-    (catch e
-      (+ "Error: " e.message)))))
-
-(safe-divide 10 2)   ; Should work: 5
-(safe-divide 10 0)   ; Should catch error
-
-; Custom error throwing
-(def validate-age (fun (age)
-  (cond
-    ((< age 0) (throw "Age cannot be negative"))
-    ((> age 150) (throw "Age seems unrealistic"))
-    (true (+ "Valid age: " age)))))
-
-(try
-  (validate-age 25)
-  (catch e e))
-
-(try
-  (validate-age -5)
-  (catch e (+ "Caught: " e)))`
-            };
-
-            document.getElementById('code').value = examples[example] || '';
-        };
-
-        // Helper function to escape HTML
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+                // Focus input
+                const input = element.querySelector('.terminal-input');
+                if (input) input.focus();
+            }
         }
 
-        // Helper function to format values for display
-        function formatValue(value) {
-            if (value === null) return 'null';
-            if (value === undefined) return 'undefined';
-            if (typeof value === 'string') return `"${escapeHtml(value)}"`;
-            if (Array.isArray(value)) {
-                return '(' + value.map(formatValue).join(' ') + ')';
-            }
-            if (value instanceof Map) {
-                const entries = Array.from(value.entries());
-                const formatted = entries.map(([k, v]) => `${formatValue(k)}: ${formatValue(v)}`).join(', ');
-                return `{${formatted}}`;
-            }
-            if (typeof value === 'object' && value.params && value.body) {
-                return `<function: ${value.params.join(', ')}>`;
-            }
-            return escapeHtml(String(value));
-        }
-
-        // Add keyboard shortcut for running code (Ctrl+Enter or Cmd+Enter)
-        document.getElementById('code').addEventListener('keydown', function(event) {
-            if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-                event.preventDefault();
-                runCode();
-            }
-        });
-
-        // Display initial message
-        document.getElementById('output').innerHTML = '<div class="info">Welcome to Slight LISP! Press Ctrl+Enter (or Cmd+Enter) to run your code.</div>';
+        // Initialize window manager
+        window.windowManager = new WindowManager();
     </script>
 </body>
 </html>
