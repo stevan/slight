@@ -13,6 +13,7 @@ import {
     QuoteNode,
     CondNode,
     DefNode,
+    DefMacroNode,
     LetNode,
     FunNode
 } from './AST.js';
@@ -82,7 +83,7 @@ export class Parser {
     }
 
     private nodeFromCall(elements: ASTNode[]): ASTNode {
-        // Special forms: quote, cond, def, fun
+        // Special forms: quote, cond, def, defmacro, fun
         if (elements.length > 0 && elements[0] instanceof SymbolNode) {
             const sym = elements[0].name;
             if (sym === 'quote' && elements.length === 2) {
@@ -121,6 +122,26 @@ export class Parser {
                     return el.name;
                 });
                 return new FunNode(params, elements[2]);
+            }
+            if (sym === 'defmacro') {
+                // (defmacro name (params...) body) - macro definition
+                if (elements.length !== 4) {
+                    throw new Error('Invalid defmacro syntax: expected (defmacro name (params...) body)');
+                }
+                if (!(elements[1] instanceof SymbolNode)) {
+                    throw new Error('Invalid defmacro syntax: name must be a symbol');
+                }
+                if (!(elements[2] instanceof CallNode)) {
+                    throw new Error('Invalid defmacro syntax: parameters must be a list');
+                }
+                const name = elements[1].name;
+                const params = elements[2].elements.map((el: any) => {
+                    if (!(el instanceof SymbolNode)) {
+                        throw new Error('Invalid defmacro syntax: all parameters must be symbols');
+                    }
+                    return el.name;
+                });
+                return new DefMacroNode(name, params, elements[3]);
             }
             if (sym === 'def') {
                 if (elements.length === 4 && elements[1] instanceof SymbolNode && elements[2] instanceof CallNode) {

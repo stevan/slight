@@ -189,6 +189,29 @@ export class FunNode extends ASTNode {
 }
 
 // -----------------------------------------------------------------------------
+// Macros
+// -----------------------------------------------------------------------------
+
+export class DefMacroNode extends ASTNode {
+    type = 'DEFMACRO';
+    constructor(
+        public name: string,
+        public params: string[],
+        public body: ASTNode
+    ) { super(); }
+    async evaluate(interpreter: any, params: Map<string, any>): Promise<any> {
+        // Store the macro in the interpreter's macro map
+        // Macros receive unevaluated AST nodes as arguments
+        const macro = {
+            params: this.params,
+            body: this.body
+        };
+        interpreter.macros.set(this.name, macro);
+        return true;
+    }
+}
+
+// -----------------------------------------------------------------------------
 // Definitions
 // -----------------------------------------------------------------------------
 

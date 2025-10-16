@@ -15,6 +15,7 @@ import {
     QuoteNode,
     CondNode,
     DefNode,
+    DefMacroNode,
     LetNode
 } from './AST.js';
 import * as fs from 'fs';
@@ -22,6 +23,7 @@ import * as path from 'path';
 
 export class Interpreter {
     public functions : Map<string, { params: string[], body: ASTNode }> = new Map();
+    public macros    : Map<string, { params: string[], body: ASTNode }> = new Map();
     public builtins  : Map<string, Function>    = new Map();
     public bindings  : Map<string, any>         = new Map();
     private loadingFiles : Set<string> = new Set();  // Track files being loaded
@@ -48,7 +50,7 @@ export class Interpreter {
             }
             try {
                 const result = await node.evaluate(this, new Map());
-                if (node instanceof DefNode) {
+                if (node instanceof DefNode || node instanceof DefMacroNode) {
                     yield { type: OutputHandle.INFO, value: result };
                 } else {
                     yield { type: OutputHandle.STDOUT, value: result };
