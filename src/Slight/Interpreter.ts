@@ -16,6 +16,7 @@ import {
     CondNode,
     DefNode,
     DefMacroNode,
+    SetNode,
     LetNode
 } from './AST.js';
 import * as fs from 'fs';
@@ -51,7 +52,7 @@ export class Interpreter {
             }
             try {
                 const result = await node.evaluate(this, new Map());
-                if (node instanceof DefNode || node instanceof DefMacroNode) {
+                if (node instanceof DefNode || node instanceof DefMacroNode || node instanceof SetNode) {
                     yield { type: OutputHandle.INFO, value: result };
                 } else {
                     yield { type: OutputHandle.STDOUT, value: result };

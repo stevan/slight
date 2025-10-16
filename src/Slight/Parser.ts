@@ -14,6 +14,8 @@ import {
     CondNode,
     DefNode,
     DefMacroNode,
+    BeginNode,
+    SetNode,
     LetNode,
     FunNode
 } from './AST.js';
@@ -97,11 +99,18 @@ export class Parser {
     }
 
     private nodeFromCall(elements: ASTNode[]): ASTNode {
-        // Special forms: quote, cond, def, defmacro, fun
+        // Special forms: quote, cond, def, defmacro, begin, set!, let, fun
         if (elements.length > 0 && elements[0] instanceof SymbolNode) {
             const sym = elements[0].name;
             if (sym === 'quote' && elements.length === 2) {
                 return new QuoteNode(elements[1]);
+            }
+            if (sym === 'begin') {
+                // (begin expr1 expr2 ... exprN) - evaluate expressions in sequence
+                if (elements.length < 2) {
+                    throw new Error('Invalid begin syntax: expected (begin expr ...)');
+                }
+                return new BeginNode(elements.slice(1));
             }
             if (sym === 'cond') {
                 // cond clauses: (cond (test1 result1) (test2 result2) ... [else result])
@@ -171,6 +180,17 @@ export class Parser {
                 } else {
                     throw new Error('Invalid def syntax: expected (def name value) or (def name (params...) body)')
                 }
+            }
+            if (sym === 'set!') {
+                // (set! name value) - mutate existing variable
+                if (elements.length !== 3) {
+                    throw new Error('Invalid set! syntax: expected (set! name value)');
+                }
+                if (!(elements[1] instanceof SymbolNode)) {
+                    throw new Error('Invalid set! syntax: name must be a symbol');
+                }
+                const name = elements[1].name;
+                return new SetNode(name, elements[2]);
             }
             if (sym === 'let') {
                 // (let ((var1 val1) (var2 val2) ...) body)

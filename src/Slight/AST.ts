@@ -267,6 +267,50 @@ export class DefNode extends ASTNode {
 }
 
 // -----------------------------------------------------------------------------
+// Sequencing
+// -----------------------------------------------------------------------------
+
+export class BeginNode extends ASTNode {
+    type = 'BEGIN';
+    constructor(public expressions: ASTNode[]) { super(); }
+    async evaluate(interpreter: any, params: Map<string, any>): Promise<any> {
+        let result: any = null;
+        for (const expr of this.expressions) {
+            result = await expr.evaluate(interpreter, params);
+        }
+        return result;
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Mutation
+// -----------------------------------------------------------------------------
+
+export class SetNode extends ASTNode {
+    type = 'SET';
+    constructor(
+        public name: string,
+        public value: ASTNode
+    ) { super(); }
+    async evaluate(interpreter: any, params: Map<string, any>): Promise<any> {
+        const newValue = await this.value.evaluate(interpreter, params);
+
+        // Search for the variable in local scope first, then global bindings
+        if (params.has(this.name)) {
+            // Update local scope
+            params.set(this.name, newValue);
+        } else if (interpreter.bindings.has(this.name)) {
+            // Update global bindings
+            interpreter.bindings.set(this.name, newValue);
+        } else {
+            throw new Error(`Cannot set! undefined variable: ${this.name}`);
+        }
+
+        return newValue;
+    }
+}
+
+// -----------------------------------------------------------------------------
 // Bindings
 // -----------------------------------------------------------------------------
 
