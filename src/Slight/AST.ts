@@ -186,13 +186,22 @@ export class DefNode extends ASTNode {
 
 export class LetNode extends ASTNode {
     type = 'LET';
-    constructor(public name: string, public valueExpr: ASTNode) { super(); }
+    constructor(
+        public bindings: Array<{ name: string, value: ASTNode }>,
+        public body: ASTNode
+    ) { super(); }
     async evaluate(interpreter: any, params: Map<string, any>): Promise<any> {
-        if (interpreter.bindings.has(this.name)) {
-            throw new Error(`Variable '${this.name}' is already defined`);
+        // Create a new scope with the parent params
+        const localParams = new Map(params);
+
+        // Evaluate and bind each binding in sequence
+        // This allows later bindings to reference earlier ones
+        for (const binding of this.bindings) {
+            const value = await binding.value.evaluate(interpreter, localParams);
+            localParams.set(binding.name, value);
         }
-        const value = await this.valueExpr.evaluate(interpreter, params);
-        interpreter.bind(this.name, value);
-        return value;
+
+        // Evaluate the body with the new local bindings
+        return await this.body.evaluate(interpreter, localParams);
     }
 }

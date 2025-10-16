@@ -12,7 +12,8 @@ import {
     CallNode,
     QuoteNode,
     CondNode,
-    DefNode
+    DefNode,
+    LetNode
 } from './AST.js';
 
 export class Parser {
@@ -113,6 +114,36 @@ export class Parser {
                 } else {
                     throw new Error('Invalid def syntax: expected (def name (params...) body)')
                 }
+            }
+            if (sym === 'let') {
+                // (let ((var1 val1) (var2 val2) ...) body)
+                if (elements.length !== 3) {
+                    throw new Error('Invalid let syntax: expected (let ((var value) ...) body)');
+                }
+
+                const bindingsNode = elements[1];
+                const body = elements[2];
+
+                if (!(bindingsNode instanceof CallNode)) {
+                    throw new Error('Invalid let syntax: bindings must be a list');
+                }
+
+                const bindings = [];
+                for (const binding of bindingsNode.elements) {
+                    if (!(binding instanceof CallNode) || binding.elements.length !== 2) {
+                        throw new Error('Invalid let syntax: each binding must be (name value)');
+                    }
+                    const nameNode = binding.elements[0];
+                    if (!(nameNode instanceof SymbolNode)) {
+                        throw new Error('Invalid let syntax: binding name must be a symbol');
+                    }
+                    bindings.push({
+                        name: nameNode.name,
+                        value: binding.elements[1]
+                    });
+                }
+
+                return new LetNode(bindings, body);
             }
         }
         return new CallNode(elements);

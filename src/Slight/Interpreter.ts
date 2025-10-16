@@ -15,7 +15,7 @@ import {
     QuoteNode,
     CondNode,
     DefNode,
-    // LetNode (not used yet)
+    LetNode
 } from './AST.js';
 
 export class Interpreter {

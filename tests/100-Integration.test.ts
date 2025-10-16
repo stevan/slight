@@ -248,3 +248,92 @@ test('full pipeline evaluates string handling', async () => {
   for await (const result of interpreter.run(asts)) results.push(result);
   assert.deepStrictEqual(results.map(x => x.value), [["a", "b", "c"], "foo", "baz"]);
 });
+
+test('full pipeline evaluates simple let binding', async () => {
+  async function* mockAsyncGen(items: string[]) { for (const i of items) yield i; }
+  const tokenizer = new Tokenizer();
+  const parser = new Parser();
+  const interpreter = new Interpreter();
+
+  const input = [
+    '(let ((x 5)) x)',
+    '(let ((x 10) (y 20)) (+ x y))',
+    '(let () 42)' // empty bindings
+  ];
+  const tokens = tokenizer.run(mockAsyncGen(input));
+  const asts = parser.run(tokens);
+  const results = [];
+  for await (const result of interpreter.run(asts)) results.push(result);
+  assert.deepStrictEqual(results.map(x => x.value), [5, 30, 42]);
+});
+
+test('full pipeline evaluates let with shadowing', async () => {
+  async function* mockAsyncGen(items: string[]) { for (const i of items) yield i; }
+  const tokenizer = new Tokenizer();
+  const parser = new Parser();
+  const interpreter = new Interpreter();
+
+  const input = [
+    '(def test-shadow (x) (let ((x 5)) x))', // function parameter x shadowed by let
+    '(test-shadow 100)', // pass 100 as x, but let shadows it with 5
+    '(let ((x 1)) (let ((x 2)) x))' // nested shadowing
+  ];
+  const tokens = tokenizer.run(mockAsyncGen(input));
+  const asts = parser.run(tokens);
+  const results = [];
+  for await (const result of interpreter.run(asts)) results.push(result);
+  assert.deepStrictEqual(results.map(x => x.value), [true, 5, 2]);
+});
+
+test('full pipeline evaluates let with sequential bindings', async () => {
+  async function* mockAsyncGen(items: string[]) { for (const i of items) yield i; }
+  const tokenizer = new Tokenizer();
+  const parser = new Parser();
+  const interpreter = new Interpreter();
+
+  const input = [
+    '(let ((x 5) (y x)) y)', // y refers to x from same let
+    '(let ((x 5) (y (+ x 10))) y)', // expression using earlier binding
+    '(let ((x 5) (y (* x 2)) (z (+ x y))) z)' // multiple sequential references
+  ];
+  const tokens = tokenizer.run(mockAsyncGen(input));
+  const asts = parser.run(tokens);
+  const results = [];
+  for await (const result of interpreter.run(asts)) results.push(result);
+  assert.deepStrictEqual(results.map(x => x.value), [5, 15, 15]);
+});
+
+test('full pipeline evaluates let with function calls', async () => {
+  async function* mockAsyncGen(items: string[]) { for (const i of items) yield i; }
+  const tokenizer = new Tokenizer();
+  const parser = new Parser();
+  const interpreter = new Interpreter();
+
+  const input = [
+    '(def double (x) (* x 2))',
+    '(let ((x 5) (y (double x))) y)',
+    '(let ((f double) (x 10)) (f x))' // binding function to variable
+  ];
+  const tokens = tokenizer.run(mockAsyncGen(input));
+  const asts = parser.run(tokens);
+  const results = [];
+  for await (const result of interpreter.run(asts)) results.push(result);
+  assert.deepStrictEqual(results.map(x => x.value), [true, 10, 20]);
+});
+
+test('full pipeline evaluates let in function body', async () => {
+  async function* mockAsyncGen(items: string[]) { for (const i of items) yield i; }
+  const tokenizer = new Tokenizer();
+  const parser = new Parser();
+  const interpreter = new Interpreter();
+
+  const input = [
+    '(def calc (a b) (let ((sum (+ a b)) (prod (* a b))) (list sum prod)))',
+    '(calc 3 4)'
+  ];
+  const tokens = tokenizer.run(mockAsyncGen(input));
+  const asts = parser.run(tokens);
+  const results = [];
+  for await (const result of interpreter.run(asts)) results.push(result);
+  assert.deepStrictEqual(results.map(x => x.value), [true, [7, 12]]);
+});
