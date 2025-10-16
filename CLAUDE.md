@@ -50,6 +50,10 @@ The main orchestrator (`src/Slight.ts`) composes these stages and provides `run(
 - Messages are `[sender_pid, data]` tuples for easy destructuring
 - Automatic registration of PID 0 when spawned processes send to main
 - Test isolation via `ProcessRuntime.reset()` to avoid inter-test pollution
+- **Spawn with Functions**: `spawn` accepts named functions with arguments (e.g., `(spawn worker 42)`)
+- **Share-Nothing Model**: Child processes get independent copies of parent's `functions`, `macros`, and `bindings`
+- Parent state is cloned at spawn time via `new Map()` - changes after spawn don't affect child
+- Function arguments are serialized to code strings for spawning
 
 ### Object-Oriented AST
 The OO interpreter implements each AST node class with its own `evaluate()` method:
@@ -80,6 +84,10 @@ Tests use Node.js native test runner (`node:test`) with no external dependencies
 ## Current Implementation Notes
 
 ### Recent Changes
+- **Function-Based Spawn**: `spawn` now accepts named functions with arguments (e.g., `(spawn worker 42)`)
+  - Child processes automatically inherit parent's functions, macros, and bindings
+  - Share-nothing concurrency via cloned interpreter state at spawn time
+  - Arguments are serialized to code strings (supports numbers, strings, booleans, lists)
 - **Process System**: Added Erlang-style actor model with `spawn`, `send`, `recv`, `self`, `is-alive?`, `kill`, `processes`
 - **Parser Fix**: Top-level literals (symbols, numbers, strings) now work correctly outside expressions
 - **Tokenizer Fix**: Escaped quotes in strings now handled properly (`"(?:[^"\\]|\\.)*"`)

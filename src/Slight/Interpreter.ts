@@ -20,7 +20,7 @@ import {
 } from './AST.js';
 import * as fs from 'fs';
 import * as path from 'path';
-import { ProcessRuntime } from './ProcessRuntime.js';
+import { ProcessRuntime, ParentState } from './ProcessRuntime.js';
 
 export class Interpreter {
     public functions : Map<string, { params: string[], body: ASTNode }> = new Map();
@@ -97,6 +97,31 @@ export class Interpreter {
         this.bindings.set(name, value);
     }
 
+    /**
+     * Serialize a value to Slight code string for spawning
+     */
+    private serializeValue(value: any): string {
+        if (typeof value === 'number') {
+            return String(value);
+        } else if (typeof value === 'string') {
+            // Escape quotes and backslashes
+            const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+            return `"${escaped}"`;
+        } else if (typeof value === 'boolean') {
+            return value ? 'true' : 'false';
+        } else if (value === null || value === undefined) {
+            return 'null';
+        } else if (Array.isArray(value)) {
+            const items = value.map(v => this.serializeValue(v)).join(' ');
+            return `(list ${items})`;
+        } else if (value instanceof Map) {
+            // Can't easily serialize maps, throw error
+            throw new Error('Cannot serialize Map for spawn');
+        } else {
+            throw new Error(`Cannot serialize value for spawn: ${typeof value}`);
+        }
+    }
+
     private initBuiltins(): void {
         this.builtins.set('+', (...args: number[]) => args.reduce((a, b) => a + b, 0));
         this.builtins.set('-', (a: number, ...rest: number[]) => rest.length === 0 ? -a : rest.reduce((acc, b) => acc - b, a));
@@ -168,8 +193,48 @@ export class Interpreter {
         // Process operations
         const runtime = ProcessRuntime.getInstance();
 
-        this.builtins.set('spawn', (code: string) => {
-            return runtime.spawn(code);
+        this.builtins.set('spawn', (target: any, ...args: any[]) => {
+            let code: string;
+
+            if (typeof target === 'string') {
+                // Legacy: spawn with code string
+                code = target;
+            } else if (target && typeof target === 'object' && 'params' in target && 'body' in target) {
+                // Function or closure passed
+                // Serialize arguments
+                const serializedArgs = args.map(arg => this.serializeValue(arg)).join(' ');
+
+                // Find the function name if it exists
+                let funcName: string | null = null;
+                for (const [name, func] of this.functions.entries()) {
+                    if (func === target) {
+                        funcName = name;
+                        break;
+                    }
+                }
+
+                if (funcName) {
+                    // Named function: just call it
+                    code = args.length > 0
+                        ? `(${funcName} ${serializedArgs})`
+                        : `(${funcName})`;
+                } else {
+                    // Anonymous function or closure: we'll need to define it inline
+                    // For now, throw an error - we can't easily serialize the AST
+                    throw new Error('Cannot spawn anonymous function - pass a named function or use code string');
+                }
+            } else {
+                throw new Error('spawn expects a string (code) or function');
+            }
+
+            // Clone parent interpreter state
+            const parentState: ParentState = {
+                functions: new Map(this.functions),
+                macros: new Map(this.macros),
+                bindings: new Map(this.bindings)
+            };
+
+            return runtime.spawn(code, parentState);
         });
 
         this.builtins.set('send', (pid: number, data: any) => {

@@ -48,6 +48,15 @@ class SilentOutputSink implements OutputSink {
 }
 
 /**
+ * Parent interpreter state that can be cloned into child processes
+ */
+export interface ParentState {
+    functions: Map<string, any>;
+    macros: Map<string, any>;
+    bindings: Map<string, any>;
+}
+
+/**
  * Global process runtime managing all concurrent processes
  */
 export class ProcessRuntime {
@@ -67,8 +76,9 @@ export class ProcessRuntime {
     /**
      * Spawn a new process running the given code
      * Returns the new process ID
+     * Optionally accepts parent interpreter state to clone
      */
-    spawn(code: string): number {
+    spawn(code: string, parentState?: ParentState): number {
         const pid = this.nextPid++;
         const mailbox = new AsyncQueue<Message>();
 
@@ -76,6 +86,13 @@ export class ProcessRuntime {
         const input = new CodeInputSource(code);
         const output = new SilentOutputSink();
         const slight = new Slight(input, output);
+
+        // Clone parent state if provided (share-nothing concurrency)
+        if (parentState) {
+            slight.interpreter.functions = new Map(parentState.functions);
+            slight.interpreter.macros = new Map(parentState.macros);
+            slight.interpreter.bindings = new Map(parentState.bindings);
+        }
 
         // Set the PID in the interpreter so builtins can access it
         (slight.interpreter as any)._processPid = pid;

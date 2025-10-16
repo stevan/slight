@@ -205,3 +205,64 @@ test('message contains sender PID', async () => {
     assert.ok(typeof results[2] === 'number');
     assert.ok(results[2] > 0); // Valid PID
 });
+
+test('spawn with named function and arguments', async () => {
+    const results = await evaluate([
+        '(def worker (x) (send 0 (* x 2)))',
+        '(spawn worker 21)',
+        '(def msg (recv 1000))',
+        '(head (tail msg))'
+    ]);
+    assert.equal(results[3], 42);
+});
+
+test('spawn with named function - no arguments', async () => {
+    const results = await evaluate([
+        '(def worker () (send 0 (quote done)))',
+        '(spawn worker)',
+        '(def msg (recv 1000))',
+        '(head (tail msg))'
+    ]);
+    assert.equal(results[3], 'done');
+});
+
+test('spawned process has access to parent functions', async () => {
+    const results = await evaluate([
+        '(def helper (x) (* x 3))',
+        '(def worker (x) (send 0 (helper x)))',
+        '(spawn worker 7)',
+        '(def msg (recv 1000))',
+        '(head (tail msg))'
+    ]);
+    assert.equal(results[4], 21); // 7 * 3
+});
+
+test('spawn with complex arguments', async () => {
+    const results = await evaluate([
+        '(def worker (x y z) (send 0 (+ x (+ y z))))',
+        '(spawn worker 10 20 30)',
+        '(def msg (recv 1000))',
+        '(head (tail msg))'
+    ]);
+    assert.equal(results[3], 60);
+});
+
+test('spawn with string argument', async () => {
+    const results = await evaluate([
+        '(def worker (msg) (send 0 msg))',
+        '(spawn worker "hello world")',
+        '(def result (recv 1000))',
+        '(head (tail result))'
+    ]);
+    assert.equal(results[3], 'hello world');
+});
+
+test('spawn with list argument', async () => {
+    const results = await evaluate([
+        '(def worker (lst) (send 0 (head lst)))',
+        '(spawn worker (list 1 2 3))',
+        '(def msg (recv 1000))',
+        '(head (tail msg))'
+    ]);
+    assert.equal(results[3], 1);
+});
