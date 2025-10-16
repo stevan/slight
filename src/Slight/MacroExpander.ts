@@ -17,8 +17,20 @@ import {
     FunNode
 } from './AST.js';
 
+// Type for interpreter factory - accepts any interpreter-like object
+export type InterpreterFactory = () => any;
+
 export class MacroExpander {
     private macros: Map<string, { params: string[], body: ASTNode }> = new Map();
+    private createInterpreter: InterpreterFactory;
+
+    constructor(createInterpreter?: InterpreterFactory) {
+        // Default to Node.js Interpreter if not specified
+        this.createInterpreter = createInterpreter || (async () => {
+            const { Interpreter } = await import('./Interpreter.js');
+            return new Interpreter();
+        });
+    }
 
     async *run(source: ASTStream): ASTStream {
         for await (const node of source) {
@@ -181,8 +193,7 @@ export class MacroExpander {
 
         // Evaluate the macro body to get the expansion (as a value)
         // We need a minimal interpreter context for this
-        const { Interpreter } = await import('./Interpreter.js');
-        const tempInterpreter = new Interpreter();
+        const tempInterpreter = await this.createInterpreter();
         const expandedValue = await macro.body.evaluate(tempInterpreter, bindings);
 
         // Convert the expanded value back to AST

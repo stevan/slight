@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slight LISP Interpreter - Browser Version</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+        }
+
+        h1 {
+            color: #569cd6;
+            border-bottom: 2px solid #569cd6;
+            padding-bottom: 10px;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background-color: #2d2d30;
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #3e3e42;
+        }
+
+        h2 {
+            color: #4ec9b0;
+            margin-top: 0;
+        }
+
+        textarea {
+            width: 100%;
+            height: 300px;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            border: 1px solid #3e3e42;
+            border-radius: 3px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            resize: vertical;
+        }
+
+        button {
+            background-color: #0e639c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background-color: #1177bb;
+        }
+
+        button:active {
+            background-color: #007acc;
+        }
+
+        #output {
+            background-color: #1e1e1e;
+            border: 1px solid #3e3e42;
+            border-radius: 3px;
+            padding: 10px;
+            min-height: 300px;
+            max-height: 500px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .result {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #4ec9b0;
+            padding-left: 10px;
+        }
+
+        .error {
+            color: #f48771;
+            border-left-color: #f48771;
+        }
+
+        .info {
+            color: #dcdcaa;
+            border-left-color: #dcdcaa;
+        }
+
+        .status {
+            color: #608b4e;
+            font-style: italic;
+            margin: 10px 0;
+        }
+
+        .examples {
+            margin-top: 20px;
+        }
+
+        .example-button {
+            background-color: #3e3e42;
+            font-size: 12px;
+            padding: 5px 10px;
+            margin: 5px 5px 5px 0;
+        }
+
+        .example-button:hover {
+            background-color: #4e4e52;
+        }
+
+        .notice {
+            background-color: #3c3c00;
+            border: 1px solid #808000;
+            border-radius: 3px;
+            padding: 10px;
+            margin-bottom: 20px;
+            color: #dcdcaa;
+        }
+
+        .notice strong {
+            color: #ffcc00;
+        }
+    </style>
+</head>
+<body>
+    <h1>Slight LISP Interpreter - Browser Version</h1>
+
+    <div class="notice">
+        <strong>Note:</strong> This is the browser version of Slight. File operations, process management (spawn/send/recv),
+        and system functions (get-env, exit) are not available in this environment. All core LISP functionality
+        including functions, macros, closures, and data structures work normally.
+    </div>
+
+    <div class="container">
+        <div class="panel">
+            <h2>Code Input</h2>
+            <textarea id="code" placeholder="Enter your LISP code here...">(def greet (fun (name)
+  (+ "Hello, " name "!")))
+
+(greet "World")
+
+; Try some examples:
+; - Click the example buttons below
+; - Or write your own LISP code!</textarea>
+
+            <button onclick="runCode()">▶ Run Code</button>
+            <button onclick="clearInput()">Clear Input</button>
+            <button onclick="clearOutput()">Clear Output</button>
+
+            <div class="examples">
+                <h3 style="color: #4ec9b0;">Examples:</h3>
+                <button class="example-button" onclick="loadExample('factorial')">Factorial</button>
+                <button class="example-button" onclick="loadExample('fibonacci')">Fibonacci</button>
+                <button class="example-button" onclick="loadExample('map')">Map & Filter</button>
+                <button class="example-button" onclick="loadExample('closure')">Closures</button>
+                <button class="example-button" onclick="loadExample('macro')">Macros</button>
+                <button class="example-button" onclick="loadExample('quicksort')">Quicksort</button>
+                <button class="example-button" onclick="loadExample('trycatch')">Try/Catch</button>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>Output</h2>
+            <div id="output"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Import the compiled browser module
+        import { evaluate } from './js/src/browser.js';
+
+        // Store evaluate function globally for button onclick handlers
+        window.slightEvaluate = evaluate;
+
+        window.runCode = async function() {
+            const code = document.getElementById('code').value;
+            const outputDiv = document.getElementById('output');
+
+            // Add status message
+            outputDiv.innerHTML += '<div class="status">Running...</div>';
+            outputDiv.scrollTop = outputDiv.scrollHeight;
+
+            try {
+                const startTime = performance.now();
+                const { results, errors } = await evaluate(code);
+                const endTime = performance.now();
+                const duration = (endTime - startTime).toFixed(2);
+
+                // Clear the "Running..." message
+                const statusElements = outputDiv.getElementsByClassName('status');
+                if (statusElements.length > 0) {
+                    statusElements[statusElements.length - 1].remove();
+                }
+
+                // Display results
+                if (errors.length > 0) {
+                    errors.forEach(error => {
+                        const errorMessage = error.message || error;
+                        outputDiv.innerHTML += `<div class="result error">Error: ${escapeHtml(String(errorMessage))}</div>`;
+                    });
+                } else if (results.length > 0) {
+                    results.forEach(result => {
+                        const formattedResult = formatValue(result);
+                        if (result === undefined) {
+                            outputDiv.innerHTML += `<div class="result info">${formattedResult}</div>`;
+                        } else {
+                            outputDiv.innerHTML += `<div class="result">${formattedResult}</div>`;
+                        }
+                    });
+                } else {
+                    outputDiv.innerHTML += '<div class="result info">(no output)</div>';
+                }
+
+                outputDiv.innerHTML += `<div class="status">Completed in ${duration}ms</div>`;
+
+            } catch (error) {
+                // Clear the "Running..." message
+                const statusElements = outputDiv.getElementsByClassName('status');
+                if (statusElements.length > 0) {
+                    statusElements[statusElements.length - 1].remove();
+                }
+
+                outputDiv.innerHTML += `<div class="result error">Unexpected Error: ${escapeHtml(error.message)}</div>`;
+            }
+
+            // Scroll to bottom
+            outputDiv.scrollTop = outputDiv.scrollHeight;
+        };
+
+        window.clearInput = function() {
+            document.getElementById('code').value = '';
+        };
+
+        window.clearOutput = function() {
+            document.getElementById('output').innerHTML = '';
+        };
+
+        window.loadExample = function(example) {
+            const examples = {
+                factorial: `; Factorial function using recursion
+(def factorial (fun (n)
+  (cond
+    ((== n 0) 1)
+    (true (* n (factorial (- n 1)))))))
+
+(factorial 5)  ; Should return 120
+(factorial 10) ; Should return 3628800`,
+
+                fibonacci: `; Fibonacci sequence
+(def fib (fun (n)
+  (cond
+    ((< n 2) n)
+    (true (+ (fib (- n 1)) (fib (- n 2)))))))
+
+; Calculate first 10 Fibonacci numbers
+(def fib-list (fun (n)
+  (cond
+    ((== n 0) (list))
+    (true (cons (fib (- n 1)) (fib-list (- n 1)))))))
+
+(fib 10)  ; 10th Fibonacci number
+(fib-list 10)  ; First 10 Fibonacci numbers`,
+
+                map: `; Map and filter operations
+(def map (fun (f lst)
+  (cond
+    ((empty? lst) (list))
+    (true (cons (f (head lst)) (map f (tail lst)))))))
+
+(def filter (fun (pred lst)
+  (cond
+    ((empty? lst) (list))
+    ((pred (head lst)) (cons (head lst) (filter pred (tail lst))))
+    (true (filter pred (tail lst))))))
+
+(def square (fun (x) (* x x)))
+(def is-even? (fun (x) (== (mod x 2) 0)))
+
+(def numbers (list 1 2 3 4 5 6 7 8 9 10))
+
+(map square numbers)
+(filter is-even? numbers)
+(map square (filter is-even? numbers))`,
+
+                closure: `; Demonstrating closures
+(def make-counter (fun ()
+  (let ((count 0))
+    (fun ()
+      (begin
+        (set! count (+ count 1))
+        count)))))
+
+(def counter1 (make-counter))
+(def counter2 (make-counter))
+
+(counter1)  ; 1
+(counter1)  ; 2
+(counter1)  ; 3
+(counter2)  ; 1 (independent counter)
+(counter1)  ; 4
+(counter2)  ; 2`,
+
+                macro: `; Macro demonstration
+(defmacro when (condition body)
+  (list 'cond
+    (list condition body)
+    (list 'true 'null)))
+
+(defmacro unless (condition body)
+  (list 'when (list 'not condition) body))
+
+(def x 5)
+
+(when (> x 3)
+  "x is greater than 3")
+
+(unless (< x 3)
+  "x is not less than 3")
+
+; Macro for timing expressions
+(defmacro time (expr)
+  (list 'let (list (list 'result expr))
+    'result))
+
+(time (+ 1 2 3 4 5))`,
+
+                quicksort: `; Quicksort implementation
+(def quicksort (fun (lst)
+  (cond
+    ((empty? lst) (list))
+    (true
+      (let ((pivot (head lst))
+            (rest (tail lst)))
+        (let ((smaller (filter (fun (x) (<= x pivot)) rest))
+              (larger (filter (fun (x) (> x pivot)) rest)))
+          (append (quicksort smaller)
+                  (cons pivot (quicksort larger)))))))))
+
+(def append (fun (lst1 lst2)
+  (cond
+    ((empty? lst1) lst2)
+    (true (cons (head lst1) (append (tail lst1) lst2))))))
+
+(def filter (fun (pred lst)
+  (cond
+    ((empty? lst) (list))
+    ((pred (head lst)) (cons (head lst) (filter pred (tail lst))))
+    (true (filter pred (tail lst))))))
+
+(def unsorted (list 3 1 4 1 5 9 2 6 5 3 5))
+(quicksort unsorted)`,
+
+                trycatch: `; Exception handling with try/catch
+(def safe-divide (fun (a b)
+  (try
+    (/ a b)
+    (catch e
+      (+ "Error: " e.message)))))
+
+(safe-divide 10 2)   ; Should work: 5
+(safe-divide 10 0)   ; Should catch error
+
+; Custom error throwing
+(def validate-age (fun (age)
+  (cond
+    ((< age 0) (throw "Age cannot be negative"))
+    ((> age 150) (throw "Age seems unrealistic"))
+    (true (+ "Valid age: " age)))))
+
+(try
+  (validate-age 25)
+  (catch e e))
+
+(try
+  (validate-age -5)
+  (catch e (+ "Caught: " e)))`
+            };
+
+            document.getElementById('code').value = examples[example] || '';
+        };
+
+        // Helper function to escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Helper function to format values for display
+        function formatValue(value) {
+            if (value === null) return 'null';
+            if (value === undefined) return 'undefined';
+            if (typeof value === 'string') return `"${escapeHtml(value)}"`;
+            if (Array.isArray(value)) {
+                return '(' + value.map(formatValue).join(' ') + ')';
+            }
+            if (value instanceof Map) {
+                const entries = Array.from(value.entries());
+                const formatted = entries.map(([k, v]) => `${formatValue(k)}: ${formatValue(v)}`).join(', ');
+                return `{${formatted}}`;
+            }
+            if (typeof value === 'object' && value.params && value.body) {
+                return `<function: ${value.params.join(', ')}>`;
+            }
+            return escapeHtml(String(value));
+        }
+
+        // Add keyboard shortcut for running code (Ctrl+Enter or Cmd+Enter)
+        document.getElementById('code').addEventListener('keydown', function(event) {
+            if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+                event.preventDefault();
+                runCode();
+            }
+        });
+
+        // Display initial message
+        document.getElementById('output').innerHTML = '<div class="info">Welcome to Slight LISP! Press Ctrl+Enter (or Cmd+Enter) to run your code.</div>';
+    </script>
+</body>
+</html>

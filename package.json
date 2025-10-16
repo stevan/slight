@@ -8,6 +8,8 @@
     "author": "tsc && node js/bin/author.js",
     "repl": "tsc && node js/bin/repl.js",
     "slight": "tsc && node js/bin/slight.js",
-    "test": "tsc && node --test js/tests/*.js"
+    "test": "tsc && node --test js/tests/*.js",
+    "build": "tsc",
+    "build:browser": "tsc"
   }
 }
