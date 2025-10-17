@@ -1,7 +1,6 @@
-(def math/pi () 3.14159)
-(def math/e () 2.71828)
-(def math/tau () (* 2 (math/pi)))
-(def math/square (x) (* x x))
-(def math/cube (x) (* x (* x x)))
-(def math/area-of-circle (r) (* (math/pi) (* r r)))
-(def math/circumference (r) (* (math/tau) r))
+; Custom math utilities that don't shadow builtins
+(def mymath/double (x) (* x 2))
+(def mymath/square (x) (* x x))
+(def mymath/cube (x) (* x (* x x)))
+(def mymath/area-of-circle (r) (* (math/pi) (* r r)))
+(def mymath/circumference (r) (* (* 2 (math/pi)) r))

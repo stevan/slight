@@ -94,11 +94,54 @@ Tests use Node.js native test runner (`node:test`) with no external dependencies
 - **Unit tests**: Individual pipeline stages (Tokenizer, Parser, Interpreter)
 - **Integration tests**: Full pipeline execution with various LISP expressions
 - **Error tests**: Verify error propagation through pipeline
+- **Standard library tests**: Comprehensive coverage of all builtin functions
 - **Test utilities**: `astToPlainObject` for AST assertion comparisons
+
+### Standard Library Test Suite
+
+Location: `tests/stdlib/`
+
+The standard library has comprehensive test coverage organized by namespace:
+
+- `000-core.test.ts` - Core operations (arithmetic, comparison, boolean) - 13 tests
+- `010-math.test.ts` - Math namespace (22 functions) - 13 tests
+- `020-string.test.ts` - String namespace (20+ functions) - 13 tests
+- `030-list.test.ts` - List namespace including higher-order functions - 16 tests
+- `040-map.test.ts` - Map/dictionary operations - 10 tests
+- `050-type.test.ts` - Type inspection system - 8 tests
+- `060-json.test.ts` - JSON parsing and stringification - 5 tests
+- `070-fs.test.ts` - Filesystem operations (Node.js) - 5 tests
+- `080-sys.test.ts` - System operations (Node.js) - 5 tests
+
+**Total: 88 passing tests**
+
+Run all tests: `node --test js/tests/stdlib/*.test.js`
+Run specific namespace: `node --test js/tests/stdlib/010-math.test.js`
 
 ## Current Implementation Notes
 
 ### Recent Changes
+- **Standard Library Test Suite**: Comprehensive test coverage (88 tests) for all namespaces (2025-10-17)
+  - Tests organized by namespace in `tests/stdlib/` directory
+  - Covers core operations, math, string, list, map, type, JSON, filesystem, and system functions
+  - Simple, maintainable tests suitable for active development
+- **Higher-Order Function Fix**: `list/map`, `list/filter`, and `list/reduce` now work with user-defined functions (2025-10-17)
+  - Detects function type (builtin, user-defined, or closure) and calls appropriately
+  - Supports named functions, anonymous `fun` expressions, and closures
+- **Removed sys/hostname**: Eliminated problematic `require('os')` usage (2025-10-17)
+- **Namespace Reorganization**: Complete overhaul of builtin organization (2025-10-17)
+  - **Math namespace (`math/`)**: 22 functions from JavaScript Math module
+  - **String namespace (`string/`)**: 20+ string manipulation functions
+  - **List namespace (`list/`)**: 15+ list operations including `map`, `filter`, `reduce`
+  - **Map namespace (`map/`)**: Full dictionary operations with new functions
+  - **Timer namespace (`timer/`)**: Cross-platform timer operations
+  - **Network namespace (`net/`)**: Fetch API (Node.js 18+ and browser)
+  - **Process namespace (`process/`)**: Actor model operations
+  - **File system namespace (`fs/`)**: Node.js file operations
+  - **System namespace (`sys/`)**: Node.js system operations
+  - **Type inspection (`type/`)**: Runtime type checking with `type/of`, `type/is?`, `type/assert`
+  - **Backward compatibility**: Key functions retain aliases (`list`, `head`, `tail`, `cons`, `empty?`, `mod`)
+  - **Removed inconsistent names**: `make-map` → `map/create`, `json-parse` → `json/parse`
 - **I/O and Logging System**: Added comprehensive output and logging primitives (2025-10-17)
   - **I/O Functions**: `print` (no newline), `say` (with newline) for stdout
   - **Logging Functions**: `log/info`, `log/debug`, `log/warn`, `log/error` for structured logging

@@ -174,12 +174,12 @@ test('comprehensive closure test - pipeline builder', async () => {
 test('comprehensive closure test - memoization pattern', async () => {
     const code = `
         (def memoize (f)
-          (let ((cache (make-map)))
+          (let ((cache (map/create)))
             (fun (x)
               (cond
-                ((map-has? cache x) (map-get cache x))
+                ((map/has? cache x) (map/get cache x))
                 (else (let ((result (f x)))
-                        (let ((ignored (map-set! cache x result)))
+                        (let ((ignored (map/set! cache x result)))
                           result)))))))
 
         (def slow-double (fun (x) (* x 2)))

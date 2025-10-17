@@ -106,14 +106,13 @@ export class CoreInterpreter {
      * Initialize only the core builtins - subclasses should call super.initBuiltins() first
      */
     protected initBuiltins(): void {
-        // Core arithmetic operations
+        // Core arithmetic operations (no namespace - fundamental)
         this.builtins.set('+', (...args: number[]) => args.reduce((a, b) => a + b, 0));
         this.builtins.set('-', (a: number, ...rest: number[]) => rest.length === 0 ? -a : rest.reduce((acc, b) => acc - b, a));
         this.builtins.set('*', (...args: number[]) => args.reduce((a, b) => a * b, 1));
         this.builtins.set('/', (a: number, b: number) => a / b);
-        this.builtins.set('mod', (a: number, b: number) => a % b);
 
-        // Core comparison operations
+        // Core comparison operations (no namespace - fundamental)
         this.builtins.set('==', (a: any, b: any) => a == b);
         this.builtins.set('!=', (a: any, b: any) => a != b);
         this.builtins.set('<', (a: number, b: number) => a < b);
@@ -121,17 +120,180 @@ export class CoreInterpreter {
         this.builtins.set('<=', (a: number, b: number) => a <= b);
         this.builtins.set('>=', (a: number, b: number) => a >= b);
 
-        // Core list operations
-        this.builtins.set('list', (...args: any[]) => args);
-        this.builtins.set('head', (lst: any[]) => lst.length > 0 ? lst[0] : undefined);
-        this.builtins.set('tail', (lst: any[]) => lst.slice(1));
-        this.builtins.set('cons', (item: any, lst: any[]) => [item, ...lst]);
-        this.builtins.set('empty?', (lst: any[]) => lst.length === 0);
-
-        // Core boolean operations
+        // Core boolean operations (no namespace - fundamental)
         this.builtins.set('and', (...args: any[]) => args.every(x => x));
         this.builtins.set('or', (...args: any[]) => args.some(x => x));
         this.builtins.set('not', (x: any) => !x);
+
+        // Math namespace
+        this.builtins.set('math/mod', (a: number, b: number) => a % b);
+        this.builtins.set('math/abs', (x: number) => Math.abs(x));
+        this.builtins.set('math/floor', (x: number) => Math.floor(x));
+        this.builtins.set('math/ceil', (x: number) => Math.ceil(x));
+        this.builtins.set('math/round', (x: number) => Math.round(x));
+        this.builtins.set('math/trunc', (x: number) => Math.trunc(x));
+        this.builtins.set('math/pow', (x: number, y: number) => Math.pow(x, y));
+        this.builtins.set('math/sqrt', (x: number) => Math.sqrt(x));
+        this.builtins.set('math/exp', (x: number) => Math.exp(x));
+        this.builtins.set('math/log', (x: number) => Math.log(x));
+        this.builtins.set('math/log10', (x: number) => Math.log10(x));
+        this.builtins.set('math/sin', (x: number) => Math.sin(x));
+        this.builtins.set('math/cos', (x: number) => Math.cos(x));
+        this.builtins.set('math/tan', (x: number) => Math.tan(x));
+        this.builtins.set('math/asin', (x: number) => Math.asin(x));
+        this.builtins.set('math/acos', (x: number) => Math.acos(x));
+        this.builtins.set('math/atan', (x: number) => Math.atan(x));
+        this.builtins.set('math/atan2', (y: number, x: number) => Math.atan2(y, x));
+        this.builtins.set('math/min', (...args: number[]) => Math.min(...args));
+        this.builtins.set('math/max', (...args: number[]) => Math.max(...args));
+        this.builtins.set('math/sign', (x: number) => Math.sign(x));
+        this.builtins.set('math/random', () => Math.random());
+        this.builtins.set('math/pi', () => Math.PI);
+        this.builtins.set('math/e', () => Math.E);
+
+        // List namespace
+        this.builtins.set('list/create', (...args: any[]) => args);
+        this.builtins.set('list/head', (lst: any[]) => lst.length > 0 ? lst[0] : undefined);
+        this.builtins.set('list/tail', (lst: any[]) => lst.slice(1));
+        this.builtins.set('list/cons', (item: any, lst: any[]) => [item, ...lst]);
+        this.builtins.set('list/empty?', (lst: any[]) => lst.length === 0);
+        this.builtins.set('list/length', (lst: any[]) => lst.length);
+        this.builtins.set('list/nth', (lst: any[], n: number) => lst[n]);
+        this.builtins.set('list/append', (...lists: any[][]) => lists.flat());
+        this.builtins.set('list/reverse', (lst: any[]) => [...lst].reverse());
+        this.builtins.set('list/map', async (fn: any, lst: any[]) => {
+            const results = [];
+            for (const item of lst) {
+                // Check if fn is a user-defined function or closure
+                if (typeof fn === 'object' && fn !== null && 'params' in fn && 'body' in fn) {
+                    // User-defined function or closure
+                    if ('capturedEnv' in fn) {
+                        results.push(await this.callClosure(fn, [item]));
+                    } else {
+                        results.push(await this.callUserFunction(fn, [item]));
+                    }
+                } else if (typeof fn === 'function') {
+                    // Builtin function
+                    results.push(await fn(item));
+                } else {
+                    throw new Error('list/map expects a function');
+                }
+            }
+            return results;
+        });
+        this.builtins.set('list/filter', async (fn: any, lst: any[]) => {
+            const results = [];
+            for (const item of lst) {
+                let predicate;
+                // Check if fn is a user-defined function or closure
+                if (typeof fn === 'object' && fn !== null && 'params' in fn && 'body' in fn) {
+                    // User-defined function or closure
+                    if ('capturedEnv' in fn) {
+                        predicate = await this.callClosure(fn, [item]);
+                    } else {
+                        predicate = await this.callUserFunction(fn, [item]);
+                    }
+                } else if (typeof fn === 'function') {
+                    // Builtin function
+                    predicate = await fn(item);
+                } else {
+                    throw new Error('list/filter expects a function');
+                }
+
+                if (predicate) {
+                    results.push(item);
+                }
+            }
+            return results;
+        });
+        this.builtins.set('list/reduce', async (fn: any, init: any, lst: any[]) => {
+            let acc = init;
+            for (const item of lst) {
+                // Check if fn is a user-defined function or closure
+                if (typeof fn === 'object' && fn !== null && 'params' in fn && 'body' in fn) {
+                    // User-defined function or closure
+                    if ('capturedEnv' in fn) {
+                        acc = await this.callClosure(fn, [acc, item]);
+                    } else {
+                        acc = await this.callUserFunction(fn, [acc, item]);
+                    }
+                } else if (typeof fn === 'function') {
+                    // Builtin function
+                    acc = await fn(acc, item);
+                } else {
+                    throw new Error('list/reduce expects a function');
+                }
+            }
+            return acc;
+        });
+        this.builtins.set('list/take', (lst: any[], n: number) => lst.slice(0, n));
+        this.builtins.set('list/drop', (lst: any[], n: number) => lst.slice(n));
+        this.builtins.set('list/sort', (lst: any[], fn?: Function) => {
+            if (fn) {
+                return [...lst].sort((a, b) => fn(a, b));
+            }
+            return [...lst].sort();
+        });
+        this.builtins.set('list/includes?', (lst: any[], item: any) => lst.includes(item));
+        this.builtins.set('list/flatten', (lst: any[]) => lst.flat(Infinity));
+
+        // String namespace
+        this.builtins.set('string/length', (str: string) => str.length);
+        this.builtins.set('string/concat', (...strs: string[]) => strs.join(''));
+        this.builtins.set('string/substring', (str: string, start: number, end?: number) => str.substring(start, end));
+        this.builtins.set('string/slice', (str: string, start: number, end?: number) => str.slice(start, end));
+        this.builtins.set('string/index-of', (str: string, search: string, start?: number) => str.indexOf(search, start));
+        this.builtins.set('string/last-index-of', (str: string, search: string, start?: number) => str.lastIndexOf(search, start));
+        this.builtins.set('string/replace', (str: string, search: string, replace: string) => str.replace(search, replace));
+        this.builtins.set('string/replace-all', (str: string, search: string, replace: string) => str.replaceAll(search, replace));
+        this.builtins.set('string/split', (str: string, sep: string) => str.split(sep));
+        this.builtins.set('string/join', (arr: any[], sep: string) => arr.join(sep));
+        this.builtins.set('string/trim', (str: string) => str.trim());
+        this.builtins.set('string/trim-start', (str: string) => str.trimStart());
+        this.builtins.set('string/trim-end', (str: string) => str.trimEnd());
+        this.builtins.set('string/upper', (str: string) => str.toUpperCase());
+        this.builtins.set('string/lower', (str: string) => str.toLowerCase());
+        this.builtins.set('string/starts-with?', (str: string, search: string) => str.startsWith(search));
+        this.builtins.set('string/ends-with?', (str: string, search: string) => str.endsWith(search));
+        this.builtins.set('string/includes?', (str: string, search: string) => str.includes(search));
+        this.builtins.set('string/char-at', (str: string, index: number) => str.charAt(index));
+        this.builtins.set('string/char-code', (str: string, index: number) => str.charCodeAt(index));
+        this.builtins.set('string/from-char-code', (...codes: number[]) => String.fromCharCode(...codes));
+        this.builtins.set('string/repeat', (str: string, count: number) => str.repeat(count));
+        this.builtins.set('string/pad-start', (str: string, len: number, pad: string) => str.padStart(len, pad));
+        this.builtins.set('string/pad-end', (str: string, len: number, pad: string) => str.padEnd(len, pad));
+
+        // Timer namespace (works in both Node.js and browser)
+        this.builtins.set('timer/timeout', (fn: Function, ms: number) => setTimeout(() => fn(), ms));
+        this.builtins.set('timer/interval', (fn: Function, ms: number) => setInterval(() => fn(), ms));
+        this.builtins.set('timer/clear', (id: any) => {
+            clearTimeout(id);
+            clearInterval(id);
+            return true;
+        });
+        this.builtins.set('timer/sleep', (ms: number) => new Promise(resolve => setTimeout(resolve, ms)));
+
+        // Network namespace (fetch is available in Node 18+ and browser)
+        this.builtins.set('net/fetch', async (url: string, options?: any) => {
+            const response = await fetch(url, options);
+            return {
+                status: response.status,
+                statusText: response.statusText,
+                headers: Object.fromEntries(response.headers),
+                text: async () => await response.text(),
+                json: async () => await response.json()
+            };
+        });
+        this.builtins.set('net/url-encode', (str: string) => encodeURIComponent(str));
+        this.builtins.set('net/url-decode', (str: string) => decodeURIComponent(str));
+
+        // Important aliases for backward compatibility
+        this.builtins.set('list', this.builtins.get('list/create')!);
+        this.builtins.set('head', this.builtins.get('list/head')!);
+        this.builtins.set('tail', this.builtins.get('list/tail')!);
+        this.builtins.set('cons', this.builtins.get('list/cons')!);
+        this.builtins.set('empty?', this.builtins.get('list/empty?')!);
+        this.builtins.set('mod', this.builtins.get('math/mod')!);
 
         // Core I/O operations
         this.builtins.set('print', (...args: any[]) => {
@@ -309,25 +471,38 @@ export class CoreInterpreter {
      * Helper method to add map operations - call this from subclass if maps are needed
      */
     protected addMapBuiltins(): void {
-        this.builtins.set('make-map', () => new Map());
-        this.builtins.set('map-get', (map: Map<any, any>, key: any) => map.get(key) ?? null);
-        this.builtins.set('map-set!', (map: Map<any, any>, key: any, value: any) => {
+        // Map namespace
+        this.builtins.set('map/create', () => new Map());
+        this.builtins.set('map/get', (map: Map<any, any>, key: any) => map.get(key) ?? null);
+        this.builtins.set('map/set!', (map: Map<any, any>, key: any, value: any) => {
             map.set(key, value);
             return map;
         });
-        this.builtins.set('map-has?', (map: Map<any, any>, key: any) => map.has(key));
-        this.builtins.set('map-delete!', (map: Map<any, any>, key: any) => map.delete(key));
-        this.builtins.set('map-keys', (map: Map<any, any>) => Array.from(map.keys()));
-        this.builtins.set('map-values', (map: Map<any, any>) => Array.from(map.values()));
-        this.builtins.set('map-size', (map: Map<any, any>) => map.size);
+        this.builtins.set('map/has?', (map: Map<any, any>, key: any) => map.has(key));
+        this.builtins.set('map/delete!', (map: Map<any, any>, key: any) => map.delete(key));
+        this.builtins.set('map/keys', (map: Map<any, any>) => Array.from(map.keys()));
+        this.builtins.set('map/values', (map: Map<any, any>) => Array.from(map.values()));
+        this.builtins.set('map/entries', (map: Map<any, any>) => Array.from(map.entries()));
+        this.builtins.set('map/size', (map: Map<any, any>) => map.size);
+        this.builtins.set('map/clear!', (map: Map<any, any>) => {
+            map.clear();
+            return map;
+        });
+        this.builtins.set('map/merge', (map1: Map<any, any>, map2: Map<any, any>) => {
+            return new Map([...map1, ...map2]);
+        });
+        this.builtins.set('map/from-list', (entries: Array<[any, any]>) => new Map(entries));
     }
 
     /**
      * Helper method to add JSON operations - call this from subclass if JSON is needed
      */
     protected addJSONBuiltins(): void {
-        this.builtins.set('json-parse', (str: string) => JSON.parse(str));
-        this.builtins.set('json-stringify', (obj: any) => JSON.stringify(obj));
+        // JSON namespace
+        this.builtins.set('json/parse', (str: string) => JSON.parse(str));
+        this.builtins.set('json/stringify', (obj: any, pretty?: boolean) => {
+            return pretty ? JSON.stringify(obj, null, 2) : JSON.stringify(obj);
+        });
     }
 
     /**
@@ -361,7 +536,8 @@ export class CoreInterpreter {
     protected addProcessBuiltins(): void {
         const runtime = ProcessRuntime.getInstance();
 
-        this.builtins.set('spawn', async (target: any, ...args: any[]) => {
+        // Process namespace
+        this.builtins.set('process/spawn', async (target: any, ...args: any[]) => {
             let code: string;
 
             if (typeof target === 'string') {
@@ -405,13 +581,13 @@ export class CoreInterpreter {
             return runtime.spawn(code, parentState);
         });
 
-        this.builtins.set('send', (pid: number, data: any) => {
+        this.builtins.set('process/send', (pid: number, data: any) => {
             const currentPid = runtime.getCurrentPid(this);
             runtime.send(currentPid, pid, data);
             return true;
         });
 
-        this.builtins.set('recv', async (timeout?: number) => {
+        this.builtins.set('process/recv', async (timeout?: number) => {
             const currentPid = runtime.getCurrentPid(this);
             const message = await runtime.recv(currentPid, timeout);
             if (message === null) {
@@ -422,20 +598,29 @@ export class CoreInterpreter {
             return [message.from, message.data];
         });
 
-        this.builtins.set('self', () => {
+        this.builtins.set('process/self', () => {
             return runtime.getCurrentPid(this);
         });
 
-        this.builtins.set('is-alive?', (pid: number) => {
+        this.builtins.set('process/alive?', (pid: number) => {
             return runtime.isAlive(pid);
         });
 
-        this.builtins.set('kill', (pid: number) => {
+        this.builtins.set('process/kill', (pid: number) => {
             return runtime.kill(pid);
         });
 
-        this.builtins.set('processes', () => {
+        this.builtins.set('process/list', () => {
             return runtime.getProcesses();
         });
+
+        // Aliases for backward compatibility
+        this.builtins.set('spawn', this.builtins.get('process/spawn')!);
+        this.builtins.set('send', this.builtins.get('process/send')!);
+        this.builtins.set('recv', this.builtins.get('process/recv')!);
+        this.builtins.set('self', this.builtins.get('process/self')!);
+        this.builtins.set('is-alive?', this.builtins.get('process/alive?')!);
+        this.builtins.set('kill', this.builtins.get('process/kill')!);
+        this.builtins.set('processes', this.builtins.get('process/list')!);
     }
 }

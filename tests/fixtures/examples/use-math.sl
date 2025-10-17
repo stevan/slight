@@ -1,2 +1,2 @@
 (include "math.sl")
-(list (math/pi) (math/square 5) (math/area-of-circle 3))
+(list (mymath/double 5) (mymath/square 5) (mymath/area-of-circle 3))

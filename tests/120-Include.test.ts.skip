@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Tokenizer } from '../src/Slight/Tokenizer.js';
 import { Parser } from '../src/Slight/Parser.js';
+import { MacroExpander } from '../src/Slight/MacroExpander.js';
 import { Interpreter } from '../src/Slight/Interpreter.js';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -15,10 +16,12 @@ async function* mockAsyncGen(items: string[]) {
 async function runSlight(code: string, interpreter: Interpreter) {
     const tokenizer = new Tokenizer();
     const parser = new Parser();
+    const macroExpander = new MacroExpander();
     const tokens = tokenizer.run(mockAsyncGen([code]));
     const asts = parser.run(tokens);
+    const expanded = macroExpander.run(asts);
     const results = [];
-    for await (const result of interpreter.run(asts)) {
+    for await (const result of interpreter.run(expanded)) {
         results.push(result);
     }
     return results;
@@ -55,11 +58,11 @@ test('include resolves files from include paths', async () => {
     // Filter out null and true results
     const finalResults = results.filter(r => r.value !== null && r.value !== true);
     assert.strictEqual(finalResults.length, 1);
-    // Should return list with pi, square(5)=25, area-of-circle(3)
-    const [pi, square25, area] = finalResults[0].value;
-    assert.strictEqual(pi, 3.14159);
+    // Should return list with double(5)=10, square(5)=25, area-of-circle(3)
+    const [double10, square25, area] = finalResults[0].value;
+    assert.strictEqual(double10, 10);
     assert.strictEqual(square25, 25);
-    assert.strictEqual(area, 3.14159 * 9); // pi * r^2
+    assert.strictEqual(area, Math.PI * 9); // pi * r^2
 });
 
 test('include fails when file not found', async () => {
@@ -89,7 +92,7 @@ test('include detects circular dependencies', async () => {
 
 test('include with namespace conventions', async () => {
     const interpreter = new Interpreter();
-    const code = '(include "math.sl") (list (math/pi) (math/square 5) (math/tau))';
+    const code = '(include "math.sl") (list (mymath/double 5) (mymath/square 5) (mymath/cube 3))';
 
     // Set include path to lib directory
     interpreter.setIncludePaths([path.join(fixturesPath, 'lib')]);
@@ -99,10 +102,10 @@ test('include with namespace conventions', async () => {
     // Filter out null results from definitions
     const nonNullResults = results.filter(r => r.value !== null && r.value !== true);
     assert.strictEqual(nonNullResults.length, 1);
-    const [pi, square25, tau] = nonNullResults[0].value;
-    assert.strictEqual(pi, 3.14159);
+    const [double10, square25, cube27] = nonNullResults[0].value;
+    assert.strictEqual(double10, 10);
     assert.strictEqual(square25, 25);
-    assert.strictEqual(tau, 6.28318); // 2 * pi
+    assert.strictEqual(cube27, 27); // 3 * 3 * 3
 });
 
 test('include with multiple include paths', async () => {
@@ -128,7 +131,7 @@ test('include preserves global bindings across files', async () => {
     const code = `
         (include "constants.sl")
         (include "math.sl")
-        (list (version) (math/pi) (debug-mode))
+        (list (version) (mymath/double 10) (debug-mode))
     `;
 
     interpreter.setIncludePaths([path.join(fixturesPath, 'lib')]);
@@ -138,7 +141,7 @@ test('include preserves global bindings across files', async () => {
     // Filter out null and true results from definitions
     const finalResult = results.filter(r => r.value !== null && r.value !== true);
     assert.strictEqual(finalResult.length, 1);
-    assert.deepStrictEqual(finalResult[0].value, ["1.0.0", 3.14159, false]);
+    assert.deepStrictEqual(finalResult[0].value, ["1.0.0", 20, false]);
 });
 
 test('include with FFI operations', async () => {
@@ -146,7 +149,7 @@ test('include with FFI operations', async () => {
     const code = `
         (include "data.sl")
         (let ((person (data/create-person "Alice" 30)))
-          (list (map-get person "name") (map-get person "age")))
+          (list (map/get person "name") (map/get person "age")))
     `;
 
     interpreter.setIncludePaths([path.join(fixturesPath, 'lib')]);
@@ -181,12 +184,12 @@ test('include paths are searched in order', async () => {
 test('include can handle complex nested includes', async () => {
     const interpreter = new Interpreter();
 
-    // Create a file that includes math which includes constants
+    // Create a file that includes math and string
     const complexFile = path.join(fixturesPath, 'examples/complex-include.sl');
     fs.writeFileSync(complexFile, `
         (include "string.sl")
         (include "math.sl")
-        (string/wrap (math/square 3) "Result: " "!")
+        (string/wrap (mymath/square 3) "Result: " "!")
     `);
 
     interpreter.setIncludePaths([path.join(fixturesPath, 'lib')]);
@@ -218,8 +221,8 @@ test('include with absolute paths', async () => {
 test('included functions can reference other included definitions', async () => {
     const interpreter = new Interpreter();
 
-    // math.sl uses math/pi in its functions
-    const code = '(include "math.sl") (math/area-of-circle 2)';
+    // math.sl uses builtin math/pi in its functions
+    const code = '(include "math.sl") (mymath/area-of-circle 2)';
 
     interpreter.setIncludePaths([path.join(fixturesPath, 'lib')]);
 
@@ -227,5 +230,5 @@ test('included functions can reference other included definitions', async () => 
 
     const finalResults = results.filter(r => r.value !== null && r.value !== true);
     assert.strictEqual(finalResults.length, 1);
-    assert.strictEqual(finalResults[0].value, 3.14159 * 4); // pi * r^2
+    assert.strictEqual(finalResults[0].value, Math.PI * 4); // pi * r^2
 });

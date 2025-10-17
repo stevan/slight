@@ -30,35 +30,84 @@ export class Interpreter extends CoreInterpreter {
         this.addJSONBuiltins();
         this.addProcessBuiltins();
 
-        // File operations
-        this.builtins.set('read-file', (filepath: string) => {
+        // File system namespace (fs/)
+        this.builtins.set('fs/read', (filepath: string) => {
             return fs.readFileSync(filepath, 'utf8');
         });
 
-        this.builtins.set('write-file!', (filepath: string, content: string) => {
+        this.builtins.set('fs/write!', (filepath: string, content: string) => {
             fs.writeFileSync(filepath, content, 'utf8');
             return true;
         });
 
-        this.builtins.set('file-exists?', (filepath: string) => {
+        this.builtins.set('fs/append!', (filepath: string, content: string) => {
+            fs.appendFileSync(filepath, content, 'utf8');
+            return true;
+        });
+
+        this.builtins.set('fs/exists?', (filepath: string) => {
             return fs.existsSync(filepath);
         });
 
-        this.builtins.set('delete-file!', (filepath: string) => {
+        this.builtins.set('fs/delete!', (filepath: string) => {
             fs.unlinkSync(filepath);
             return true;
         });
 
-        this.builtins.set('resolve-path', (filepath: string, base?: string) => {
+        this.builtins.set('fs/resolve', (filepath: string, base?: string) => {
             if (base) {
                 return path.resolve(path.dirname(base), filepath);
             }
             return path.resolve(filepath);
         });
 
-        // System operations
-        this.builtins.set('get-env', (name: string) => process.env[name] ?? null);
-        this.builtins.set('exit', (code: number = 0) => process.exit(code));
+        this.builtins.set('fs/mkdir!', (dirpath: string, recursive: boolean = true) => {
+            fs.mkdirSync(dirpath, { recursive });
+            return true;
+        });
+
+        this.builtins.set('fs/readdir', (dirpath: string) => {
+            return fs.readdirSync(dirpath);
+        });
+
+        this.builtins.set('fs/stat', (filepath: string) => {
+            const stats = fs.statSync(filepath);
+            return {
+                size: stats.size,
+                isFile: stats.isFile(),
+                isDirectory: stats.isDirectory(),
+                mtime: stats.mtime.toISOString(),
+                ctime: stats.ctime.toISOString()
+            };
+        });
+
+        this.builtins.set('fs/copy!', (src: string, dest: string) => {
+            fs.copyFileSync(src, dest);
+            return true;
+        });
+
+        this.builtins.set('fs/move!', (src: string, dest: string) => {
+            fs.renameSync(src, dest);
+            return true;
+        });
+
+        // System namespace (sys/)
+        this.builtins.set('sys/env', (name: string) => process.env[name] ?? null);
+        this.builtins.set('sys/exit', (code: number = 0) => process.exit(code));
+        this.builtins.set('sys/args', () => process.argv.slice(2));
+        this.builtins.set('sys/cwd', () => process.cwd());
+        this.builtins.set('sys/chdir!', (dir: string) => {
+            process.chdir(dir);
+            return true;
+        });
+        this.builtins.set('sys/platform', () => process.platform);
+        this.builtins.set('sys/arch', () => process.arch);
+
+        // Backward compatibility aliases for critical file operations
+        this.builtins.set('read-file', this.builtins.get('fs/read')!);
+        this.builtins.set('write-file!', this.builtins.get('fs/write!')!);
+        this.builtins.set('file-exists?', this.builtins.get('fs/exists?')!);
+        this.builtins.set('get-env', this.builtins.get('sys/env')!);
 
         // Include - special async builtin
         this.builtins.set('include', async (filepath: string) => {
@@ -119,9 +168,11 @@ export class Interpreter extends CoreInterpreter {
                 // Run it through the pipeline
                 const { Tokenizer } = await import('./Tokenizer.js');
                 const { Parser } = await import('./Parser.js');
+                const { MacroExpander } = await import('./MacroExpander.js');
 
                 const tokenizer = new Tokenizer();
                 const parser = new Parser();
+                const macroExpander = new MacroExpander();
 
                 // Create a simple string source
                 async function* stringSource() {
@@ -130,10 +181,11 @@ export class Interpreter extends CoreInterpreter {
 
                 const tokens = tokenizer.run(stringSource());
                 const asts = parser.run(tokens);
+                const expanded = macroExpander.run(asts);
 
                 // Evaluate all expressions and return the last one
                 let lastResult: any = null;
-                for await (const node of asts) {
+                for await (const node of expanded) {
                     if (isPipelineError(node)) {
                         throw new Error(`Error in ${resolvedPath}: ${node.message}`);
                     }
