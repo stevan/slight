@@ -16,7 +16,7 @@ Slight is a minimal LISP dialect with lexical scoping, first-class functions, an
 Slight uses S-expressions (symbolic expressions) where everything is either an atom or a list:
 
 ```lisp
-; This is a comment (not currently supported in the language)
+; This is a comment
 
 42              ; Number
 "hello"         ; String
@@ -24,6 +24,19 @@ true            ; Boolean
 x               ; Symbol
 (+ 1 2)         ; List (function call)
 (list 1 2 3)    ; List (data)
+```
+
+### Comments
+
+Comments start with a semicolon `;` and extend to the end of the line:
+
+```lisp
+; Full-line comment
+(+ 1 2)  ; Inline comment after code
+
+; Multiple lines require semicolon on each line
+; Like this
+; And this
 ```
 
 ## Data Types
@@ -666,13 +679,12 @@ Compile-time metaprogramming for creating new syntax:
 
 ## Language Limitations
 
-1. **No Comments** - The tokenizer doesn't support comment syntax
-2. **No Variadic Functions** - Functions must have fixed arity
-3. **No Tail Call Optimization** - Deep recursion may stack overflow
-4. **Limited Mutability** - Only variables (via `set!`) and Maps are mutable
-5. **No Module System** - Use naming conventions for namespaces
-6. **No Quasiquote/Unquote** - Macro writing is more verbose
-7. **No Finally Clause** - Try/catch doesn't support cleanup blocks
+1. **No Variadic Functions** - Functions must have fixed arity
+2. **No Tail Call Optimization** - Deep recursion may stack overflow
+3. **Limited Mutability** - Only variables (via `set!`) and Maps are mutable
+4. **No Module System** - Use naming conventions for namespaces
+5. **No Quasiquote/Unquote** - Macro writing is more verbose
+6. **No Finally Clause** - Try/catch doesn't support cleanup blocks
 
 ## Best Practices
 

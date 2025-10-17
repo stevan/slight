@@ -8,14 +8,14 @@ export class Tokenizer {
     private readonly IS_STRING  = /^"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'$/;
     private readonly IS_BOOLEAN = /^(true|false)$/;
     private readonly IS_SYMBOL  = /^[a-zA-Z_+\-*/?!<>=:.][a-zA-Z0-9_+\-*/?!<>=:.]*$/;
-    private readonly SPLITTER   = /\(|\)|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^\s\(\)#]+/g;
+    private readonly SPLITTER   = /\(|\)|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^\s\(\);]+/g;
 
     async *run(source: SourceStream): TokenStream {
         let sequence_id = 0;
         for await (const chunk of source) {
             if (chunk.trim() === '') continue;
 
-            const cleanChunk = chunk.split('#')[0];
+            const cleanChunk = chunk.split(';')[0];
             if (cleanChunk.trim() === '') continue;
 
             let match;
