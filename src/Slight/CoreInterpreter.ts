@@ -29,6 +29,7 @@ export class CoreInterpreter {
     public macros    : Map<string, { params: string[], body: ASTNode }> = new Map();
     public builtins  : Map<string, Function>    = new Map();
     public bindings  : Map<string, any>         = new Map();
+    public outputQueue : OutputToken[]          = [];
 
     constructor() {
         this.initBuiltins();
@@ -42,12 +43,24 @@ export class CoreInterpreter {
             }
             try {
                 const result = await node.evaluate(this, new Map());
+
+                // Yield any queued output tokens first (from print/say/warn)
+                while (this.outputQueue.length > 0) {
+                    yield this.outputQueue.shift()!;
+                }
+
+                // Then yield the evaluation result
                 if (node instanceof DefNode || node instanceof DefMacroNode || node instanceof SetNode) {
                     yield { type: OutputHandle.INFO, value: result };
                 } else {
                     yield { type: OutputHandle.STDOUT, value: result };
                 }
             } catch (e) {
+                // Flush output queue even on error
+                while (this.outputQueue.length > 0) {
+                    yield this.outputQueue.shift()!;
+                }
+
                 yield {
                     type  : OutputHandle.ERROR,
                     value : {
@@ -118,6 +131,62 @@ export class CoreInterpreter {
         this.builtins.set('and', (...args: any[]) => args.every(x => x));
         this.builtins.set('or', (...args: any[]) => args.some(x => x));
         this.builtins.set('not', (x: any) => !x);
+
+        // Core I/O operations
+        this.builtins.set('print', (...args: any[]) => {
+            // Print without newline
+            const output = args.map(arg => this.formatForOutput(arg)).join(' ');
+            this.outputQueue.push({
+                type: OutputHandle.STDOUT,
+                value: output
+            });
+            return null;  // print returns null
+        });
+
+        this.builtins.set('say', (...args: any[]) => {
+            // Print with newline
+            const output = args.map(arg => this.formatForOutput(arg)).join(' ') + '\n';
+            this.outputQueue.push({
+                type: OutputHandle.STDOUT,
+                value: output
+            });
+            return null;  // say returns null
+        });
+
+        this.builtins.set('warn', (...args: any[]) => {
+            // Warning with newline
+            const output = args.map(arg => this.formatForOutput(arg)).join(' ') + '\n';
+            this.outputQueue.push({
+                type: OutputHandle.WARN,
+                value: output
+            });
+            return null;  // warn returns null
+        });
+    }
+
+    /**
+     * Format a value for output (used by print/say/warn)
+     */
+    private formatForOutput(value: any): string {
+        if (value === null || value === undefined) {
+            return '()';
+        }
+        if (typeof value === 'boolean') {
+            return value ? 'true' : 'false';
+        }
+        if (typeof value === 'number') {
+            return value.toString();
+        }
+        if (typeof value === 'string') {
+            return value;
+        }
+        if (Array.isArray(value)) {
+            if (value.length === 0) {
+                return '()';
+            }
+            return `(${value.map(v => this.formatForOutput(v)).join(' ')})`;
+        }
+        return String(value);
     }
 
     /**
