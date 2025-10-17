@@ -212,6 +212,23 @@ export class CoreInterpreter {
         this.builtins.set('warn', (...args: any[]) => {
             return this.builtins.get('log/warn')!(...args);
         });
+
+        // Type inspection operations
+        this.builtins.set('type/of', (value: any) => {
+            return this.getTypeString(value);
+        });
+
+        this.builtins.set('type/is?', (value: any, typeName: string) => {
+            return this.getTypeString(value) === typeName;
+        });
+
+        this.builtins.set('type/assert', (value: any, typeName: string) => {
+            const actualType = this.getTypeString(value);
+            if (actualType !== typeName) {
+                throw new Error(`Type assertion failed: expected ${typeName}, got ${actualType}`);
+            }
+            return value;
+        });
     }
 
     /**
@@ -237,6 +254,55 @@ export class CoreInterpreter {
             return `(${value.map(v => this.formatForOutput(v)).join(' ')})`;
         }
         return String(value);
+    }
+
+    /**
+     * Get the type string for a value (used by type inspection primitives)
+     */
+    protected getTypeString(value: any): string {
+        // Handle null/undefined as NIL
+        if (value === null || value === undefined) {
+            return 'NIL';
+        }
+
+        // Check if it's an array (LIST or NIL for empty)
+        if (Array.isArray(value)) {
+            // Empty list is NIL in LISP
+            return value.length === 0 ? 'NIL' : 'LIST';
+        }
+
+        // Check if it's an error object (from try/catch)
+        if (typeof value === 'object' && value !== null &&
+            'message' in value && 'type' in value) {
+            return 'ERROR';
+        }
+
+        // Check if it's a function object (user-defined function or closure)
+        if (typeof value === 'object' && value !== null &&
+            'params' in value && 'body' in value) {
+            return 'FUNCTION';
+        }
+
+        // Check for builtin functions
+        if (typeof value === 'function') {
+            return 'FUNCTION';
+        }
+
+        // For primitive types, use JavaScript's typeof and uppercase it
+        const jsType = typeof value;
+        switch (jsType) {
+            case 'number':
+                return 'NUMBER';
+            case 'string':
+                return 'STRING';
+            case 'boolean':
+                return 'BOOLEAN';
+            case 'symbol':
+                return 'SYMBOL';
+            default:
+                // For any other object types we haven't handled
+                return 'OBJECT';
+        }
     }
 
     /**
