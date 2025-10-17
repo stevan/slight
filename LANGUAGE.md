@@ -191,16 +191,16 @@ Create compile-time code transformations:
   (list (quote cond) (list test body)))
 
 ; Usage
-(when (> x 5) (print "big"))
-; Expands to: (cond ((> x 5) (print "big")))
+(when (> x 5) (say "big"))
+; Expands to: (cond ((> x 5) (say "big")))
 
 ; Define an 'unless' macro
 (defmacro unless (test body)
   (list (quote cond) (list (list (quote not) test) body)))
 
 ; Usage
-(unless (< x 0) (print "positive"))
-; Expands to: (cond ((not (< x 0)) (print "positive")))
+(unless (< x 0) (say "positive"))
+; Expands to: (cond ((not (< x 0)) (say "positive")))
 
 ; Macros receive unevaluated arguments
 (defmacro add2 (x)
@@ -216,8 +216,8 @@ Evaluate multiple expressions in sequence:
 ```lisp
 ; Multiple side effects
 (begin
-  (print "First")
-  (print "Second")
+  (say "First")
+  (say "Second")
   42)  ; Returns 42
 
 ; With variable mutation
@@ -231,7 +231,7 @@ Evaluate multiple expressions in sequence:
 (def update-counter (c)
   (begin
     (set! c (+ c 1))
-    (print c)
+    (say "Counter:" c)
     c))
 ```
 
@@ -271,7 +271,7 @@ Handle exceptions gracefully:
 (try
   (throw "Something went wrong")
   (catch e
-    (print e.message)
+    (say e.message)
     "recovered"))  ; Returns "recovered"
 
 ; No error - returns try result
@@ -418,6 +418,40 @@ Throw exceptions to be caught:
 (get-env "PATH")                ; Get environment variable
 (exit 0)                        ; Exit program
 ```
+
+### I/O
+
+Basic output functions for stdout:
+
+```lisp
+(print "Hello" "World")         ; Print without newline: Hello World
+(say "Hello" "World")           ; Print with newline: Hello World\n
+```
+
+### Logging
+
+Structured logging functions (all write to stderr with newlines):
+
+```lisp
+(log/info "Server started")     ; Informational messages (🌈 INFO)
+(log/debug "Variable x =" 42)   ; Debug/diagnostic messages (💩 DEBUG)
+(log/warn "Deprecated API")     ; Warnings (⚡️ WARN)
+(log/error "Connection failed") ; Errors - logged, not thrown (💔 ERROR)
+
+; Control logging output
+(log/enable)                    ; Enable logging (default)
+(log/disable)                   ; Disable all log/* output
+
+; Alias
+(warn "Warning message")        ; Alias to log/warn
+```
+
+**Notes:**
+- `print` outputs without a newline, useful for building output incrementally
+- `say` outputs with a newline, like `println` in other languages
+- `log/*` functions are conditionally enabled via `log/enable`/`log/disable`
+- `log/*` messages include emoji prefixes when using StandardError output
+- `warn` is affected by `log/disable` since it's an alias to `log/warn`
 
 ### Processes
 

@@ -99,6 +99,16 @@ Tests use Node.js native test runner (`node:test`) with no external dependencies
 ## Current Implementation Notes
 
 ### Recent Changes
+- **I/O and Logging System**: Added comprehensive output and logging primitives (2025-10-17)
+  - **I/O Functions**: `print` (no newline), `say` (with newline) for stdout
+  - **Logging Functions**: `log/info`, `log/debug`, `log/warn`, `log/error` for structured logging
+  - **Logging Control**: `log/enable` and `log/disable` for conditional logging
+  - **Output Streams**: Added `StandardOutput` and `StandardError` classes in `src/Slight/Outputs.ts`
+  - StandardOutput filters STDOUT tokens to `process.stdout` (Node) / `console.log` (Browser)
+  - StandardError filters non-STDOUT tokens to `process.stderr` (Node) / appropriate console methods (Browser)
+  - `warn` is an alias to `log/warn` and respects `log/disable`
+  - All log functions include newlines and are disabled with a single flag
+  - OutputQueue architecture allows builtins to emit OutputTokens with specific OutputHandles
 - **Browser Terminal UI**: Added visual multi-window terminal interface for browser processes (2025-10-16)
   - Draggable, resizable terminal windows for each process
   - Window titles show PID and parent PID

@@ -30,6 +30,7 @@ export class CoreInterpreter {
     public builtins  : Map<string, Function>    = new Map();
     public bindings  : Map<string, any>         = new Map();
     public outputQueue : OutputToken[]          = [];
+    private loggingEnabled : boolean            = true;
 
     constructor() {
         this.initBuiltins();
@@ -153,14 +154,63 @@ export class CoreInterpreter {
             return null;  // say returns null
         });
 
-        this.builtins.set('warn', (...args: any[]) => {
-            // Warning with newline
+        // Note: warn is defined later as an alias to log/warn
+
+        // Logging functions (conditionally enabled)
+        this.builtins.set('log/info', (...args: any[]) => {
+            if (!this.loggingEnabled) return null;
+            const output = args.map(arg => this.formatForOutput(arg)).join(' ') + '\n';
+            this.outputQueue.push({
+                type: OutputHandle.INFO,
+                value: output
+            });
+            return null;
+        });
+
+        this.builtins.set('log/debug', (...args: any[]) => {
+            if (!this.loggingEnabled) return null;
+            const output = args.map(arg => this.formatForOutput(arg)).join(' ') + '\n';
+            this.outputQueue.push({
+                type: OutputHandle.DEBUG,
+                value: output
+            });
+            return null;
+        });
+
+        this.builtins.set('log/warn', (...args: any[]) => {
+            if (!this.loggingEnabled) return null;
             const output = args.map(arg => this.formatForOutput(arg)).join(' ') + '\n';
             this.outputQueue.push({
                 type: OutputHandle.WARN,
                 value: output
             });
-            return null;  // warn returns null
+            return null;
+        });
+
+        this.builtins.set('log/error', (...args: any[]) => {
+            if (!this.loggingEnabled) return null;
+            const output = args.map(arg => this.formatForOutput(arg)).join(' ') + '\n';
+            this.outputQueue.push({
+                type: OutputHandle.ERROR,
+                value: output
+            });
+            return null;
+        });
+
+        // Logging control
+        this.builtins.set('log/enable', () => {
+            this.loggingEnabled = true;
+            return true;
+        });
+
+        this.builtins.set('log/disable', () => {
+            this.loggingEnabled = false;
+            return true;
+        });
+
+        // Alias: warn -> log/warn
+        this.builtins.set('warn', (...args: any[]) => {
+            return this.builtins.get('log/warn')!(...args);
         });
     }
 

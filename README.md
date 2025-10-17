@@ -43,7 +43,7 @@ Slight is a mini-LISP like interpreter written in TypeScript. The interpreter fe
 (defmacro when (test body)
   (list (quote cond) (list test body)))
 
-(when (> x 10) (print "big"))  ; Expands to: (cond ((> x 10) (print "big")))
+(when (> x 10) (say "big"))  ; Expands to: (cond ((> x 10) (say "big")))
 
 ; Concurrent processes with message passing
 (def echo-server (spawn "(let ((msg (recv))) (send (head msg) (head (tail msg))))"))
@@ -73,6 +73,8 @@ Slight is a mini-LISP like interpreter written in TypeScript. The interpreter fe
 - **Logic**: `and`, `or`, `not`
 - **Lists**: `list`, `head`, `tail`, `cons`, `empty?`
 - **Maps**: `make-map`, `map-get`, `map-set!`, `map-has?`, `map-delete!`, `map-keys`, `map-values`
+- **I/O**: `print` (no newline), `say` (with newline)
+- **Logging**: `log/info`, `log/debug`, `log/warn`, `log/error`, `log/enable`, `log/disable`, `warn`
 - **Files**: `read-file`, `write-file!`, `file-exists?`, `delete-file!`, `include`
 - **JSON**: `json-parse`, `json-stringify`
 - **System**: `get-env`, `exit`
