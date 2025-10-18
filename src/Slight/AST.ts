@@ -138,6 +138,45 @@ export class QuoteNode extends ASTNode {
         if (ast instanceof CallNode) {
             return ast.elements.map(QuoteNode.astToValue);
         }
+        if (ast instanceof QuoteNode) {
+            // A quoted quote becomes a list with 'quote' symbol
+            return ['quote', QuoteNode.astToValue(ast.expr)];
+        }
+        // Handle special form nodes
+        if (ast instanceof DefNode) {
+            return ['def', ast.name, ast.params, QuoteNode.astToValue(ast.body)];
+        }
+        if (ast instanceof CondNode) {
+            const clauses = ast.clauses.map((c: any) => [QuoteNode.astToValue(c.test), QuoteNode.astToValue(c.result)]);
+            if (ast.elseClause) {
+                clauses.push(['else', QuoteNode.astToValue(ast.elseClause)]);
+            }
+            return ['cond', ...clauses];
+        }
+        if (ast instanceof LetNode) {
+            const bindings = ast.bindings.map((b: any) => [b.name, QuoteNode.astToValue(b.value)]);
+            return ['let', bindings, QuoteNode.astToValue(ast.body)];
+        }
+        if (ast instanceof FunNode) {
+            return ['fun', ast.params, QuoteNode.astToValue(ast.body)];
+        }
+        if (ast instanceof DefMacroNode) {
+            return ['defmacro', ast.name, ast.params, QuoteNode.astToValue(ast.body)];
+        }
+        if (ast instanceof BeginNode) {
+            return ['begin', ...ast.expressions.map(QuoteNode.astToValue)];
+        }
+        if (ast instanceof SetNode) {
+            return ['set!', ast.name, QuoteNode.astToValue(ast.value)];
+        }
+        if (ast instanceof TryNode) {
+            const tryBody = ast.tryBody.map(QuoteNode.astToValue);
+            const catchBody = ast.catchBody.map(QuoteNode.astToValue);
+            return ['try', ...tryBody, ['catch', ast.catchVar, ...catchBody]];
+        }
+        if (ast instanceof ThrowNode) {
+            return ['throw', QuoteNode.astToValue(ast.value)];
+        }
         // fallback for unknown node types
         return ast;
     }

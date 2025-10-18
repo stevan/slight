@@ -24,7 +24,9 @@ import {
 
 export class Parser {
     async *run(source: TokenStream): ASTStream {
-        let stack: { type: 'CALL', elements: ASTNode[] }[] = [];
+        let stack: { type: 'CALL', elements: ASTNode[], quotePending?: number }[] = [];
+        let quotePending = 0; // Track how many quote levels are pending
+
         for await (const token of source) {
             if (isPipelineError(token)) {
                 yield token;
@@ -32,42 +34,74 @@ export class Parser {
             }
             try {
                 switch (token.type) {
+                    case 'QUOTE':
+                        quotePending++;
+                        break;
                     case 'STRING': {
-                        const node = new StringNode(token.source);
+                        let node: ASTNode = new StringNode(token.source);
+                        if (quotePending > 0) {
+                            node = this.wrapInQuotes(node, quotePending);
+                            quotePending = 0;
+                        }
                         const yielded = this.addNode(node, stack);
                         if (yielded) yield node;
                         break;
                     }
                     case 'NUMBER': {
                         const numValue = token.source.includes('.') ? parseFloat(token.source) : parseInt(token.source);
-                        const node = new NumberNode(numValue);
+                        let node: ASTNode = new NumberNode(numValue);
+                        if (quotePending > 0) {
+                            node = this.wrapInQuotes(node, quotePending);
+                            quotePending = 0;
+                        }
                         const yielded = this.addNode(node, stack);
                         if (yielded) yield node;
                         break;
                     }
                     case 'BOOLEAN': {
-                        const node = new BooleanNode(token.source === 'true');
+                        let node: ASTNode = new BooleanNode(token.source === 'true');
+                        if (quotePending > 0) {
+                            node = this.wrapInQuotes(node, quotePending);
+                            quotePending = 0;
+                        }
                         const yielded = this.addNode(node, stack);
                         if (yielded) yield node;
                         break;
                     }
                     case 'SYMBOL': {
-                        const node = new SymbolNode(token.source);
+                        let node: ASTNode = new SymbolNode(token.source);
+                        if (quotePending > 0) {
+                            node = this.wrapInQuotes(node, quotePending);
+                            quotePending = 0;
+                        }
                         const yielded = this.addNode(node, stack);
                         if (yielded) yield node;
                         break;
                     }
                     case 'LPAREN':
-                        stack.push({ type: 'CALL', elements: [] });
+                        if (quotePending > 0) {
+                            // Store the quotes with this list level
+                            stack.push({ type: 'CALL', elements: [], quotePending: quotePending });
+                            quotePending = 0; // Reset for inner elements
+                        } else {
+                            stack.push({ type: 'CALL', elements: [] });
+                        }
                         break;
                     case 'RPAREN':
                         if (stack.length === 0) throw new Error('Unmatched closing parenthesis');
                         const completed = stack.pop();
                         if (!completed) throw new Error('Unmatched closing parenthesis');
+                        let listNode = this.nodeFromCall(completed.elements);
+
+                        // Apply any quotes stored with this list level
+                        if (completed.quotePending && completed.quotePending > 0) {
+                            listNode = this.wrapInQuotes(listNode, completed.quotePending);
+                        }
+
                         if (stack.length === 0) {
-                            yield this.nodeFromCall(completed.elements);
+                            yield listNode;
                         } else {
-                            this.addNode(this.nodeFromCall(completed.elements), stack);
+                            this.addNode(listNode, stack);
                         }
                         break;
                     default:
@@ -90,7 +124,7 @@ export class Parser {
         }
     }
 
-    private addNode(node: ASTNode, stack: { type: 'CALL', elements: ASTNode[] }[]): boolean {
+    private addNode(node: ASTNode, stack: { type: 'CALL', elements: ASTNode[], quotePending?: number }[]): boolean {
         if (stack.length === 0) {
             // Top-level node - should be yielded
             return true;
@@ -98,6 +132,14 @@ export class Parser {
             stack[stack.length - 1].elements.push(node);
             return false;
         }
+    }
+
+    private wrapInQuotes(node: ASTNode, quoteCount: number): ASTNode {
+        let result = node;
+        for (let i = 0; i < quoteCount; i++) {
+            result = new QuoteNode(result);
+        }
+        return result;
     }
 
     private nodeFromCall(elements: ASTNode[]): ASTNode {

@@ -29,7 +29,8 @@ export type TokenType =
     | 'BOOLEAN'
     | 'SYMBOL'
     | 'LPAREN'
-    | 'RPAREN';
+    | 'RPAREN'
+    | 'QUOTE';
 
 export interface Token {
     type        : TokenType;

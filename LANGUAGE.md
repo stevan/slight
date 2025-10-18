@@ -54,11 +54,12 @@ Integers and floating-point numbers:
 
 ### Strings
 
-Double-quoted text:
+Strings use double quotes only (single quotes are reserved for the quote syntax):
 
 ```lisp
 "Hello, World!"
 "Line 1\nLine 2"
+; 'text' is NOT a string - it's the quote syntax, equivalent to (quote text)
 ```
 
 ### Booleans
@@ -174,11 +175,26 @@ Multi-branch conditionals:
 
 ### `quote` - Treat as Data
 
-Prevent evaluation:
+Prevent evaluation using either explicit `quote` form or the quote syntax `'`:
 
 ```lisp
+; Explicit quote form
 (quote (+ 1 2))    ; Returns the list (+ 1 2), not 3
 (quote x)          ; Returns the symbol x, not its value
+
+; Quote syntax (equivalent)
+'(+ 1 2)           ; Returns the list (+ 1 2), not 3
+'x                 ; Returns the symbol x, not its value
+
+; More examples
+'foo               ; Returns the symbol foo as a string "foo"
+'123               ; Returns the number 123
+'(a b c)           ; Returns the list ("a" "b" "c")
+''foo              ; Returns (quote foo) - a quoted quote
+
+; Using quotes in expressions
+(list 'a 'b 'c)    ; Returns ("a" "b" "c")
+(head '(1 2 3))    ; Returns 1
 ```
 
 ### `defmacro` - Define Macros
@@ -186,9 +202,9 @@ Prevent evaluation:
 Create compile-time code transformations:
 
 ```lisp
-; Define a 'when' macro
+; Define a 'when' macro using quote syntax
 (defmacro when (test body)
-  (list (quote cond) (list test body)))
+  (list 'cond (list test body)))
 
 ; Usage
 (when (> x 5) (say "big"))
@@ -196,7 +212,7 @@ Create compile-time code transformations:
 
 ; Define an 'unless' macro
 (defmacro unless (test body)
-  (list (quote cond) (list (list (quote not) test) body)))
+  (list 'cond (list (list 'not test) body)))
 
 ; Usage
 (unless (< x 0) (say "positive"))
@@ -204,7 +220,7 @@ Create compile-time code transformations:
 
 ; Macros receive unevaluated arguments
 (defmacro add2 (x)
-  (list (quote +) x 2))
+  (list '+ x 2))
 
 (add2 5)  ; Expands to: (+ 5 2), returns 7
 ```
@@ -621,22 +637,22 @@ Compile-time metaprogramming for creating new syntax:
 ```lisp
 ; Basic macro - when conditional
 (defmacro when (test body)
-  (list (quote cond) (list test body)))
+  (list 'cond (list test body)))
 
 (when (> x 10) (* x 2))  ; Expands at compile-time
 
 ; Macro for arithmetic shortcuts
 (defmacro incr (x)
-  (list (quote +) x 1))
+  (list '+ x 1))
 
 (incr 5)  ; Returns 6
 
 ; Macro with multiple parameters
 (defmacro swap (a b)
-  (list (quote let)
-        (list (list (quote temp) a))
+  (list 'let
+        (list (list 'temp a))
         b
-        (list (quote set!) a (quote temp))))
+        (list 'set! a 'temp)))
 
 ; Macros work with function definitions
 (def process (x)
@@ -719,6 +735,7 @@ Compile-time metaprogramming for creating new syntax:
 4. **No Module System** - Use naming conventions for namespaces
 5. **No Quasiquote/Unquote** - Macro writing is more verbose
 6. **No Finally Clause** - Try/catch doesn't support cleanup blocks
+7. **No Single-Quoted Strings** - Single quotes are reserved for the quote syntax `'expr`
 
 ## Best Practices
 
