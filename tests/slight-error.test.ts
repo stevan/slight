@@ -11,6 +11,8 @@ const error = new UndefinedSymbolError('foo', node);
 // Get pipeline error
 const pipelineError = error.toPipelineError();
 
-console.log('Pipeline Error:', JSON.stringify(pipelineError, null, 2));
-console.log('\nFormatted output:');
-console.log(error.format());
+if (process.env['DEBUG']) {
+    console.log('Pipeline Error:', JSON.stringify(pipelineError, null, 2));
+    console.log('\nFormatted output:');
+    console.log(error.format());
+}

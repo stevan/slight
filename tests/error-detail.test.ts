@@ -22,15 +22,19 @@ async function test() {
     const asts = parser.run(tokens);
     const expanded = macroExpander.run(asts);
 
-    console.log('Running interpreter...\n');
+    if (process.env['DEBUG']) {
+        console.log('Running interpreter...\n');
+    }
     for await (const result of interpreter.run(expanded)) {
-        if (isPipelineError(result.value)) {
-            console.log('ERROR DETECTED:');
-            console.log('  Type:', result.type);
-            console.log('  Value:', result.value);
-            console.log('  Details:', (result.value as any).details);
-        } else {
-            console.log('Result:', result.value);
+        if (process.env['DEBUG']) {
+            if (isPipelineError(result.value)) {
+                console.log('ERROR DETECTED:');
+                console.log('  Type:', result.type);
+                console.log('  Value:', result.value);
+                console.log('  Details:', (result.value as any).details);
+            } else {
+                console.log('Result:', result.value);
+            }
         }
     }
 }

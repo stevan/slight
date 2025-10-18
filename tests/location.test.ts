@@ -15,19 +15,23 @@ async function test() {
     const parser = new Parser();
 
     // Check tokens
-    console.log('=== TOKENS ===');
+    if (process.env['DEBUG']) {
+        console.log('=== TOKENS ===');
+    }
     const tokens = tokenizer.run(stringSource(code));
     for await (const token of tokens) {
-        if (!isPipelineError(token)) {
+        if (!isPipelineError(token) && process.env['DEBUG']) {
             console.log(`${token.type} "${token.source}" at line ${token.line}, col ${token.column}`);
         }
     }
 
     // Check AST
-    console.log('\n=== AST ===');
+    if (process.env['DEBUG']) {
+        console.log('\n=== AST ===');
+    }
     const asts = parser.run(tokenizer.run(stringSource(code)));
     for await (const ast of asts) {
-        if (!isPipelineError(ast)) {
+        if (!isPipelineError(ast) && process.env['DEBUG']) {
             console.log(`${ast.type} at`, ast.location);
         }
     }

@@ -37,8 +37,8 @@ class CodeInputSource implements InputSource {
 class SilentOutputSink implements OutputSink {
     async run(source: OutputStream): Promise<void> {
         for await (const output of source) {
-            // Log errors for debugging
-            if (output.type === OutputHandle.ERROR || (output.value && typeof output.value === 'object' && output.value.type === 'ERROR')) {
+            // Log errors for debugging (only when DEBUG env var is set)
+            if (process.env['DEBUG'] && (output.type === OutputHandle.ERROR || (output.value && typeof output.value === 'object' && output.value.type === 'ERROR'))) {
                 console.error('[Process Error]', output.value);
             }
             // Otherwise silently consume output
