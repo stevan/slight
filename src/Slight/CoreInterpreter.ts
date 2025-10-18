@@ -5,6 +5,7 @@ import {
     OutputStream,
     OutputHandle
 } from './Types.js';
+import { SlightError } from './SlightError.js';
 import {
     ASTNode,
     NumberNode,
@@ -62,14 +63,22 @@ export class CoreInterpreter {
                     yield this.outputQueue.shift()!;
                 }
 
-                yield {
-                    type  : OutputHandle.ERROR,
-                    value : {
-                        type    : 'ERROR',
-                        stage   : 'Interpreter',
-                        message : (e as Error).message
-                    }
-                };
+                // Handle SlightError specifically to preserve location info
+                if (e instanceof SlightError) {
+                    yield {
+                        type: OutputHandle.ERROR,
+                        value: e.toPipelineError()
+                    };
+                } else {
+                    yield {
+                        type  : OutputHandle.ERROR,
+                        value : {
+                            type    : 'ERROR',
+                            stage   : 'Interpreter',
+                            message : (e as Error).message
+                        }
+                    };
+                }
             }
         }
     }

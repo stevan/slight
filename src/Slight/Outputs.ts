@@ -18,6 +18,13 @@ export class ConsoleOutput implements OutputSink {
 
     private prettyPrint(token: OutputToken): string {
         if (isPipelineError(token.value)) {
+            // Check for enhanced error details
+            if (token.value.details?.formatted) {
+                return token.value.details.formatted;
+            }
+            if (token.value.details?.line !== undefined && token.value.details?.column !== undefined) {
+                return `Error at line ${token.value.details.line}, column ${token.value.details.column}:\n  ${token.value.message}`;
+            }
             return `[${token.value.stage} Error] ${token.value.message}`;
         }
         if (token.value === null || token.value === undefined) {
@@ -136,6 +143,22 @@ export class StandardError implements OutputSink {
         const prefix = `${token.type} `;
 
         if (isPipelineError(token.value)) {
+            // Check if we have detailed error information
+            const hasFormatted = token.value.details?.formatted;
+            const hasLocation = token.value.details?.line !== undefined && token.value.details?.column !== undefined;
+
+            if (process.env['DEBUG']) {
+                console.error('DEBUG formatToken - hasFormatted:', hasFormatted, 'hasLocation:', hasLocation);
+                console.error('DEBUG formatToken - details:', JSON.stringify(token.value.details));
+            }
+
+            if (hasFormatted) {
+                return `${prefix}\n${token.value.details.formatted}`;
+            }
+            // Check for line/column in details
+            if (hasLocation) {
+                return `${prefix}\nError at line ${token.value.details.line}, column ${token.value.details.column}:\n  ${token.value.message}`;
+            }
             return `${prefix}[${token.value.stage} Error] ${token.value.message}`;
         }
 

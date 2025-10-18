@@ -40,6 +40,7 @@ async function main() {
     // Parse include paths and remaining arguments
     const includePaths: string[] = [];
     let remainingArgs: string[] = [];
+    let debugMode = false;
 
     let i = 0;
     while (i < args.length) {
@@ -50,6 +51,9 @@ async function main() {
             }
             includePaths.push(resolve(args[i + 1]));
             i += 2;
+        } else if (args[i] === '--debug') {
+            debugMode = true;
+            i++;
         } else {
             remainingArgs.push(args[i]);
             i++;
@@ -59,11 +63,24 @@ async function main() {
     // Parse command line arguments
     if (remainingArgs.length === 0) {
         // No arguments - start REPL
-        const { REPL, REPLOutput } = await import('../src/Slight/REPL.js');
-        const slight = new Slight(
-            new REPL(),
-            new REPLOutput()
-        );
+        let slight;
+
+        if (debugMode) {
+            // Use EnhancedREPL with debugging features
+            const { EnhancedREPL, EnhancedREPLOutput } = await import('../src/Slight/EnhancedREPL.js');
+            slight = new Slight(
+                new EnhancedREPL(),
+                new EnhancedREPLOutput()
+            );
+        } else {
+            // Use standard REPL
+            const { REPL, REPLOutput } = await import('../src/Slight/REPL.js');
+            slight = new Slight(
+                new REPL(),
+                new REPLOutput()
+            );
+        }
+
         // Set include paths if any
         if (includePaths.length > 0) {
             slight.getInterpreter().setIncludePaths(includePaths);
@@ -99,9 +116,12 @@ Usage:
 Options:
   -i, --include-path <path>                Add directory to include search path
                                             (can be used multiple times)
+  --debug                                   Enable debug mode with enhanced REPL
+                                            (adds :ast, :tokens, :expand commands)
 
 Examples:
   slight                                   # Start REPL
+  slight --debug                            # Start REPL with debugging features
   slight program.sl                        # Run program.sl
   slight -e "(+ 1 2)"                      # Evaluate expression, prints 3
   slight -i lib/ program.sl                # Run with lib/ in include path

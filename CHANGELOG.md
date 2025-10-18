@@ -2,9 +2,32 @@
 
 All notable changes to Slight will be documented in this file.
 
-## [Unreleased] - 2025-10-16
+## [Unreleased] - 2025-10-18
 
 ### Added
+
+#### Quote Syntax Support
+
+- **LISP Quote Syntax** - Added `'expr` as syntactic sugar for `(quote expr)`
+  - Single quotes now reserved for quote syntax (breaking change: no more single-quoted strings)
+  - Full support for quoting all special forms (def, let, cond, etc.)
+  - Comprehensive test suite with 19 test cases
+
+#### Enhanced Debugging Capabilities
+
+- **Location Tracking** - All tokens and AST nodes now track line/column information
+  - Enhanced error messages show exact position: `Error at line 4, column 6`
+  - Location information propagated through entire compilation pipeline
+
+- **Debug Mode** - New `--debug` CLI flag enables enhanced REPL with debugging commands
+  - `:ast <expr>` - Display Abstract Syntax Tree
+  - `:tokens <expr>` - Show token stream
+  - `:expand <expr>` - Show macro-expanded form
+  - `:bindings` - Display current environment bindings
+
+- **Error System** - New `SlightError` class hierarchy for better error reporting
+  - `UndefinedSymbolError`, `ArityError`, `TypeMismatchError` with location info
+  - Pretty-printed error messages with source context
 
 #### Browser Support
 

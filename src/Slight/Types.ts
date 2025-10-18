@@ -36,6 +36,8 @@ export interface Token {
     type        : TokenType;
     source      : string;
     sequence_id : number;
+    line?       : number;
+    column?     : number;
 }
 
 // -----------------------------------------------------------------------------

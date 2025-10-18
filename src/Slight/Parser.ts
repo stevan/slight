@@ -24,7 +24,7 @@ import {
 
 export class Parser {
     async *run(source: TokenStream): ASTStream {
-        let stack: { type: 'CALL', elements: ASTNode[], quotePending?: number }[] = [];
+        let stack: { type: 'CALL', elements: ASTNode[], quotePending?: number, location?: { line: number, column: number } }[] = [];
         let quotePending = 0; // Track how many quote levels are pending
 
         for await (const token of source) {
@@ -38,7 +38,7 @@ export class Parser {
                         quotePending++;
                         break;
                     case 'STRING': {
-                        let node: ASTNode = new StringNode(token.source);
+                        let node: ASTNode = new StringNode(token.source).setLocation(token.line, token.column);
                         if (quotePending > 0) {
                             node = this.wrapInQuotes(node, quotePending);
                             quotePending = 0;
@@ -49,7 +49,7 @@ export class Parser {
                     }
                     case 'NUMBER': {
                         const numValue = token.source.includes('.') ? parseFloat(token.source) : parseInt(token.source);
-                        let node: ASTNode = new NumberNode(numValue);
+                        let node: ASTNode = new NumberNode(numValue).setLocation(token.line, token.column);
                         if (quotePending > 0) {
                             node = this.wrapInQuotes(node, quotePending);
                             quotePending = 0;
@@ -59,7 +59,7 @@ export class Parser {
                         break;
                     }
                     case 'BOOLEAN': {
-                        let node: ASTNode = new BooleanNode(token.source === 'true');
+                        let node: ASTNode = new BooleanNode(token.source === 'true').setLocation(token.line, token.column);
                         if (quotePending > 0) {
                             node = this.wrapInQuotes(node, quotePending);
                             quotePending = 0;
@@ -69,7 +69,7 @@ export class Parser {
                         break;
                     }
                     case 'SYMBOL': {
-                        let node: ASTNode = new SymbolNode(token.source);
+                        let node: ASTNode = new SymbolNode(token.source).setLocation(token.line, token.column);
                         if (quotePending > 0) {
                             node = this.wrapInQuotes(node, quotePending);
                             quotePending = 0;
@@ -81,17 +81,26 @@ export class Parser {
                     case 'LPAREN':
                         if (quotePending > 0) {
                             // Store the quotes with this list level
-                            stack.push({ type: 'CALL', elements: [], quotePending: quotePending });
+                            stack.push({
+                                type: 'CALL',
+                                elements: [],
+                                quotePending: quotePending,
+                                location: { line: token.line || 0, column: token.column || 0 }
+                            });
                             quotePending = 0; // Reset for inner elements
                         } else {
-                            stack.push({ type: 'CALL', elements: [] });
+                            stack.push({
+                                type: 'CALL',
+                                elements: [],
+                                location: { line: token.line || 0, column: token.column || 0 }
+                            });
                         }
                         break;
                     case 'RPAREN':
                         if (stack.length === 0) throw new Error('Unmatched closing parenthesis');
                         const completed = stack.pop();
                         if (!completed) throw new Error('Unmatched closing parenthesis');
-                        let listNode = this.nodeFromCall(completed.elements);
+                        let listNode = this.nodeFromCall(completed.elements, completed.location);
 
                         // Apply any quotes stored with this list level
                         if (completed.quotePending && completed.quotePending > 0) {
@@ -124,7 +133,7 @@ export class Parser {
         }
     }
 
-    private addNode(node: ASTNode, stack: { type: 'CALL', elements: ASTNode[], quotePending?: number }[]): boolean {
+    private addNode(node: ASTNode, stack: { type: 'CALL', elements: ASTNode[], quotePending?: number, location?: { line: number, column: number } }[]): boolean {
         if (stack.length === 0) {
             // Top-level node - should be yielded
             return true;
@@ -142,12 +151,12 @@ export class Parser {
         return result;
     }
 
-    private nodeFromCall(elements: ASTNode[]): ASTNode {
+    private nodeFromCall(elements: ASTNode[], location?: { line: number, column: number }): ASTNode {
         // Special forms: quote, cond, def, defmacro, begin, set!, try, throw, let, fun
         if (elements.length > 0 && elements[0] instanceof SymbolNode) {
             const sym = elements[0].name;
             if (sym === 'quote' && elements.length === 2) {
-                return new QuoteNode(elements[1]);
+                return new QuoteNode(elements[1]).setLocation(location?.line, location?.column);
             }
             if (sym === 'begin') {
                 // (begin expr1 expr2 ... exprN) - evaluate expressions in sequence
@@ -219,7 +228,7 @@ export class Parser {
                         }
                     }
                 }
-                return new CondNode(clauses, elseClause);
+                return new CondNode(clauses, elseClause).setLocation(location?.line, location?.column);
             }
             if (sym === 'fun') {
                 // (fun (params...) body) - anonymous function
@@ -262,12 +271,12 @@ export class Parser {
                     // (def name (params...) body) - function definition
                     const name = elements[1].name;
                     const params = elements[2].elements.map((el: any) => el instanceof SymbolNode ? el.name : undefined).filter((n: string | undefined) => n !== undefined);
-                    return new DefNode(name, params, elements[3]);
+                    return new DefNode(name, params, elements[3]).setLocation(location?.line, location?.column);
                 } else if (elements.length === 3 && elements[1] instanceof SymbolNode) {
                     // (def name value) - simple value definition
                     const name = elements[1].name;
                     // Use null params to indicate value definition (not function)
-                    return new DefNode(name, null as any, elements[2]);
+                    return new DefNode(name, null as any, elements[2]).setLocation(location?.line, location?.column);
                 } else {
                     throw new Error('Invalid def syntax: expected (def name value) or (def name (params...) body)')
                 }
@@ -314,6 +323,6 @@ export class Parser {
                 return new LetNode(bindings, body);
             }
         }
-        return new CallNode(elements);
+        return new CallNode(elements).setLocation(location?.line, location?.column);
     }
 }

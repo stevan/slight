@@ -33,9 +33,13 @@ Slight is a mini-LISP like interpreter written in TypeScript. The interpreter fe
       (y 20))
   (+ x y))  ; Returns 30
 
+; Quote syntax for preventing evaluation
+'(+ 1 2)          ; Returns the list (+ 1 2) instead of 3
+(quote (+ 1 2))   ; Equivalent to '(+ 1 2)
+
 ; Macros for metaprogramming
 (defmacro when (test body)
-  (list (quote cond) (list test body)))
+  (list 'cond (list test body)))  ; Using quote syntax
 
 (when (> x 10) (say "big"))  ; Expands to: (cond ((> x 10) (say "big")))
 ```
@@ -240,6 +244,9 @@ Each stage is an async generator, making the pipeline composable and testable.
 # Start interactive REPL
 slight
 
+# Start REPL with debugging features
+slight --debug
+
 # Execute a file
 slight program.sl
 
@@ -251,6 +258,22 @@ slight -i lib/ -i vendor/ program.sl
 
 # Show help
 slight --help
+```
+
+### Debug Mode
+
+When running with `--debug`, the REPL provides additional debugging commands:
+
+- `:ast <expr>` - Show the Abstract Syntax Tree for an expression
+- `:tokens <expr>` - Show the token stream for an expression
+- `:expand <expr>` - Show the macro-expanded form of an expression
+- `:bindings` - Show current bindings in the environment
+- `:q` - Quit the REPL
+
+Enhanced error messages now include line and column information:
+```
+💔 Error at line 4, column 6:
+  Undefined symbol: z
 ```
 
 ---

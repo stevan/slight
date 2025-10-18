@@ -74,6 +74,13 @@ export class REPLOutput implements OutputSink {
         const value = token?.value !== undefined ? token.value : token;
 
         if (isPipelineError(value)) {
+            // Check for enhanced error details
+            if (value.details?.formatted) {
+                return value.details.formatted;
+            }
+            if (value.details?.line !== undefined && value.details?.column !== undefined) {
+                return `Error at line ${value.details.line}, column ${value.details.column}:\n  ${value.message}`;
+            }
             return `[${value.stage} Error] ${value.message}`;
         }
         if (value === null || value === undefined) {

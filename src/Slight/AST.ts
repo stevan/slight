@@ -1,4 +1,6 @@
 
+import { UndefinedSymbolError, TypeMismatchError, ArityError, SyntaxError } from './SlightError.js';
+
 // interface Environment {
 //     bindings
 //     builtins
@@ -12,7 +14,15 @@
 
 export abstract class ASTNode {
     abstract type: string;
+    location?: { line: number; column: number };
     abstract evaluate(interpreter: any, params: Map<string, any>): Promise<any>;
+
+    setLocation(line?: number, column?: number): this {
+        if (line !== undefined && column !== undefined) {
+            this.location = { line, column };
+        }
+        return this;
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -65,7 +75,11 @@ export class SymbolNode extends ASTNode {
         if (interpreter.bindings.has(this.name)) return interpreter.bindings.get(this.name);
         if (interpreter.builtins.has(this.name)) return interpreter.builtins.get(this.name);
         if (interpreter.functions.has(this.name)) return interpreter.functions.get(this.name);
-        throw new Error(`Undefined symbol: ${this.name}`);
+        // Debug: log location when error occurs
+        if (process.env['DEBUG']) {
+            console.error(`DEBUG: SymbolNode '${this.name}' at location:`, this.location);
+        }
+        throw new UndefinedSymbolError(this.name, this);
     }
 }
 
