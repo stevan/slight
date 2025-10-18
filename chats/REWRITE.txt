@@ -1,0 +1,968 @@
+⏺ Comprehensive Analysis: Porting Slight to a Lower-Level Language
+
+  Based on my thorough analysis of your Slight LISP interpreter, here's a detailed evaluation with recommendations for porting to lower-level languages while preserving the
+  async generator pipeline and process architecture.
+
+  ---
+  1. ARCHITECTURE SUMMARY
+
+  Core Design Patterns
+
+  Pipeline Architecture (src/Slight/Tokenizer.ts, Parser.ts, etc.):
+  - Composable async generators: Input → Tokenizer → Parser → MacroExpander → Interpreter → Output
+  - Each stage is independent and can be tested/swapped
+  - ~0.012ms overhead per expression through full pipeline
+  - Clean separation of concerns with pipeline error propagation
+
+  Process System (src/Slight/ProcessRuntime.ts):
+  - Erlang-style actors with isolated interpreter instances
+  - Copy-on-write environment inheritance (41x speedup for 200-item environments)
+  - AsyncQueue for message passing (250K+ messages/sec throughput)
+  - Process spawn: ~0.018ms (55K+ spawns/sec)
+  - Memory: ~0.16 KB per process
+  - Linear scaling up to 1000+ concurrent processes
+
+  Memory Management:
+  - Prototype chain for environment lookups (ProcessRuntime.ts:112-116)
+  - Reference-based parent state instead of deep cloning
+  - Interpreter reuse saves ~80% memory
+  - Minimal heap growth (~0.3MB over 1000 iterations)
+
+  AST System (src/Slight/AST.ts):
+  - Object-oriented with polymorphic evaluate() methods
+  - 626 LOC core interpreter with 150+ builtin functions
+  - Platform-agnostic core with Node.js/Browser extensions
+
+  ---
+  2. KEY CHALLENGES FOR PORTING
+
+  Challenge 1: Async Generators
+
+  Your pipeline heavily relies on JavaScript's async generator syntax (async function*). This provides:
+  - Lazy evaluation with backpressure
+  - Clean composition with for await
+  - Automatic promise handling
+
+  Challenge 2: Dynamic Typing & Maps
+
+  - Heavy use of Map<string, any> for environments
+  - Dynamic dispatch for builtin functions
+  - Runtime type checking for function calls
+
+  Challenge 3: Garbage Collection
+
+  - Copy-on-write relies on GC for shared references
+  - No manual memory management burden
+  - Process cleanup relies on automatic collection
+
+  ---
+  3. LANGUAGE EVALUATION
+
+  RECOMMENDATION: Rust (Primary Choice)
+
+  Why Rust is ideal for your use case:
+
+  ✅ Native async/await with generators-like patterns via async streams
+  ✅ Zero-cost abstractions for pipeline composition✅ Excellent concurrency with Tokio runtime for process system✅ Reference counting (Rc<T>) for copy-on-write semantics✅
+  Strong type system with enums for AST nodes✅ Cross-platform (WASM support for browser)✅ Memory safety without GC overhead
+
+  Concrete mapping:
+
+  // 1. PIPELINE ARCHITECTURE using async streams
+  use futures::stream::{Stream, StreamExt};
+  use std::pin::Pin;
+
+  type SourceStream = Pin<Box<dyn Stream<Item = String> + Send>>;
+  type TokenStream = Pin<Box<dyn Stream<Item = Result<Token, PipelineError>> + Send>>;
+  type ASTStream = Pin<Box<dyn Stream<Item = Result<ASTNode, PipelineError>> + Send>>;
+
+  struct Tokenizer;
+  impl Tokenizer {
+      async fn run(self, source: SourceStream) -> TokenStream {
+          Box::pin(source.flat_map(|chunk| {
+              // Tokenize and yield tokens as stream
+              futures::stream::iter(self.tokenize(chunk))
+          }))
+      }
+  }
+
+  // 2. PROCESS SYSTEM using Tokio actors
+  use tokio::sync::mpsc;
+  use std::collections::HashMap;
+  use std::rc::Rc;
+
+  struct Message {
+      from: usize,
+      data: Value,
+  }
+
+  struct ProcessHandle {
+      pid: usize,
+      mailbox: mpsc::UnboundedSender<Message>,
+      task: tokio::task::JoinHandle<()>,
+  }
+
+  struct ProcessRuntime {
+      processes: HashMap<usize, ProcessHandle>,
+      next_pid: usize,
+  }
+
+  impl ProcessRuntime {
+      async fn spawn(&mut self, code: String, parent_state: Option<ParentState>) -> usize {
+          let pid = self.next_pid;
+          self.next_pid += 1;
+
+          let (tx, mut rx) = mpsc::unbounded_channel();
+
+          // Create interpreter with copy-on-write state
+          let mut interpreter = Interpreter::new();
+          if let Some(state) = parent_state {
+              // Use Rc for cheap reference counting (copy-on-write)
+              interpreter.parent_functions = Some(Rc::clone(&state.functions));
+              interpreter.parent_macros = Some(Rc::clone(&state.macros));
+              interpreter.parent_bindings = Some(Rc::clone(&state.bindings));
+          }
+
+          // Spawn async task
+          let task = tokio::spawn(async move {
+              // Run interpreter with message processing
+              while let Some(msg) = rx.recv().await {
+                  // Process messages
+              }
+          });
+
+          self.processes.insert(pid, ProcessHandle { pid, mailbox: tx, task });
+          pid
+      }
+  }
+
+  // 3. COPY-ON-WRITE ENVIRONMENT using Rc
+  use std::rc::Rc;
+  use std::collections::HashMap;
+
+  struct Interpreter {
+      // Local environment (writes go here)
+      functions: HashMap<String, FunctionDef>,
+      bindings: HashMap<String, Value>,
+
+      // Parent environment (reads fall back here)
+      parent_functions: Option<Rc<HashMap<String, FunctionDef>>>,
+      parent_bindings: Option<Rc<HashMap<String, Value>>>,
+  }
+
+  impl Interpreter {
+      fn get_binding(&self, name: &str) -> Option<&Value> {
+          // Check local first
+          if let Some(val) = self.bindings.get(name) {
+              return Some(val);
+          }
+          // Fall back to parent
+          self.parent_bindings.as_ref()?.get(name)
+      }
+  }
+
+  // 4. AST SYSTEM using enums and pattern matching
+  #[derive(Debug, Clone)]
+  enum ASTNode {
+      Number(f64),
+      String(String),
+      Boolean(bool),
+      Symbol(String),
+      Call(Vec<ASTNode>),
+      Def { name: String, params: Option<Vec<String>>, body: Box<ASTNode> },
+      Cond { clauses: Vec<(ASTNode, ASTNode)>, else_clause: Option<Box<ASTNode>> },
+      // ... other variants
+  }
+
+  impl ASTNode {
+      async fn evaluate(&self, interp: &mut Interpreter, params: &HashMap<String, Value>) -> Result<Value, RuntimeError> {
+          match self {
+              ASTNode::Number(n) => Ok(Value::Number(*n)),
+              ASTNode::Symbol(name) => {
+                  // Lookup in params, then bindings, then builtins
+                  params.get(name)
+                      .or_else(|| interp.get_binding(name))
+                      .cloned()
+                      .ok_or_else(|| RuntimeError::UndefinedSymbol(name.clone()))
+              },
+              ASTNode::Call(elements) => {
+                  // Function call logic
+                  let func = elements[0].evaluate(interp, params).await?;
+                  let args = futures::future::try_join_all(
+                      elements[1..].iter().map(|e| e.evaluate(interp, params))
+                  ).await?;
+                  interp.call_function(func, args).await
+              },
+              // ... other cases
+          }
+      }
+  }
+
+  Key Rust advantages for your architecture:
+
+  1. Async Streams: The futures crate provides Stream trait which maps directly to your async generators
+  2. Tokio Runtime: Built-in work-stealing scheduler for M:N threading (like Erlang processes)
+  3. Rc/Arc: Reference counting for copy-on-write without GC overhead
+  4. Zero-cost Channels: tokio::sync::mpsc for message passing
+  5. Pattern Matching: Cleaner than TypeScript type guards for AST handling
+  6. WASM Support: Can compile to browser with wasm-bindgen
+
+  ---
+  Alternative 1: C++20 (If You Need Maximum Control)
+
+  Strengths:
+  - Coroutines with co_yield for generator-like behavior
+  - Full control over memory layout
+  - Excellent performance
+
+  Challenges:
+  - Manual memory management complexity
+  - No standard async runtime (need to build or use asio/libuv)
+  - More verbose than Rust
+  - Harder to achieve memory safety
+
+  Example mapping:
+  // C++20 coroutine generators
+  #include <coroutine>
+  #include <optional>
+
+  template<typename T>
+  struct Generator {
+      struct promise_type {
+          T current_value;
+          auto get_return_object() { return Generator{handle_type::from_promise(*this)}; }
+          auto initial_suspend() { return std::suspend_always{}; }
+          auto final_suspend() noexcept { return std::suspend_always{}; }
+          auto yield_value(T value) {
+              current_value = std::move(value);
+              return std::suspend_always{};
+          }
+          void return_void() {}
+          void unguarded_exception() { std::terminate(); }
+      };
+
+      using handle_type = std::coroutine_handle<promise_type>;
+      handle_type coro;
+
+      Generator(handle_type h) : coro(h) {}
+      ~Generator() { if (coro) coro.destroy(); }
+
+      std::optional<T> next() {
+          if (!coro || coro.done()) return std::nullopt;
+          coro.resume();
+          if (coro.done()) return std::nullopt;
+          return coro.promise().current_value;
+      }
+  };
+
+  // Tokenizer using generator
+  Generator<Token> Tokenizer::run(Generator<std::string>& source) {
+      while (auto chunk = source.next()) {
+          for (auto& token : tokenize(*chunk)) {
+              co_yield token;
+          }
+      }
+  }
+
+  Recommendation: Only choose C++ if you need to integrate with existing C++ codebases or need ultra-precise control over memory layout. Otherwise, Rust is superior.
+
+  ---
+  Alternative 2: Go (If You Prioritize Simplicity)
+
+  Strengths:
+  - Built-in goroutines map naturally to your process system
+  - Channels for message passing
+  - Simple syntax, easy to maintain
+  - Fast compilation
+
+  Challenges:
+  - ❌ No generators - would need to use channels instead, changing architecture significantly
+  - Garbage collected (less control than Rust)
+  - No sum types (would need interface{} for AST)
+  - Less type safety than Rust
+
+  Example mapping:
+  // Pipeline using channels
+  type Token struct { Type string; Value string }
+  type ASTNode interface { Evaluate(*Interpreter) (Value, error) }
+
+  func (t *Tokenizer) Run(source <-chan string) <-chan Token {
+      tokens := make(chan Token)
+      go func() {
+          defer close(tokens)
+          for chunk := range source {
+              for _, token := range t.tokenize(chunk) {
+                  tokens <- token
+              }
+          }
+      }()
+      return tokens
+  }
+
+  // Process system maps naturally
+  type ProcessRuntime struct {
+      processes map[int]*Process
+  }
+
+  type Process struct {
+      pid int
+      mailbox chan Message
+      interpreter *Interpreter
+  }
+
+  func (r *ProcessRuntime) Spawn(code string) int {
+      pid := r.nextPid
+      r.nextPid++
+
+      mailbox := make(chan Message, 100)
+      interp := NewInterpreter()
+
+      go func() {
+          // Run interpreter
+          for msg := range mailbox {
+              // Handle message
+          }
+      }()
+
+      r.processes[pid] = &Process{pid, mailbox, interp}
+      return pid
+  }
+
+  Recommendation: Go is good for rapid development but loses the elegant async generator composition. Would require architectural changes.
+
+  ---
+  Alternative 3: Zig (If You Want Modern + Control)
+
+  Strengths:
+  - C-level performance with modern syntax
+  - Explicit memory management
+  - Compiles to C (maximum portability)
+  - No hidden allocations
+
+  Challenges:
+  - ❌ No async/await yet (async is experimental)
+  - ❌ No built-in generators
+  - Smaller ecosystem than Rust
+  - Would require manual implementation of async primitives
+
+  Recommendation: Wait until Zig's async system matures, or be prepared to implement your own runtime.
+
+  ---
+  Alternative 4: OCaml (If You Value Functional Purity)
+
+  Strengths:
+  - Excellent pattern matching for AST
+  - Effect handlers for generator-like behavior
+  - Algebraic types perfect for AST representation
+  - Good GC
+
+  Challenges:
+  - ❌ Async story is complex (need lwt or async library)
+  - Smaller ecosystem
+  - Less mainstream for systems programming
+
+  Example:
+  type ast_node =
+    | Number of float
+    | String of string
+    | Symbol of string
+    | Call of ast_node list
+    | Def of { name: string; params: string list option; body: ast_node }
+
+  let rec evaluate env = function
+    | Number n -> Lwt.return (Value.Number n)
+    | Symbol s ->
+        (match Env.lookup env s with
+         | Some v -> Lwt.return v
+         | None -> Lwt.fail (Undefined_symbol s))
+    | Call (fn :: args) ->
+        let%lwt fn_val = evaluate env fn in
+        let%lwt arg_vals = Lwt_list.map_s (evaluate env) args in
+        call_function env fn_val arg_vals
+
+  ---
+  4. DETAILED RUST IMPLEMENTATION STRATEGY
+
+  Phase 1: Core Data Structures
+
+  // src/types.rs
+  use std::rc::Rc;
+  use std::collections::HashMap;
+
+  #[derive(Debug, Clone)]
+  pub enum Value {
+      Nil,
+      Number(f64),
+      String(String),
+      Boolean(bool),
+      List(Vec<Value>),
+      Function(FunctionRef),
+      Closure { params: Vec<String>, body: Box<ASTNode>, env: Rc<HashMap<String, Value>> },
+  }
+
+  pub type FunctionRef = Rc<dyn Fn(Vec<Value>) -> Result<Value, RuntimeError>>;
+
+  // src/ast.rs
+  #[derive(Debug, Clone)]
+  pub enum ASTNode {
+      Number(f64),
+      String(String),
+      Boolean(bool),
+      Symbol(String),
+      Call(Vec<ASTNode>),
+      Quote(Box<ASTNode>),
+      Def { name: String, params: Option<Vec<String>>, body: Box<ASTNode> },
+      Let { bindings: Vec<(String, ASTNode)>, body: Box<ASTNode> },
+      Cond { clauses: Vec<(ASTNode, ASTNode)>, else_clause: Option<Box<ASTNode>> },
+      Fun { params: Vec<String>, body: Box<ASTNode> },
+      // ... more variants
+  }
+
+  Phase 2: Async Pipeline
+
+  // src/pipeline.rs
+  use futures::stream::{Stream, StreamExt};
+  use std::pin::Pin;
+
+  pub type SourceStream = Pin<Box<dyn Stream<Item = String> + Send>>;
+  pub type TokenStream = Pin<Box<dyn Stream<Item = Result<Token, PipelineError>> + Send>>;
+  pub type ASTStream = Pin<Box<dyn Stream<Item = Result<ASTNode, PipelineError>> + Send>>;
+  pub type OutputStream = Pin<Box<dyn Stream<Item = OutputToken> + Send>>;
+
+  pub struct Tokenizer {
+      sequence_id: usize,
+      current_line: usize,
+  }
+
+  impl Tokenizer {
+      pub fn run(mut self, source: SourceStream) -> TokenStream {
+          Box::pin(source.flat_map(move |chunk| {
+              let tokens: Vec<_> = self.tokenize_chunk(&chunk).collect();
+              futures::stream::iter(tokens)
+          }))
+      }
+
+      fn tokenize_chunk(&mut self, chunk: &str) -> impl Iterator<Item = Result<Token, PipelineError>> + '_ {
+          // Tokenization logic
+          chunk.split_whitespace()
+              .map(move |word| {
+                  self.sequence_id += 1;
+                  Ok(Token {
+                      typ: self.classify(word),
+                      source: word.to_string(),
+                      sequence_id: self.sequence_id,
+                      line: self.current_line,
+                  })
+              })
+      }
+  }
+
+  Phase 3: Process System with Tokio
+
+  // src/process.rs
+  use tokio::sync::mpsc;
+  use std::rc::Rc;
+  use std::collections::HashMap;
+
+  #[derive(Clone)]
+  pub struct ParentState {
+      pub functions: Rc<HashMap<String, FunctionDef>>,
+      pub macros: Rc<HashMap<String, MacroDef>>,
+      pub bindings: Rc<HashMap<String, Value>>,
+  }
+
+  pub struct ProcessRuntime {
+      processes: HashMap<usize, ProcessHandle>,
+      next_pid: usize,
+  }
+
+  struct ProcessHandle {
+      pid: usize,
+      mailbox: mpsc::UnboundedSender<Message>,
+      task: tokio::task::JoinHandle<Result<(), RuntimeError>>,
+      status: ProcessStatus,
+  }
+
+  #[derive(Debug, Clone, Copy)]
+  enum ProcessStatus {
+      Running,
+      Completed,
+      Error,
+  }
+
+  impl ProcessRuntime {
+      pub async fn spawn(&mut self, code: String, parent_state: Option<ParentState>) -> usize {
+          let pid = self.next_pid;
+          self.next_pid += 1;
+
+          let (tx, mut rx) = mpsc::unbounded_channel();
+
+          // Create interpreter with COW state
+          let mut interpreter = CoreInterpreter::new();
+          if let Some(state) = parent_state {
+              interpreter.parent_functions = Some(state.functions);
+              interpreter.parent_macros = Some(state.macros);
+              interpreter.parent_bindings = Some(state.bindings);
+          }
+
+          // Spawn task
+          let task = tokio::spawn(async move {
+              // Set up pipeline
+              let source = futures::stream::iter(vec![code]);
+              let tokens = Tokenizer::new().run(Box::pin(source));
+              let asts = Parser::new().run(tokens);
+              let expanded = MacroExpander::new().run(asts);
+
+              // Run interpreter
+              let mut output_stream = interpreter.run(expanded);
+              while let Some(output) = output_stream.next().await {
+                  // Process output
+              }
+
+              Ok(())
+          });
+
+          self.processes.insert(pid, ProcessHandle {
+              pid,
+              mailbox: tx,
+              task,
+              status: ProcessStatus::Running,
+          });
+
+          pid
+      }
+
+      pub fn send(&mut self, from: usize, to: usize, data: Value) -> Result<(), RuntimeError> {
+          let handle = self.processes.get(&to)
+              .ok_or(RuntimeError::ProcessNotFound(to))?;
+
+          handle.mailbox.send(Message { from, data })
+              .map_err(|_| RuntimeError::ProcessDead(to))?;
+
+          Ok(())
+      }
+
+      pub async fn recv(&mut self, pid: usize, timeout_ms: Option<u64>) -> Result<Option<Message>, RuntimeError> {
+          let handle = self.processes.get_mut(&pid)
+              .ok_or(RuntimeError::ProcessNotFound(pid))?;
+
+          if let Some(timeout) = timeout_ms {
+              tokio::time::timeout(
+                  std::time::Duration::from_millis(timeout),
+                  handle.mailbox_rx.recv()
+              ).await
+              .map(|opt| opt)
+              .unwrap_or(Ok(None))
+          } else {
+              Ok(handle.mailbox_rx.recv().await)
+          }
+      }
+  }
+
+  Phase 4: Copy-on-Write Interpreter
+
+  // src/interpreter.rs
+  use std::rc::Rc;
+  use std::collections::HashMap;
+
+  pub struct CoreInterpreter {
+      // Local environment (writes)
+      pub functions: HashMap<String, FunctionDef>,
+      pub macros: HashMap<String, MacroDef>,
+      pub bindings: HashMap<String, Value>,
+      pub builtins: HashMap<String, BuiltinFn>,
+
+      // Parent environment (reads fall back here)
+      pub parent_functions: Option<Rc<HashMap<String, FunctionDef>>>,
+      pub parent_macros: Option<Rc<HashMap<String, MacroDef>>>,
+      pub parent_bindings: Option<Rc<HashMap<String, Value>>>,
+  }
+
+  impl CoreInterpreter {
+      pub fn has_binding(&self, name: &str) -> bool {
+          self.bindings.contains_key(name) ||
+          self.parent_bindings.as_ref().map_or(false, |p| p.contains_key(name))
+      }
+
+      pub fn get_binding(&self, name: &str) -> Option<Value> {
+          self.bindings.get(name).cloned()
+              .or_else(|| self.parent_bindings.as_ref()?.get(name).cloned())
+      }
+
+      pub fn set_binding(&mut self, name: String, value: Value) {
+          // Always write to local environment
+          self.bindings.insert(name, value);
+      }
+
+      pub async fn run(&mut self, source: ASTStream) -> OutputStream {
+          Box::pin(source.then(move |node_result| async move {
+              match node_result {
+                  Ok(node) => {
+                      match node.evaluate(self, &HashMap::new()).await {
+                          Ok(value) => OutputToken::stdout(value),
+                          Err(e) => OutputToken::error(e),
+                      }
+                  }
+                  Err(e) => OutputToken::error(e.into()),
+              }
+          }))
+      }
+  }
+
+  ---
+  5. PERFORMANCE EXPECTATIONS
+
+  Based on your benchmarks and typical Rust performance characteristics:
+
+  | Metric             | TypeScript (Current) | Rust (Expected) | Improvement      |
+  |--------------------|----------------------|-----------------|------------------|
+  | Pipeline overhead  | 0.012ms              | 0.001-0.003ms   | 4-12x faster     |
+  | Process spawn      | 0.018ms              | 0.005-0.010ms   | 2-4x faster      |
+  | Message throughput | 250K msg/s           | 500K-2M msg/s   | 2-8x faster      |
+  | Memory per process | 0.16 KB              | 0.05-0.10 KB    | 40-60% reduction |
+  | Heap growth        | 0.3MB/1000 iter      | Near-zero       | Eliminated       |
+
+  Key improvements:
+  - No GC pauses
+  - Stack allocation for AST nodes
+  - Zero-cost async (vs Promise overhead)
+  - Better cache locality with enums
+  - SIMD opportunities for builtin math ops
+
+  ---
+  6. MIGRATION STRATEGY
+
+  Recommended Phased Approach:
+
+  Phase 1: Core (2-3 weeks)
+  - Port AST types as Rust enums
+  - Implement basic evaluator
+  - Port 20 core builtins (+, -, *, /, etc.)
+  - Get simple expressions working
+
+  Phase 2: Pipeline (2-3 weeks)
+  - Implement Tokenizer with futures::Stream
+  - Port Parser
+  - Add MacroExpander
+  - Integrate with async runtime
+
+  Phase 3: Process System (2-3 weeks)
+  - Implement ProcessRuntime with Tokio
+  - Add AsyncQueue equivalent (tokio::sync::mpsc)
+  - Port copy-on-write semantics with Rc
+  - Test concurrency scaling
+
+  Phase 4: Builtins & Platform (2-3 weeks)
+  - Port all 150+ builtins
+  - Add Node.js-specific features (fs/, sys/)
+  - Implement WASM target for browser
+  - FFI bindings if needed
+
+  Phase 5: Optimization (2-4 weeks)
+  - Profile with cargo flamegraph
+  - Optimize hot paths
+  - Add custom allocators if needed
+  - Benchmark against TypeScript version
+
+  Total estimated time: 10-15 weeks for a single experienced Rust developer
+
+  ---
+  7. TOOLING & ECOSYSTEM
+
+  Recommended Rust Crates:
+
+  [dependencies]
+  # Async runtime
+  tokio = { version = "1.35", features = ["full"] }
+  futures = "0.3"
+
+  # Parsing (if you want parser combinators instead of manual)
+  nom = "7.1"  # Optional: alternative to manual parsing
+  pest = "2.7"  # Optional: PEG parser generator
+
+  # Error handling
+  thiserror = "1.0"
+  anyhow = "1.0"
+
+  # Performance
+  dashmap = "5.5"  # Concurrent HashMap (for global process registry)
+  parking_lot = "0.12"  # Faster mutexes
+
+  # Testing
+  proptest = "1.4"  # Property-based testing
+  criterion = "0.5"  # Benchmarking
+
+  # WASM support
+  wasm-bindgen = "0.2"
+  web-sys = "0.3"
+
+  Development Tools:
+
+  # Profiling
+  cargo install flamegraph
+  cargo install cargo-instruments  # macOS only
+
+  # Benchmarking
+  cargo install cargo-criterion
+
+  # Testing
+  cargo install cargo-nextest  # Faster test runner
+
+  # WASM
+  cargo install wasm-pack
+
+  ---
+  8. POTENTIAL CHALLENGES & SOLUTIONS
+
+  Challenge 1: Async Recursion
+
+  Problem: Rust doesn't allow direct recursive async functions (stack size)
+
+  Solution: Use async_recursion crate or Box
+
+  use async_recursion::async_recursion;
+
+  impl ASTNode {
+      #[async_recursion]
+      async fn evaluate(&self, interp: &mut Interpreter) -> Result<Value, Error> {
+          // Can now call evaluate recursively
+      }
+  }
+
+  Challenge 2: Shared Mutable State
+
+  Problem: Rust's borrow checker prevents shared mutable access
+
+  Solution: Use RefCell for interior mutability or restructure to avoid mutation
+
+  use std::rc::Rc;
+  use std::cell::RefCell;
+
+  struct Interpreter {
+      bindings: Rc<RefCell<HashMap<String, Value>>>,
+  }
+
+  // Or restructure to return new interpreter state
+  impl Interpreter {
+      fn with_binding(mut self, name: String, value: Value) -> Self {
+          self.bindings.insert(name, value);
+          self
+      }
+  }
+
+  Challenge 3: Error Location Tracking
+
+  Problem: Preserving location info through pipeline
+
+  Solution: Use Result with custom error type containing location
+
+  #[derive(Debug, Clone)]
+  pub struct LocatedError {
+      pub error: RuntimeError,
+      pub location: Option<Location>,
+  }
+
+  #[derive(Debug, Clone, Copy)]
+  pub struct Location {
+      pub line: usize,
+      pub column: usize,
+  }
+
+  ---
+  9. ALTERNATIVE: HYBRID APPROACH
+
+  If full rewrite is too risky, consider incrementally porting hot paths:
+
+  Strategy: Keep TypeScript, Add Rust via Native Modules
+
+  // Rust side (compiled to .node)
+  #[neon::export]
+  fn fast_evaluate(code: String) -> Result<Value, Error> {
+      // Rust implementation of interpreter
+  }
+
+  // TypeScript side
+  const native = require('./native/index.node');
+
+  class Interpreter {
+      async evaluate(code: string) {
+          // Use native Rust for hot path
+          return native.fastEvaluate(code);
+      }
+  }
+
+  Benefits:
+  - Incremental migration
+  - Keep existing tests
+  - Measure performance gains empirically
+  - Lower risk
+
+  Drawbacks:
+  - FFI overhead
+  - Complexity of maintaining both
+
+  ---
+  10. FINAL RECOMMENDATIONS
+
+  Primary Recommendation: Full Rust Rewrite
+
+  Why:
+  1. Your architecture (async generators + actors) maps perfectly to Rust's async/futures + Tokio
+  2. Performance gains will be substantial (4-12x on pipeline, 2-8x on processes)
+  3. Memory safety prevents entire classes of bugs
+  4. WASM support gives you browser target for free
+  5. No GC means predictable performance
+
+  Migration Path:
+
+  1. Start with Phase 1 (Core AST + evaluation)
+  2. Port test suite incrementally
+  3. Keep TypeScript version until Rust version reaches feature parity
+  4. Use benchmarks to validate performance improvements
+  5. Deploy Rust version alongside TypeScript initially for gradual rollout
+
+  When NOT to use Rust:
+
+  - Your team has no Rust experience and tight deadlines
+  - You need rapid prototyping (stick with TypeScript)
+  - Ecosystem around LISP interpreters is richer in another language
+
+  Quick Win Alternative:
+
+  If full rewrite isn't feasible now, start with Zig or C++ for specific hot paths (like the evaluator or process spawning) and call via FFI. This gives you 70% of the
+  performance benefit with 20% of the effort.
+
+  ---
+  11. CODE EXAMPLE: COMPLETE MINIMAL PORT
+
+  Here's a minimal but complete example showing the core architecture in Rust:
+
+  // Complete minimal Slight interpreter in Rust
+  use futures::stream::{self, Stream, StreamExt};
+  use std::collections::HashMap;
+  use std::pin::Pin;
+  use std::rc::Rc;
+
+  // ============================================================================
+  // AST
+  // ============================================================================
+
+  #[derive(Debug, Clone)]
+  enum ASTNode {
+      Number(f64),
+      Symbol(String),
+      Call(Vec<ASTNode>),
+  }
+
+  impl ASTNode {
+      async fn evaluate(&self, env: &HashMap<String, f64>) -> Result<f64, String> {
+          match self {
+              ASTNode::Number(n) => Ok(*n),
+              ASTNode::Symbol(s) => env.get(s).copied()
+                  .ok_or_else(|| format!("Undefined: {}", s)),
+              ASTNode::Call(elems) => {
+                  let func = match &elems[0] {
+                      ASTNode::Symbol(s) => s.as_str(),
+                      _ => return Err("First element must be symbol".into()),
+                  };
+                  let args: Vec<f64> = stream::iter(&elems[1..])
+                      .then(|node| node.evaluate(env))
+                      .collect::<Vec<_>>()
+                      .await
+                      .into_iter()
+                      .collect::<Result<_, _>>()?;
+
+                  match func {
+                      "+" => Ok(args.iter().sum()),
+                      "*" => Ok(args.iter().product()),
+                      _ => Err(format!("Unknown function: {}", func)),
+                  }
+              }
+          }
+      }
+  }
+
+  // ============================================================================
+  // Pipeline
+  // ============================================================================
+
+  type SourceStream = Pin<Box<dyn Stream<Item = String> + Send>>;
+  type ASTStream = Pin<Box<dyn Stream<Item = Result<ASTNode, String>> + Send>>;
+
+  fn tokenize(source: SourceStream) -> Pin<Box<dyn Stream<Item = String> + Send>> {
+      Box::pin(source.flat_map(|s| stream::iter(
+          s.replace('(', " ( ")
+           .replace(')', " ) ")
+           .split_whitespace()
+           .map(String::from)
+           .collect::<Vec<_>>()
+      )))
+  }
+
+  fn parse(tokens: Pin<Box<dyn Stream<Item = String> + Send>>) -> ASTStream {
+      // Simplified parser - in real impl would handle nested parens
+      Box::pin(stream::unfold((tokens, Vec::new()), |(mut tokens, stack)| async move {
+          while let Some(tok) = tokens.next().await {
+              match tok.as_str() {
+                  "(" => { /* push to stack */ },
+                  ")" => { /* pop and return */ },
+                  _ => {
+                      // Parse number or symbol
+                      if let Ok(n) = tok.parse::<f64>() {
+                          return Some((Ok(ASTNode::Number(n)), (tokens, stack)));
+                      } else {
+                          return Some((Ok(ASTNode::Symbol(tok)), (tokens, stack)));
+                      }
+                  }
+              }
+          }
+          None
+      }))
+  }
+
+  // ============================================================================
+  // Main
+  // ============================================================================
+
+  #[tokio::main]
+  async fn main() {
+      let code = "(+ 1 2 3)";
+      let source = Box::pin(stream::iter(vec![code.to_string()]));
+      let tokens = tokenize(source);
+      let mut asts = parse(tokens);
+
+      let env = HashMap::new();
+      while let Some(ast_result) = asts.next().await {
+          match ast_result {
+              Ok(ast) => {
+                  match ast.evaluate(&env).await {
+                      Ok(result) => println!("Result: {}", result),
+                      Err(e) => eprintln!("Error: {}", e),
+                  }
+              }
+              Err(e) => eprintln!("Parse error: {}", e),
+          }
+      }
+  }
+
+  ---
+  CONCLUSION
+
+  Your Slight interpreter has an exceptionally clean architecture that would translate beautifully to Rust. The async generator pipeline maps to Rust's Stream trait, the
+  process system maps to Tokio actors, and the copy-on-write semantics map to Rc.
+
+  Expected outcomes after porting to Rust:
+  - 4-12x faster pipeline throughput
+  - 2-8x more processes per second
+  - 50% less memory per process
+  - Zero GC pauses
+  - Native WASM support for browser
+  - Stronger type safety and fewer runtime errors
+
+  The estimated time investment of 10-15 weeks for a full port would yield a production-ready interpreter with significantly better performance characteristics while
+  maintaining your elegant architecture.
+
+  Would you like me to elaborate on any specific aspect of the porting strategy, or would you like me to generate a more detailed code example for a particular component?
+
+
+

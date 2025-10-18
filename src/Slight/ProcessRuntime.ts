@@ -108,11 +108,12 @@ export class ProcessRuntime {
         const output = new SilentOutputSink();
         const slight = this.slightFactory(input, output);
 
-        // Clone parent state if provided (share-nothing concurrency)
+        // Copy-on-write: Keep reference to parent state instead of cloning
         if (parentState) {
-            slight.interpreter.functions = new Map(parentState.functions);
-            slight.interpreter.macros = new Map(parentState.macros);
-            slight.interpreter.bindings = new Map(parentState.bindings);
+            slight.interpreter.parentFunctions = parentState.functions;
+            slight.interpreter.parentMacros = parentState.macros;
+            slight.interpreter.parentBindings = parentState.bindings;
+            // Local maps start empty - writes go here, reads fall back to parent
         }
 
         // Set the PID in the interpreter so builtins can access it

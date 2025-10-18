@@ -10,6 +10,12 @@
     "slight": "tsc && node js/bin/slight.js",
     "test": "tsc && node --test 'js/tests/*.test.js'",
     "build": "tsc",
-    "build:browser": "tsc"
+    "build:browser": "tsc",
+    "bench": "tsc && node js/benchmarks/pipeline-overhead.js",
+    "bench:memory": "tsc && node --expose-gc js/benchmarks/memory-usage.js",
+    "bench:process": "tsc && node --expose-gc js/benchmarks/process-system.js",
+    "profile:cpu": "tsc && node --cpu-prof js/benchmarks/pipeline-overhead.js",
+    "profile:heap": "tsc && node --heap-prof js/benchmarks/pipeline-overhead.js",
+    "profile:inspect": "tsc && node --inspect-brk js/benchmarks/pipeline-overhead.js"
   }
 }

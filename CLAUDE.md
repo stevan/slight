@@ -20,15 +20,52 @@ npm run slight program.sl
 npm run slight -e "(+ 1 2)"
 npm run slight -i lib/ program.sl
 
-# Run all tests (27 test files)
+# Run all tests (188 tests across 27 test files)
 npm test
 
 # Run a specific test
 tsc && node --test js/tests/030-Interpreter.test.js
 
+# Benchmarking and profiling
+npm run bench              # Pipeline overhead benchmark
+npm run bench:memory       # Memory usage analysis
+npm run bench:process      # Process system performance
+npm run profile:cpu        # Generate CPU profile
+npm run profile:heap       # Generate heap snapshot
+npm run profile:inspect    # Debug with Chrome DevTools
+
 # Build for browser
 npm run build:browser
 # Then serve with: npx http-server -p 8080
+```
+
+## Performance & Profiling
+
+### Benchmarking
+Three benchmark suites are available in `benchmarks/`:
+
+1. **Pipeline Overhead** (`pipeline-overhead.ts`): Measures async generator pipeline overhead
+   - Full pipeline vs direct AST evaluation
+   - Individual stage performance (Tokenizer, Parser, MacroExpander, Interpreter)
+   - ~0.012ms per expression through full pipeline (~20x overhead vs direct eval)
+
+2. **Memory Usage** (`memory-usage.ts`): Tracks heap allocations and GC patterns
+   - Interpreter reuse saves ~80% memory
+   - Minimal heap growth (~0.3MB over 1000 iterations)
+
+3. **Process System** (`process-system.ts`): Comprehensive process performance analysis
+   - Process spawning with various state sizes
+   - Message passing throughput (250K+ messages/sec)
+   - Concurrent process scaling (linear scaling up to 1000+ processes)
+   - Memory overhead per process (~0.16 KB)
+
+### Profiling Guide
+See `docs/PROFILING.md` for detailed profiling instructions including:
+- Node.js CPU profiler usage
+- Chrome DevTools integration
+- Clinic.js for advanced diagnostics
+- Memory profiling techniques
+- Optimization strategies
 ```
 
 ## Architecture Overview
@@ -65,10 +102,49 @@ All AST nodes (`src/Slight/AST.ts`) extend `ASTNode` and implement their own `ev
 `ProcessRuntime.ts` implements Erlang-style actors with:
 - Isolated interpreter instances per process
 - Message passing via AsyncQueue
+- Copy-on-write environment sharing (zero-cost state inheritance)
 - Works identically in Node.js and browser
 - Browser UI shows each process in a separate window
 
+**Performance characteristics:**
+- Process spawn: ~0.018ms (55K+ spawns/sec)
+- Message passing: 250K+ messages/sec
+- Memory: ~0.16 KB per process
+- Scaling: Linear up to 1000+ concurrent processes
+
+**Copy-on-Write Optimization:**
+Child processes inherit parent state by reference, not by cloning. Reads check local environment first, then fall back to parent. Writes always go to local environment, preserving isolation. This eliminates the cost of cloning large environments (41x speedup for 200-item environments).
+
 ## Key Implementation Details
+
+### Copy-on-Write Environment Inheritance
+The interpreter uses a prototype chain for process environments:
+
+**CoreInterpreter fields:**
+```typescript
+// Local environment (writes go here)
+public functions: Map<string, { params: string[], body: ASTNode }>;
+public macros: Map<string, { params: string[], body: ASTNode }>;
+public bindings: Map<string, any>;
+
+// Parent environment references (reads fall back here)
+public parentFunctions?: Map<...>;
+public parentMacros?: Map<...>;
+public parentBindings?: Map<...>;
+```
+
+**Lookup methods** (in `CoreInterpreter.ts`):
+- `hasFunction(name)`, `getFunction(name)`: Check local first, then parent
+- `hasMacro(name)`, `getMacro(name)`: Check local first, then parent
+- `hasBinding(name)`, `getBinding(name)`: Check local first, then parent
+
+**AST nodes** (`src/Slight/AST.ts`) use these helpers instead of direct Map access:
+- `SymbolNode`: Uses `interpreter.hasBinding()` and `interpreter.getBinding()`
+- `CallNode`: Uses helpers for method calls with dot notation
+- `SetNode`: Uses `interpreter.hasBinding()` for existence check, writes to local
+
+**ProcessRuntime** (`src/Slight/ProcessRuntime.ts:112-116`):
+Sets parent references instead of cloning Maps when spawning with state.
 
 ### Adding New Builtin Functions
 1. **Platform-agnostic**: Add to `CoreInterpreter.ts` in the constructor

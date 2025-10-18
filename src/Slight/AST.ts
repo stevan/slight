@@ -64,7 +64,7 @@ export class SymbolNode extends ASTNode {
         // Support dot notation: "obj.prop" or "obj.method"
         if (this.name.includes('.')) {
             const [objName, ...props] = this.name.split('.');
-            let obj = params.get(objName) ?? interpreter.bindings.get(objName);
+            let obj = params.get(objName) ?? interpreter.getBinding(objName);
             for (const prop of props) {
                 if (obj == null) throw new Error(`Cannot access property '${prop}' of null/undefined`);
                 obj = obj[prop];
@@ -72,9 +72,9 @@ export class SymbolNode extends ASTNode {
             return obj;
         }
         if (params.has(this.name)) return params.get(this.name);
-        if (interpreter.bindings.has(this.name)) return interpreter.bindings.get(this.name);
+        if (interpreter.hasBinding(this.name)) return interpreter.getBinding(this.name);
         if (interpreter.builtins.has(this.name)) return interpreter.builtins.get(this.name);
-        if (interpreter.functions.has(this.name)) return interpreter.functions.get(this.name);
+        if (interpreter.hasFunction(this.name)) return interpreter.getFunction(this.name);
         // Debug: log location when error occurs
         if (process.env['DEBUG']) {
             console.error(`DEBUG: SymbolNode '${this.name}' at location:`, this.location);
@@ -104,7 +104,7 @@ export class CallNode extends ASTNode {
         if (funcNode instanceof SymbolNode && funcNode.name.includes('.')) {
             // e.g., m.set => call with m as this
             const [objName, ...props] = funcNode.name.split('.');
-            let obj = params.get(objName) ?? interpreter.bindings.get(objName);
+            let obj = params.get(objName) ?? interpreter.getBinding(objName);
             for (let j = 0; j < props.length - 1; j++) {
                 obj = obj[props[j]];
             }
@@ -416,8 +416,8 @@ export class SetNode extends ASTNode {
         if (params.has(this.name)) {
             // Update local scope
             params.set(this.name, newValue);
-        } else if (interpreter.bindings.has(this.name)) {
-            // Update global bindings
+        } else if (interpreter.hasBinding(this.name)) {
+            // Update global bindings (always write to local environment for copy-on-write)
             interpreter.bindings.set(this.name, newValue);
         } else {
             throw new Error(`Cannot set! undefined variable: ${this.name}`);

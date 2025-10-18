@@ -33,8 +33,47 @@ export class CoreInterpreter {
     public outputQueue : OutputToken[]          = [];
     private loggingEnabled : boolean            = true;
 
+    // Parent environment references for copy-on-write spawning
+    public parentFunctions?: Map<string, { params: string[], body: ASTNode }>;
+    public parentMacros?: Map<string, { params: string[], body: ASTNode }>;
+    public parentBindings?: Map<string, any>;
+
     constructor() {
         this.initBuiltins();
+    }
+
+    // Helper methods for copy-on-write lookup
+    hasFunction(name: string): boolean {
+        return this.functions.has(name) || (this.parentFunctions?.has(name) ?? false);
+    }
+
+    getFunction(name: string): { params: string[], body: ASTNode } | undefined {
+        if (this.functions.has(name)) {
+            return this.functions.get(name);
+        }
+        return this.parentFunctions?.get(name);
+    }
+
+    hasMacro(name: string): boolean {
+        return this.macros.has(name) || (this.parentMacros?.has(name) ?? false);
+    }
+
+    getMacro(name: string): { params: string[], body: ASTNode } | undefined {
+        if (this.macros.has(name)) {
+            return this.macros.get(name);
+        }
+        return this.parentMacros?.get(name);
+    }
+
+    hasBinding(name: string): boolean {
+        return this.bindings.has(name) || (this.parentBindings?.has(name) ?? false);
+    }
+
+    getBinding(name: string): any | undefined {
+        if (this.bindings.has(name)) {
+            return this.bindings.get(name);
+        }
+        return this.parentBindings?.get(name);
     }
 
     async *run(source: ASTStream): OutputStream {
@@ -580,11 +619,11 @@ export class CoreInterpreter {
                 throw new Error('spawn expects a string (code) or function');
             }
 
-            // Clone parent interpreter state
+            // Pass parent interpreter state by reference (copy-on-write)
             const parentState: ParentState = {
-                functions: new Map(this.functions),
-                macros: new Map(this.macros),
-                bindings: new Map(this.bindings)
+                functions: this.functions,
+                macros: this.macros,
+                bindings: this.bindings
             };
 
             return runtime.spawn(code, parentState);
