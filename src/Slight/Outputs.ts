@@ -37,7 +37,11 @@ export class ConsoleOutput implements OutputSink {
             return token.value.toString();
         }
         if (typeof token.value === 'string') {
-            return `"${token.value}"`;
+            let output = token.value;
+            if (output.endsWith("\n")) {
+                output = output.split("\n")[0];
+            }
+            return `"${output}"`;
         }
         if (Array.isArray(token.value)) {
             if (token.value.length === 0) {

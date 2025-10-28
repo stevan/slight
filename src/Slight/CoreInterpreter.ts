@@ -91,11 +91,11 @@ export class CoreInterpreter {
                 }
 
                 // Then yield the evaluation result
-                if (node instanceof DefNode || node instanceof DefMacroNode || node instanceof SetNode) {
+                //if (node instanceof DefNode || node instanceof DefMacroNode || node instanceof SetNode) {
                     yield { type: OutputHandle.INFO, value: result };
-                } else {
-                    yield { type: OutputHandle.STDOUT, value: result };
-                }
+                //} else {
+                //    yield { type: OutputHandle.STDOUT, value: result };
+                //}
             } catch (e) {
                 // Flush output queue even on error
                 while (this.outputQueue.length > 0) {

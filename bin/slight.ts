@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { Slight } from '../src/Slight.js';
-import { ConsoleOutput, CombinedOutput } from '../src/Slight/Outputs.js';
+import { ConsoleOutput, CombinedOutput, StandardOutput } from '../src/Slight/Outputs.js';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
@@ -44,9 +44,9 @@ async function main() {
 
     let i = 0;
     while (i < args.length) {
-        if (args[i] === '-i' || args[i] === '--include-path') {
+        if (args[i] === '-i' || args[i] === '-I' || args[i] === '--include-path') {
             if (i + 1 >= args.length) {
-                console.error('Error: -i/--include-path requires a path argument');
+                console.error('Error: -i/-I/--include-path requires a path argument');
                 process.exit(1);
             }
             includePaths.push(resolve(args[i + 1]));
@@ -132,7 +132,7 @@ Examples:
         const filepath = resolve(remainingArgs[0]);
         const slight = new Slight(
             new FileSource(filepath),
-            new CombinedOutput()
+            new StandardOutput()
         );
         // Set include paths if any
         if (includePaths.length > 0) {
