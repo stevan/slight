@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { Slight } from '../src/Slight.js';
-import { ConsoleOutput } from '../src/Slight/Outputs.js';
+import { ConsoleOutput, CombinedOutput } from '../src/Slight/Outputs.js';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
@@ -95,7 +95,7 @@ async function main() {
         const expression = remainingArgs[1];
         const slight = new Slight(
             new StringSource(expression),
-            new ConsoleOutput('')
+            new CombinedOutput()
         );
         // Set include paths if any
         if (includePaths.length > 0) {
@@ -132,7 +132,7 @@ Examples:
         const filepath = resolve(remainingArgs[0]);
         const slight = new Slight(
             new FileSource(filepath),
-            new ConsoleOutput('')
+            new CombinedOutput()
         );
         // Set include paths if any
         if (includePaths.length > 0) {

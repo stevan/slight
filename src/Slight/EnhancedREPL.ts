@@ -64,15 +64,15 @@ Debug Commands:
         while (true) {
             const line = await this.$readline.question(prompt);
 
+            // Exit commands
+            if (line === ':q' || line === ':quit' || line === 'exit' || line === 'quit') {
+                break;
+            }
+
             // Handle special commands
             if (line.startsWith(':')) {
                 await this.handleCommand(line);
                 continue;
-            }
-
-            // Exit commands
-            if (line === ':q' || line === ':quit' || line === 'exit' || line === 'quit') {
-                break;
             }
 
             // Track history
@@ -282,7 +282,11 @@ export class EnhancedREPLOutput implements OutputSink {
             return value.toString();
         }
         if (typeof value === 'string') {
-            return `"${value}"`;
+            let output = value;
+            if (value.endsWith("\n")) {
+                output = value.split("\n")[0];
+            }
+            return `"${output}"`;
         }
         if (Array.isArray(value)) {
             if (value.length === 0) {
