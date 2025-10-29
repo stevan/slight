@@ -84,11 +84,6 @@ test('List: includes?', async () => {
     assert.strictEqual(await evaluate('(list/includes? (list 1 2 3) 5)'), false);
 });
 
-test('List: sort', async () => {
-    assert.deepStrictEqual(await evaluate('(list/sort (list 3 1 4 1 5))'), [1, 1, 3, 4, 5]);
-    assert.deepStrictEqual(await evaluate('(list/sort (list "c" "a" "b"))'), ['a', 'b', 'c']);
-});
-
 test('List: map with user-defined function', async () => {
     const code = `
         (def double (x) (* x 2))
@@ -120,9 +115,17 @@ test('List: filter with anonymous function', async () => {
 });
 
 test('List: reduce function', async () => {
-    const result = await evaluate('(list/reduce + 0 (list 1 2 3 4))');
+    // Using quoted builtins
+    const result = await evaluate("(list/reduce '+ 0 (list 1 2 3 4))");
     assert.strictEqual(result, 10);
 
-    const product = await evaluate('(list/reduce * 1 (list 2 3 4))');
+    const product = await evaluate("(list/reduce '* 1 (list 2 3 4))");
     assert.strictEqual(product, 24);
+
+    // Using user-defined function
+    const withUserFunc = await evaluate(`
+        (def sum (acc x) (+ acc x))
+        (list/reduce sum 0 (list 1 2 3 4))
+    `);
+    assert.strictEqual(withUserFunc, 10);
 });

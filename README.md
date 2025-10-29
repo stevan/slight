@@ -63,7 +63,7 @@ Slight is a mini-LISP like interpreter written in TypeScript. The interpreter fe
 ; Advanced list operations
 (list/map (fun (x) (* x x)) (list 1 2 3))     ; Returns (1 4 9)
 (list/filter (fun (x) (> x 2)) (list 1 2 3 4)) ; Returns (3 4)
-(list/reduce + 0 (list 1 2 3 4))              ; Returns 10
+(list/reduce '+ 0 (list 1 2 3 4))             ; Returns 10 (note quoted builtin)
 (list/take (list 1 2 3 4 5) 3)                ; Returns (1 2 3)
 (list/flatten (list 1 (list 2 3) 4))          ; Returns (1 2 3 4)
 
@@ -152,11 +152,11 @@ Slight features a comprehensive standard library organized into logical namespac
 - **Split/Join**: `string/split`, `string/join`, `string/replace`, `string/replace-all`
 - **Access**: `string/length`, `string/slice`, `string/substring`, `string/char-at`, `string/char-code`, `string/from-char-code`, `string/concat`
 
-**`list/`** - List operations (15+ functions)
+**`list/`** - List operations (14+ functions)
 - **Creation**: `list/create`, `list/cons`, `list/append`, `list/flatten`
 - **Access**: `list/head`, `list/tail`, `list/nth`, `list/length`, `list/empty?`
-- **Transform**: `list/reverse`, `list/take`, `list/drop`, `list/sort`
-- **Higher-order**: `list/map`, `list/filter`, `list/reduce` (work with builtin and user-defined functions)
+- **Transform**: `list/reverse`, `list/take`, `list/drop`
+- **Higher-order**: `list/map`, `list/filter`, `list/reduce` (accept Slight functions and quoted builtins)
 - **Search**: `list/includes?`
 
 **`map/`** - Map/dictionary operations (11 functions)

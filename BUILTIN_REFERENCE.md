@@ -207,11 +207,9 @@ This document provides a comprehensive reference for all builtin functions in Sl
   (list/flatten (list 1 (list 2 3) 4))  ; Returns (1 2 3 4)
   ```
 
-- `(list/sort lst [fn])` - Sort list (optional comparator)
-
 ### Higher-Order Functions
 
-**Note**: These functions accept both builtin functions (like `+`, `*`) and user-defined functions (named or anonymous with `fun`).
+**Note**: These functions accept Slight functions (user-defined or closures) and quoted builtins (like `'+`, `'*`).
 
 - `(list/map fn lst)` - Apply function to each element
   ```lisp
@@ -235,8 +233,8 @@ This document provides a comprehensive reference for all builtin functions in Sl
 
 - `(list/reduce fn init lst)` - Reduce list to single value
   ```lisp
-  ; With builtin function
-  (list/reduce + 0 (list 1 2 3 4))  ; Returns 10
+  ; With quoted builtin
+  (list/reduce '+ 0 (list 1 2 3 4))  ; Returns 10
 
   ; With user-defined function
   (def sum (acc x) (+ acc x))
@@ -344,9 +342,15 @@ All log functions respect the global enable/disable state.
 
 ## Timer Namespace
 
+**Note**: Timer callbacks must be Slight functions (user-defined or closures). Errors in timer callbacks are fatal.
+
 - `(timer/timeout fn ms)` - Set timeout, returns ID
   ```lisp
   (timer/timeout (fun () (say "Done!")) 1000)
+
+  ; With named function
+  (def greet () (say "Hello!"))
+  (timer/timeout greet 2000)
   ```
 
 - `(timer/interval fn ms)` - Set interval, returns ID
@@ -356,7 +360,7 @@ All log functions respect the global enable/disable state.
 
 - `(timer/clear id)` - Clear timeout or interval
   ```lisp
-  (def id (timer/timeout ... 5000))
+  (def id (timer/timeout (fun () (say "Done!")) 5000))
   (timer/clear id)  ; Cancel it
   ```
 

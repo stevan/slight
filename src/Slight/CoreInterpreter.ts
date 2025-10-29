@@ -146,6 +146,39 @@ export class CoreInterpreter {
         return func.body.evaluate(this, localParams);
     }
 
+    /**
+     * Wraps a Slight function (user-defined, closure, or quoted builtin) into a JavaScript function.
+     * This allows Slight functions to be used as callbacks in higher-order functions like map/filter/reduce.
+     *
+     * @param fn - A user-defined function, closure, or quoted builtin name (string)
+     * @returns A JavaScript async function that calls the Slight function
+     * @throws Error if fn is not a valid function type
+     */
+    public wrapSlightFunction(fn: any): (...args: any[]) => Promise<any> {
+        // Check if it's a user-defined function or closure
+        if (typeof fn === 'object' && fn !== null && 'params' in fn && 'body' in fn) {
+            if ('capturedEnv' in fn) {
+                // It's a closure
+                return async (...args: any[]) => await this.callClosure(fn, args);
+            } else {
+                // It's a user-defined function
+                return async (...args: any[]) => await this.callUserFunction(fn, args);
+            }
+        }
+
+        // Check if it's a quoted builtin (string)
+        if (typeof fn === 'string') {
+            const builtin = this.builtins.get(fn);
+            if (builtin) {
+                return async (...args: any[]) => await builtin(...args);
+            }
+            throw new Error(`Quoted builtin '${fn}' not found`);
+        }
+
+        // Invalid type
+        throw new Error(`Expected a Slight function or quoted builtin, got ${typeof fn}`);
+    }
+
     public bind(name: string, value: any) {
         this.bindings.set(name, value);
     }
@@ -210,44 +243,18 @@ export class CoreInterpreter {
         this.builtins.set('list/append', (...lists: any[][]) => lists.flat());
         this.builtins.set('list/reverse', (lst: any[]) => [...lst].reverse());
         this.builtins.set('list/map', async (fn: any, lst: any[]) => {
+            const wrappedFn = this.wrapSlightFunction(fn);
             const results = [];
             for (const item of lst) {
-                // Check if fn is a user-defined function or closure
-                if (typeof fn === 'object' && fn !== null && 'params' in fn && 'body' in fn) {
-                    // User-defined function or closure
-                    if ('capturedEnv' in fn) {
-                        results.push(await this.callClosure(fn, [item]));
-                    } else {
-                        results.push(await this.callUserFunction(fn, [item]));
-                    }
-                } else if (typeof fn === 'function') {
-                    // Builtin function
-                    results.push(await fn(item));
-                } else {
-                    throw new Error('list/map expects a function');
-                }
+                results.push(await wrappedFn(item));
             }
             return results;
         });
         this.builtins.set('list/filter', async (fn: any, lst: any[]) => {
+            const wrappedFn = this.wrapSlightFunction(fn);
             const results = [];
             for (const item of lst) {
-                let predicate;
-                // Check if fn is a user-defined function or closure
-                if (typeof fn === 'object' && fn !== null && 'params' in fn && 'body' in fn) {
-                    // User-defined function or closure
-                    if ('capturedEnv' in fn) {
-                        predicate = await this.callClosure(fn, [item]);
-                    } else {
-                        predicate = await this.callUserFunction(fn, [item]);
-                    }
-                } else if (typeof fn === 'function') {
-                    // Builtin function
-                    predicate = await fn(item);
-                } else {
-                    throw new Error('list/filter expects a function');
-                }
-
+                const predicate = await wrappedFn(item);
                 if (predicate) {
                     results.push(item);
                 }
@@ -255,33 +262,15 @@ export class CoreInterpreter {
             return results;
         });
         this.builtins.set('list/reduce', async (fn: any, init: any, lst: any[]) => {
+            const wrappedFn = this.wrapSlightFunction(fn);
             let acc = init;
             for (const item of lst) {
-                // Check if fn is a user-defined function or closure
-                if (typeof fn === 'object' && fn !== null && 'params' in fn && 'body' in fn) {
-                    // User-defined function or closure
-                    if ('capturedEnv' in fn) {
-                        acc = await this.callClosure(fn, [acc, item]);
-                    } else {
-                        acc = await this.callUserFunction(fn, [acc, item]);
-                    }
-                } else if (typeof fn === 'function') {
-                    // Builtin function
-                    acc = await fn(acc, item);
-                } else {
-                    throw new Error('list/reduce expects a function');
-                }
+                acc = await wrappedFn(acc, item);
             }
             return acc;
         });
         this.builtins.set('list/take', (lst: any[], n: number) => lst.slice(0, n));
         this.builtins.set('list/drop', (lst: any[], n: number) => lst.slice(n));
-        this.builtins.set('list/sort', (lst: any[], fn?: Function) => {
-            if (fn) {
-                return [...lst].sort((a, b) => fn(a, b));
-            }
-            return [...lst].sort();
-        });
         this.builtins.set('list/includes?', (lst: any[], item: any) => lst.includes(item));
         this.builtins.set('list/flatten', (lst: any[]) => lst.flat(Infinity));
 
@@ -312,8 +301,18 @@ export class CoreInterpreter {
         this.builtins.set('string/pad-end', (str: string, len: number, pad: string) => str.padEnd(len, pad));
 
         // Timer namespace (works in both Node.js and browser)
-        this.builtins.set('timer/timeout', (fn: Function, ms: number) => setTimeout(() => fn(), ms));
-        this.builtins.set('timer/interval', (fn: Function, ms: number) => setInterval(() => fn(), ms));
+        this.builtins.set('timer/timeout', (fn: any, ms: number) => {
+            const wrappedFn = this.wrapSlightFunction(fn);
+            return setTimeout(async () => {
+                await wrappedFn();
+            }, ms);
+        });
+        this.builtins.set('timer/interval', (fn: any, ms: number) => {
+            const wrappedFn = this.wrapSlightFunction(fn);
+            return setInterval(async () => {
+                await wrappedFn();
+            }, ms);
+        });
         this.builtins.set('timer/clear', (id: any) => {
             clearTimeout(id);
             clearInterval(id);
