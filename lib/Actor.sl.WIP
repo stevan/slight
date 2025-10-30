@@ -1,0 +1,67 @@
+; Actor Library
+;
+; Wraps OO classes in processes for concurrent message-passing actors.
+;
+; Usage:
+;   (class Counter (count)
+;     (init (n) (set! count n))
+;     (method increment () (set! count (+ count 1)) count))
+;
+;   (def c (actor/new "Counter" 0))
+;   (call c :increment)  ; => 1
+
+; Internal actor loop function (used by spawned processes)
+(def __actor-loop__ (class-name . init-args)
+  (begin
+    ; Create class instance with initialization arguments
+    (def instance (apply object/new (cons class-name init-args)))
+
+    ; Message loop
+    (def loop (fun ()
+      (begin
+        ; Receive message: [sender :method-name arg1 arg2 ...]
+        (def msg (recv))
+        (def sender (head msg))
+        (def method-symbol (head (tail msg)))
+        (def method-args (tail (tail msg)))
+
+        ; Strip : prefix from method name (e.g., ":increment" -> "increment")
+        (def method-name
+          (string/substring method-symbol 1 (string/length method-symbol)))
+
+        ; Dispatch to method on instance using method/call builtin
+        (def result
+          (try
+            (apply method/call (cons instance (cons method-name method-args)))
+            (catch e
+              (list :error e.message))))
+
+        ; Send response back to sender
+        (send sender result)
+
+        ; Continue loop
+        (loop))))
+
+    ; Start the loop
+    (loop)))
+
+; actor/new: Create an actor from a class
+; Returns a PID that responds to method calls via messages
+(def actor/new (class-name . init-args)
+  (apply spawn (cons __actor-loop__ (cons class-name init-args))))
+
+; call: Synchronous RPC-style call to an actor
+; Sends message and waits for response
+(def call (actor-pid method-name . method-args)
+  (begin
+    ; Send message: [self method-name arg1 arg2 ...]
+    (send actor-pid (cons method-name method-args))
+    ; Wait for response
+    (def response (recv))
+    ; Response format is [sender-pid result]
+    (head (tail response))))
+
+; cast: Asynchronous fire-and-forget call to an actor
+; Sends message without waiting for response
+(def cast (actor-pid method-name . method-args)
+  (send actor-pid (cons method-name method-args)))

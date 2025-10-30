@@ -452,3 +452,66 @@ export class LetNode extends ASTNode {
         return await this.body.evaluate(interpreter, localParams);
     }
 }
+
+// -----------------------------------------------------------------------------
+// Object-Oriented Programming
+// -----------------------------------------------------------------------------
+
+export class ClassNode extends ASTNode {
+    type = 'CLASS';
+    constructor(
+        public name: string,
+        public slots: string[],
+        public methods: Map<string, { params: string[], body: ASTNode }>,
+        public initMethod?: { params: string[], body: ASTNode }
+    ) { super(); }
+    async evaluate(interpreter: any, params: Map<string, any>): Promise<any> {
+        // Register the class definition in the interpreter
+        interpreter.registerClass(this.name, {
+            slots: this.slots,
+            methods: this.methods,
+            init: this.initMethod
+        });
+        return null;
+    }
+}
+
+export class NewNode extends ASTNode {
+    type = 'NEW';
+    constructor(
+        public className: string,
+        public args: ASTNode[]
+    ) { super(); }
+    async evaluate(interpreter: any, params: Map<string, any>): Promise<any> {
+        // Evaluate arguments
+        const evaluatedArgs = [];
+        for (const arg of this.args) {
+            evaluatedArgs.push(await arg.evaluate(interpreter, params));
+        }
+
+        // Create instance via interpreter
+        return await interpreter.createInstance(this.className, evaluatedArgs);
+    }
+}
+
+export class MethodCallNode extends ASTNode {
+    type = 'METHOD_CALL';
+    constructor(
+        public object: ASTNode,
+        public methodName: string,
+        public args: ASTNode[]
+    ) { super(); }
+    async evaluate(interpreter: any, params: Map<string, any>): Promise<any> {
+        // Evaluate the object
+        const obj = await this.object.evaluate(interpreter, params);
+
+        // Evaluate arguments
+        const evaluatedArgs = [];
+        for (const arg of this.args) {
+            evaluatedArgs.push(await arg.evaluate(interpreter, params));
+        }
+
+        // Dispatch method call via interpreter
+        return await interpreter.callMethod(obj, this.methodName, evaluatedArgs);
+    }
+}

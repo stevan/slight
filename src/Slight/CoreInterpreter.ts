@@ -36,6 +36,13 @@ export class CoreInterpreter {
     // Track active timers to keep the process alive
     private activeTimeouts: Set<any> = new Set();
 
+    // Class registry for OO support
+    public classes: Map<string, {
+        slots: string[],
+        methods: Map<string, { params: string[], body: ASTNode }>,
+        init?: { params: string[], body: ASTNode }
+    }> = new Map();
+
     // Parent environment references for copy-on-write spawning
     public parentFunctions?: Map<string, { params: string[], body: ASTNode }>;
     public parentMacros?: Map<string, { params: string[], body: ASTNode }>;
@@ -190,6 +197,121 @@ export class CoreInterpreter {
 
         // Invalid type
         throw new Error(`Expected a Slight function or quoted builtin, got ${typeof fn}`);
+    }
+
+    /**
+     * Register a class definition
+     */
+    public registerClass(name: string, classDef: {
+        slots: string[],
+        methods: Map<string, { params: string[], body: ASTNode }>,
+        init?: { params: string[], body: ASTNode }
+    }) {
+        this.classes.set(name, classDef);
+    }
+
+    /**
+     * Create an instance of a class
+     */
+    public async createInstance(className: string, args: any[]): Promise<any> {
+        const classDef = this.classes.get(className);
+        if (!classDef) {
+            throw new Error(`Class ${className} not defined`);
+        }
+
+        // Create instance object with metadata
+        const instance: any = {
+            __class__: className,
+            __slots__: new Map<string, any>(),
+            __methods__: new Map<string, Function>()
+        };
+
+        // Initialize slots with undefined
+        for (const slotName of classDef.slots) {
+            instance.__slots__.set(slotName, undefined);
+        }
+
+        // Bind methods to the instance
+        for (const [methodName, methodDef] of classDef.methods.entries()) {
+            instance.__methods__.set(methodName, async (...methodArgs: any[]) => {
+                // Create local environment with slots accessible as variables
+                const methodEnv = new Map<string, any>();
+
+                // Add 'this' binding that points to the instance
+                methodEnv.set('this', instance);
+
+                // Make slots accessible as variables in method body
+                for (const slotName of classDef.slots) {
+                    methodEnv.set(slotName, instance.__slots__.get(slotName));
+                }
+
+                // Add method parameters
+                if (methodArgs.length !== methodDef.params.length) {
+                    throw new Error(`Method ${methodName}: expected ${methodDef.params.length} arguments, got ${methodArgs.length}`);
+                }
+                for (let i = 0; i < methodDef.params.length; i++) {
+                    methodEnv.set(methodDef.params[i], methodArgs[i]);
+                }
+
+                // Evaluate method body
+                const result = await methodDef.body.evaluate(this, methodEnv);
+
+                // Update slots from environment (in case they were set! in the method)
+                for (const slotName of classDef.slots) {
+                    if (methodEnv.has(slotName)) {
+                        instance.__slots__.set(slotName, methodEnv.get(slotName));
+                    }
+                }
+
+                return result;
+            });
+        }
+
+        // Call init method if present
+        if (classDef.init) {
+            const initEnv = new Map<string, any>();
+            initEnv.set('this', instance);
+
+            // Make slots accessible
+            for (const slotName of classDef.slots) {
+                initEnv.set(slotName, instance.__slots__.get(slotName));
+            }
+
+            // Add init parameters
+            if (args.length !== classDef.init.params.length) {
+                throw new Error(`Constructor for ${className}: expected ${classDef.init.params.length} arguments, got ${args.length}`);
+            }
+            for (let i = 0; i < classDef.init.params.length; i++) {
+                initEnv.set(classDef.init.params[i], args[i]);
+            }
+
+            // Evaluate init body
+            await classDef.init.body.evaluate(this, initEnv);
+
+            // Update slots from init environment
+            for (const slotName of classDef.slots) {
+                if (initEnv.has(slotName)) {
+                    instance.__slots__.set(slotName, initEnv.get(slotName));
+                }
+            }
+        }
+
+        return instance;
+    }
+
+    /**
+     * Call a method on an object instance
+     */
+    public async callMethod(obj: any, methodName: string, args: any[]): Promise<any> {
+        if (!obj || typeof obj !== 'object') {
+            throw new Error(`Cannot call method ${methodName} on non-object`);
+        }
+        if (!obj.__methods__ || !obj.__methods__.has(methodName)) {
+            throw new Error(`Method ${methodName} not found on object of class ${obj.__class__ || 'unknown'}`);
+        }
+
+        const method = obj.__methods__.get(methodName);
+        return await method(...args);
     }
 
     public bind(name: string, value: any) {
@@ -682,6 +804,15 @@ export class CoreInterpreter {
 
         this.builtins.set('process/list', () => {
             return runtime.getProcesses();
+        });
+
+        // Object creation and method invocation (for dynamic dispatch)
+        this.builtins.set('object/new', async (className: string, ...args: any[]) => {
+            return await this.createInstance(className, args);
+        });
+
+        this.builtins.set('method/call', async (obj: any, methodName: string, ...args: any[]) => {
+            return await this.callMethod(obj, methodName, args);
         });
 
         // Aliases for backward compatibility

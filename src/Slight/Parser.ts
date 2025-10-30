@@ -19,7 +19,10 @@ import {
     TryNode,
     ThrowNode,
     LetNode,
-    FunNode
+    FunNode,
+    ClassNode,
+    NewNode,
+    MethodCallNode
 } from './AST.js';
 
 export class Parser {
@@ -321,6 +324,95 @@ export class Parser {
                 }
 
                 return new LetNode(bindings, body);
+            }
+            if (sym === 'class') {
+                // (class ClassName (slot1 slot2 ...) (init (params...) body) (method name (params...) body) ...)
+                if (elements.length < 3) {
+                    throw new Error('Invalid class syntax: expected (class Name (slots...) ...)');
+                }
+                if (!(elements[1] instanceof SymbolNode)) {
+                    throw new Error('Invalid class syntax: class name must be a symbol');
+                }
+                const className = elements[1].name;
+
+                // Parse slots
+                if (!(elements[2] instanceof CallNode)) {
+                    throw new Error('Invalid class syntax: slots must be a list');
+                }
+                const slots = elements[2].elements.map((el: any) => {
+                    if (!(el instanceof SymbolNode)) {
+                        throw new Error('Invalid class syntax: slot names must be symbols');
+                    }
+                    return el.name;
+                });
+
+                // Parse methods and init
+                const methods = new Map<string, { params: string[], body: ASTNode }>();
+                let initMethod: { params: string[], body: ASTNode } | undefined;
+
+                for (let i = 3; i < elements.length; i++) {
+                    const methodDef = elements[i];
+                    if (!(methodDef instanceof CallNode) || methodDef.elements.length < 3) {
+                        throw new Error('Invalid class syntax: method must be (method name (params...) body) or (init (params...) body)');
+                    }
+
+                    const methodKeyword = methodDef.elements[0];
+                    if (!(methodKeyword instanceof SymbolNode)) {
+                        throw new Error('Invalid class syntax: expected method or init keyword');
+                    }
+
+                    if (methodKeyword.name === 'init') {
+                        // (init (params...) body)
+                        if (!(methodDef.elements[1] instanceof CallNode)) {
+                            throw new Error('Invalid class syntax: init parameters must be a list');
+                        }
+                        const params = methodDef.elements[1].elements.map((el: any) => {
+                            if (!(el instanceof SymbolNode)) {
+                                throw new Error('Invalid class syntax: init parameters must be symbols');
+                            }
+                            return el.name;
+                        });
+                        initMethod = { params, body: methodDef.elements[2] };
+                    } else if (methodKeyword.name === 'method') {
+                        // (method name (params...) body)
+                        if (!(methodDef.elements[1] instanceof SymbolNode)) {
+                            throw new Error('Invalid class syntax: method name must be a symbol');
+                        }
+                        if (!(methodDef.elements[2] instanceof CallNode)) {
+                            throw new Error('Invalid class syntax: method parameters must be a list');
+                        }
+                        const methodName = methodDef.elements[1].name;
+                        const params = methodDef.elements[2].elements.map((el: any) => {
+                            if (!(el instanceof SymbolNode)) {
+                                throw new Error('Invalid class syntax: method parameters must be symbols');
+                            }
+                            return el.name;
+                        });
+                        methods.set(methodName, { params, body: methodDef.elements[3] });
+                    } else {
+                        throw new Error(`Invalid class syntax: unknown keyword ${methodKeyword.name}`);
+                    }
+                }
+
+                return new ClassNode(className, slots, methods, initMethod);
+            }
+            if (sym === 'new') {
+                // (new ClassName arg1 arg2 ...)
+                if (elements.length < 2) {
+                    throw new Error('Invalid new syntax: expected (new ClassName ...)');
+                }
+                if (!(elements[1] instanceof SymbolNode)) {
+                    throw new Error('Invalid new syntax: class name must be a symbol');
+                }
+                const className = elements[1].name;
+                const args = elements.slice(2);
+                return new NewNode(className, args);
+            }
+            // Check for method call: (obj :method args...)
+            if (elements.length >= 2 && elements[1] instanceof SymbolNode && elements[1].name.startsWith(':')) {
+                const methodName = elements[1].name.substring(1); // Remove the : prefix
+                const args = elements.slice(2);
+                return new MethodCallNode(elements[0], methodName, args);
             }
         }
         return new CallNode(elements).setLocation(location?.line, location?.column);
