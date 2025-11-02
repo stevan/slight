@@ -20,8 +20,11 @@ npm run slight program.sl
 npm run slight -e "(+ 1 2)"
 npm run slight -i lib/ program.sl
 
-# Run all tests (188 tests across 27 test files)
+# Run all tests (188 core tests)
 npm test
+
+# Run dependency injection tests (33 DI tests)
+npm run build && node --test 'js/tests/dependencies/*.test.js' 'js/tests/integration/*.test.js'
 
 # Run a specific test
 tsc && node --test js/tests/030-Interpreter.test.js
@@ -185,6 +188,58 @@ All evaluation is Promise-based to support:
 - Network requests (fetch)
 - Process scheduling
 - File I/O (Node.js)
+
+### Dependency Injection
+
+Slight uses dependency injection to make I/O operations mockable and support multiple platforms:
+
+**Architecture:**
+```typescript
+CoreInterpreter
+├── OutputSink - Where print/say/log output goes
+├── ProcessRuntime - Manages actor-style processes
+└── PlatformOperations - Platform-specific I/O (fs, sys, net, timer)
+```
+
+**Default behavior (backward compatible):**
+```typescript
+const interpreter = new CoreInterpreter();
+// Uses: QueueOutputSink, ProcessRuntime singleton, NodePlatform
+```
+
+**Testing with mocks:**
+```typescript
+import { CoreInterpreter, CollectingOutputSink, MockPlatform } from './Slight/Dependencies/index.js';
+
+const sink = new CollectingOutputSink();
+const platform = new MockPlatform();
+platform.setFile('/config.json', '{"key": "value"}');
+platform.setEnv('API_KEY', 'test-key');
+
+const interpreter = new CoreInterpreter({
+    outputSink: sink,
+    platform: platform
+});
+
+// Run code and verify behavior
+await evaluate(interpreter, '(say "Hello")');
+assert.equal(sink.getStdout()[0], 'Hello\n');
+
+await evaluate(interpreter, '(fs/read "/config.json")');
+// Reads from mock filesystem, not real disk
+```
+
+**Available platforms:**
+- `NodePlatform` - Full Node.js (fs, sys, net, timer)
+- `BrowserPlatform` - Browser-safe (net, timer only)
+- `MockPlatform` - In-memory mocks for testing
+
+**Available output sinks:**
+- `QueueOutputSink` - Default (pushes to outputQueue for pipeline)
+- `CollectingOutputSink` - Captures all output for testing
+- `ConsoleOutputSink` - Direct to console (bypasses pipeline)
+
+See `tests/integration/dependency-injection.test.ts` for comprehensive examples.
 
 ## Namespaced Standard Library
 

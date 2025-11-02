@@ -3,14 +3,19 @@ import { ASTNode } from './AST.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import { CoreInterpreter } from './CoreInterpreter.js';
+import { InterpreterDependencies } from './Dependencies/index.js';
 
 export class Interpreter extends CoreInterpreter {
     private loadingFiles : Set<string> = new Set();  // Track files being loaded
     private currentFile : string | undefined;  // Current file for relative path resolution
     private includePaths : string[] = [];  // Include directories for file resolution
 
-    constructor() {
-        super();
+    constructor(deps?: InterpreterDependencies) {
+        // Node.js interpreter uses NodePlatform by default (via CoreInterpreter)
+        super(deps);
+
+        // Add Node.js-specific include builtin
+        this.addIncludeBuiltin();
     }
 
     setIncludePaths(paths: string[]): void {
@@ -21,95 +26,18 @@ export class Interpreter extends CoreInterpreter {
         this.currentFile = filepath;
     }
 
-    protected override initBuiltins(): void {
-        // Call parent to get core builtins
-        super.initBuiltins();
-
-        // Add map, JSON, and process builtins
-        this.addMapBuiltins();
-        this.addJSONBuiltins();
-        this.addProcessBuiltins();
-
-        // File system namespace (fs/)
-        this.builtins.set('fs/read', (filepath: string) => {
-            return fs.readFileSync(filepath, 'utf8');
-        });
-
-        this.builtins.set('fs/write!', (filepath: string, content: string) => {
-            fs.writeFileSync(filepath, content, 'utf8');
-            return true;
-        });
-
-        this.builtins.set('fs/append!', (filepath: string, content: string) => {
-            fs.appendFileSync(filepath, content, 'utf8');
-            return true;
-        });
-
-        this.builtins.set('fs/exists?', (filepath: string) => {
-            return fs.existsSync(filepath);
-        });
-
-        this.builtins.set('fs/delete!', (filepath: string) => {
-            fs.unlinkSync(filepath);
-            return true;
-        });
-
-        this.builtins.set('fs/resolve', (filepath: string, base?: string) => {
-            if (base) {
-                return path.resolve(path.dirname(base), filepath);
-            }
-            return path.resolve(filepath);
-        });
-
-        this.builtins.set('fs/mkdir!', (dirpath: string, recursive: boolean = true) => {
-            fs.mkdirSync(dirpath, { recursive });
-            return true;
-        });
-
-        this.builtins.set('fs/readdir', (dirpath: string) => {
-            return fs.readdirSync(dirpath);
-        });
-
-        this.builtins.set('fs/stat', (filepath: string) => {
-            const stats = fs.statSync(filepath);
-            return {
-                size: stats.size,
-                isFile: stats.isFile(),
-                isDirectory: stats.isDirectory(),
-                mtime: stats.mtime.toISOString(),
-                ctime: stats.ctime.toISOString()
-            };
-        });
-
-        this.builtins.set('fs/copy!', (src: string, dest: string) => {
-            fs.copyFileSync(src, dest);
-            return true;
-        });
-
-        this.builtins.set('fs/move!', (src: string, dest: string) => {
-            fs.renameSync(src, dest);
-            return true;
-        });
-
-        // System namespace (sys/)
-        this.builtins.set('sys/env', (name: string) => process.env[name] ?? null);
-        this.builtins.set('sys/exit', (code: number = 0) => process.exit(code));
-        this.builtins.set('sys/args', () => process.argv.slice(2));
-        this.builtins.set('sys/cwd', () => process.cwd());
-        this.builtins.set('sys/chdir!', (dir: string) => {
-            process.chdir(dir);
-            return true;
-        });
-        this.builtins.set('sys/platform', () => process.platform);
-        this.builtins.set('sys/arch', () => process.arch);
-
+    /**
+     * Add Node.js-specific include builtin and backward compatibility aliases
+     */
+    private addIncludeBuiltin(): void {
         // Backward compatibility aliases for critical file operations
+        // These map to the fs/ operations already added by CoreInterpreter.addPlatformBuiltins()
         this.builtins.set('read-file', this.builtins.get('fs/read')!);
-        this.builtins.set('write-file!', this.builtins.get('fs/write!')!);
+        this.builtins.set('write-file!', this.builtins.get('fs/write')!);
         this.builtins.set('file-exists?', this.builtins.get('fs/exists?')!);
         this.builtins.set('get-env', this.builtins.get('sys/env')!);
 
-        // Include - special async builtin
+        // Include - special async builtin for loading and evaluating Slight files
         this.builtins.set('include', async (filepath: string) => {
             // Try to resolve the file in various locations
             let resolvedPath: string | null = null;

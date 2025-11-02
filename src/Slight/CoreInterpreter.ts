@@ -21,6 +21,14 @@ import {
     LetNode
 } from './AST.js';
 import { ProcessRuntime, ParentState } from './ProcessRuntime.js';
+import {
+    InterpreterDependencies,
+    OutputSink,
+    IProcessRuntime,
+    PlatformOperations
+} from './Dependencies/index.js';
+import { QueueOutputSink } from './Dependencies/OutputSink.js';
+import { NodePlatform } from './Dependencies/Platform.js';
 
 /**
  * Base interpreter class with core functionality shared between all interpreter implementations
@@ -36,6 +44,11 @@ export class CoreInterpreter {
     // Track active timers to keep the process alive
     private activeTimeouts: Set<any> = new Set();
 
+    // Dependency injection fields
+    protected outputSink: OutputSink;
+    protected processRuntime: ProcessRuntime;
+    protected platform: PlatformOperations;
+
     // Class registry for OO support
     public classes: Map<string, {
         slots: string[],
@@ -48,7 +61,12 @@ export class CoreInterpreter {
     public parentMacros?: Map<string, { params: string[], body: ASTNode }>;
     public parentBindings?: Map<string, any>;
 
-    constructor() {
+    constructor(deps?: InterpreterDependencies) {
+        // Initialize dependencies with provided values or defaults
+        this.outputSink = deps?.outputSink ?? new QueueOutputSink(this.outputQueue);
+        this.processRuntime = deps?.processRuntime ?? ProcessRuntime.getInstance();
+        this.platform = deps?.platform ?? new NodePlatform();
+
         this.initBuiltins();
     }
 
@@ -101,11 +119,11 @@ export class CoreInterpreter {
                 }
 
                 // Then yield the evaluation result
-                //if (node instanceof DefNode || node instanceof DefMacroNode || node instanceof SetNode) {
+                if (node instanceof DefNode || node instanceof DefMacroNode || node instanceof SetNode) {
                     yield { type: OutputHandle.INFO, value: result };
-                //} else {
-                //    yield { type: OutputHandle.STDOUT, value: result };
-                //}
+                } else {
+                    yield { type: OutputHandle.STDOUT, value: result };
+                }
             } catch (e) {
                 // Flush output queue even on error
                 while (this.outputQueue.length > 0) {
@@ -435,49 +453,8 @@ export class CoreInterpreter {
         this.builtins.set('string/pad-start', (str: string, len: number, pad: string) => str.padStart(len, pad));
         this.builtins.set('string/pad-end', (str: string, len: number, pad: string) => str.padEnd(len, pad));
 
-        // Timer namespace (works in both Node.js and browser)
-        this.builtins.set('timer/timeout', (fn: any, ms: number) => {
-            const wrappedFn = this.wrapSlightFunction(fn);
-            const timerId = setTimeout(async () => {
-                try {
-                    await wrappedFn();
-                } finally {
-                    // Remove from active set when callback completes
-                    this.activeTimeouts.delete(timerId);
-                }
-            }, ms);
-            // Track this timeout
-            this.activeTimeouts.add(timerId);
-            return timerId;
-        });
-        this.builtins.set('timer/interval', (fn: any, ms: number) => {
-            const wrappedFn = this.wrapSlightFunction(fn);
-            return setInterval(async () => {
-                await wrappedFn();
-            }, ms);
-        });
-        this.builtins.set('timer/clear', (id: any) => {
-            clearTimeout(id);
-            clearInterval(id);
-            // Remove from active set if it's there
-            this.activeTimeouts.delete(id);
-            return true;
-        });
-        this.builtins.set('timer/sleep', (ms: number) => new Promise(resolve => setTimeout(resolve, ms)));
-
-        // Network namespace (fetch is available in Node 18+ and browser)
-        this.builtins.set('net/fetch', async (url: string, options?: any) => {
-            const response = await fetch(url, options);
-            return {
-                status: response.status,
-                statusText: response.statusText,
-                headers: Object.fromEntries(response.headers),
-                text: async () => await response.text(),
-                json: async () => await response.json()
-            };
-        });
-        this.builtins.set('net/url-encode', (str: string) => encodeURIComponent(str));
-        this.builtins.set('net/url-decode', (str: string) => decodeURIComponent(str));
+        // Platform-specific operations (timer, network, fs, sys) - using injected dependencies
+        this.addPlatformBuiltins();
 
         // Important aliases for backward compatibility
         this.builtins.set('list', this.builtins.get('list/create')!);
@@ -487,85 +464,8 @@ export class CoreInterpreter {
         this.builtins.set('empty?', this.builtins.get('list/empty?')!);
         this.builtins.set('mod', this.builtins.get('math/mod')!);
 
-        // Core I/O operations
-        this.builtins.set('print', (...args: any[]) => {
-            // Print without newline
-            const output = args.map(arg => this.formatForOutput(arg)).join(' ');
-            this.outputQueue.push({
-                type: OutputHandle.STDOUT,
-                value: output
-            });
-            return null;  // print returns null
-        });
-
-        this.builtins.set('say', (...args: any[]) => {
-            // Print with newline
-            const output = args.map(arg => this.formatForOutput(arg)).join(' ') + '\n';
-            this.outputQueue.push({
-                type: OutputHandle.STDOUT,
-                value: output
-            });
-            return null;  // say returns null
-        });
-
-        // Note: warn is defined later as an alias to log/warn
-
-        // Logging functions (conditionally enabled)
-        this.builtins.set('log/info', (...args: any[]) => {
-            if (!this.loggingEnabled) return null;
-            const output = args.map(arg => this.formatForOutput(arg)).join(' ') + '\n';
-            this.outputQueue.push({
-                type: OutputHandle.INFO,
-                value: output
-            });
-            return null;
-        });
-
-        this.builtins.set('log/debug', (...args: any[]) => {
-            if (!this.loggingEnabled) return null;
-            const output = args.map(arg => this.formatForOutput(arg)).join(' ') + '\n';
-            this.outputQueue.push({
-                type: OutputHandle.DEBUG,
-                value: output
-            });
-            return null;
-        });
-
-        this.builtins.set('log/warn', (...args: any[]) => {
-            if (!this.loggingEnabled) return null;
-            const output = args.map(arg => this.formatForOutput(arg)).join(' ') + '\n';
-            this.outputQueue.push({
-                type: OutputHandle.WARN,
-                value: output
-            });
-            return null;
-        });
-
-        this.builtins.set('log/error', (...args: any[]) => {
-            if (!this.loggingEnabled) return null;
-            const output = args.map(arg => this.formatForOutput(arg)).join(' ') + '\n';
-            this.outputQueue.push({
-                type: OutputHandle.ERROR,
-                value: output
-            });
-            return null;
-        });
-
-        // Logging control
-        this.builtins.set('log/enable', () => {
-            this.loggingEnabled = true;
-            return true;
-        });
-
-        this.builtins.set('log/disable', () => {
-            this.loggingEnabled = false;
-            return true;
-        });
-
-        // Alias: warn -> log/warn
-        this.builtins.set('warn', (...args: any[]) => {
-            return this.builtins.get('log/warn')!(...args);
-        });
+        // Core I/O operations (using injected OutputSink)
+        this.addIOBuiltins();
 
         // Type inspection operations
         this.builtins.set('type/of', (value: any) => {
@@ -583,6 +483,11 @@ export class CoreInterpreter {
             }
             return value;
         });
+
+        // Add process operations, map operations, and JSON operations
+        this.addProcessBuiltins();
+        this.addMapBuiltins();
+        this.addJSONBuiltins();
     }
 
     /**
@@ -823,5 +728,188 @@ export class CoreInterpreter {
         this.builtins.set('is-alive?', this.builtins.get('process/alive?')!);
         this.builtins.set('kill', this.builtins.get('process/kill')!);
         this.builtins.set('processes', this.builtins.get('process/list')!);
+    }
+
+    /**
+     * Add I/O builtin functions (print, say, warn, logging) - uses injected OutputSink
+     */
+    protected addIOBuiltins(): void {
+        this.builtins.set('print', (...args: any[]) => {
+            // Print without newline
+            const formatted = args.map(arg => this.formatForOutput(arg)).join(' ');
+            this.outputSink.write({
+                type: OutputHandle.STDOUT,
+                value: formatted
+            });
+            return null;  // print returns null
+        });
+
+        this.builtins.set('say', (...args: any[]) => {
+            // Print with newline
+            const formatted = args.map(arg => this.formatForOutput(arg)).join(' ');
+            this.outputSink.write({
+                type: OutputHandle.STDOUT,
+                value: formatted + '\n'
+            });
+            return null;  // say returns null
+        });
+
+        // Logging functions (conditionally enabled)
+        this.builtins.set('log/info', (...args: any[]) => {
+            if (!this.loggingEnabled) return null;
+            const output = args.map(arg => this.formatForOutput(arg)).join(' ') + '\n';
+            this.outputSink.write({
+                type: OutputHandle.INFO,
+                value: output
+            });
+            return null;
+        });
+
+        this.builtins.set('log/debug', (...args: any[]) => {
+            if (!this.loggingEnabled) return null;
+            const output = args.map(arg => this.formatForOutput(arg)).join(' ') + '\n';
+            this.outputSink.write({
+                type: OutputHandle.DEBUG,
+                value: output
+            });
+            return null;
+        });
+
+        this.builtins.set('log/warn', (...args: any[]) => {
+            if (!this.loggingEnabled) return null;
+            const output = args.map(arg => this.formatForOutput(arg)).join(' ') + '\n';
+            this.outputSink.write({
+                type: OutputHandle.WARN,
+                value: output
+            });
+            return null;
+        });
+
+        this.builtins.set('log/error', (...args: any[]) => {
+            if (!this.loggingEnabled) return null;
+            const output = args.map(arg => this.formatForOutput(arg)).join(' ') + '\n';
+            this.outputSink.write({
+                type: OutputHandle.ERROR,
+                value: output
+            });
+            return null;
+        });
+
+        // Logging control
+        this.builtins.set('log/enable', () => {
+            this.loggingEnabled = true;
+            return true;
+        });
+
+        this.builtins.set('log/disable', () => {
+            this.loggingEnabled = false;
+            return true;
+        });
+
+        // Alias: warn -> log/warn
+        this.builtins.set('warn', (...args: any[]) => {
+            return this.builtins.get('log/warn')!(...args);
+        });
+    }
+
+    /**
+     * Add platform-specific builtin functions (timer, network, fs, sys) - uses injected Platform
+     */
+    protected addPlatformBuiltins(): void {
+        // Timer operations (cross-platform)
+        this.builtins.set('timer/timeout', (fn: any, ms: number) => {
+            const wrapped = this.wrapSlightFunction(fn);
+            const id = this.platform.timer.setTimeout(async () => {
+                this.activeTimeouts.delete(id);
+                await wrapped();
+            }, ms);
+            this.activeTimeouts.add(id);
+            return id;
+        });
+
+        this.builtins.set('timer/interval', (fn: any, ms: number) => {
+            const wrapped = this.wrapSlightFunction(fn);
+            return this.platform.timer.setInterval(async () => {
+                await wrapped();
+            }, ms);
+        });
+
+        this.builtins.set('timer/clear', (id: any) => {
+            this.activeTimeouts.delete(id);
+            this.platform.timer.clearTimeout(id);
+            this.platform.timer.clearInterval(id);
+            return true;
+        });
+
+        this.builtins.set('timer/sleep', (ms: number) => new Promise<void>(resolve =>
+            this.platform.timer.setTimeout(() => resolve(), ms)
+        ));
+
+        // Network operations (cross-platform)
+        this.builtins.set('net/fetch', async (url: string, options?: any) => {
+            const response = await this.platform.net.fetch(url, options);
+            return {
+                status: response.status,
+                text: async () => response.text,
+                json: async () => await response.json()
+            };
+        });
+
+        this.builtins.set('net/url-encode', (str: string) => this.platform.net.urlEncode(str));
+        this.builtins.set('net/url-decode', (str: string) => this.platform.net.urlDecode(str));
+
+        // File system operations (optional - only if platform provides them)
+        if (this.platform.fs) {
+            this.builtins.set('fs/read', (path: string) => this.platform.fs!.read(path));
+            this.builtins.set('fs/write', (path: string, content: string) => {
+                this.platform.fs!.write(path, content);
+                return true;
+            });
+            this.builtins.set('fs/append', (path: string, content: string) => {
+                this.platform.fs!.append(path, content);
+                return true;
+            });
+            this.builtins.set('fs/exists?', (path: string) => this.platform.fs!.exists(path));
+            this.builtins.set('fs/delete!', (path: string) => {
+                this.platform.fs!.delete(path);
+                return true;
+            });
+            this.builtins.set('fs/resolve', (path: string, base?: string) => {
+                return this.platform.fs!.resolve(path, base);
+            });
+            this.builtins.set('fs/mkdir!', (dirpath: string, recursive: boolean = true) => {
+                this.platform.fs!.mkdir(dirpath, recursive);
+                return true;
+            });
+            this.builtins.set('fs/readdir', (dirpath: string) => {
+                return this.platform.fs!.readdir(dirpath);
+            });
+            this.builtins.set('fs/stat', (filepath: string) => {
+                return this.platform.fs!.stat(filepath);
+            });
+            this.builtins.set('fs/copy!', (src: string, dest: string) => {
+                this.platform.fs!.copy(src, dest);
+                return true;
+            });
+            this.builtins.set('fs/move!', (src: string, dest: string) => {
+                this.platform.fs!.move(src, dest);
+                return true;
+            });
+        }
+
+        // System operations (optional - only if platform provides them)
+        if (this.platform.sys) {
+            this.builtins.set('sys/env', (name: string) => this.platform.sys!.env(name));
+            this.builtins.set('sys/exit', (code: number = 0) => this.platform.sys!.exit(code));
+            this.builtins.set('sys/args', () => this.platform.sys!.args());
+            this.builtins.set('sys/cwd', () => this.platform.sys!.cwd());
+            this.builtins.set('sys/chdir!', (dir: string) => {
+                this.platform.sys!.chdir(dir);
+                return true;
+            });
+            this.builtins.set('sys/platform', () => this.platform.sys!.platform());
+            this.builtins.set('sys/homedir', () => this.platform.sys!.homedir());
+            this.builtins.set('sys/tmpdir', () => this.platform.sys!.tmpdir());
+        }
     }
 }
