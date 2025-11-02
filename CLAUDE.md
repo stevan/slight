@@ -20,7 +20,14 @@ npm run slight program.sl
 npm run slight -e "(+ 1 2)"
 npm run slight -i lib/ program.sl
 
-# Run all tests (188 core tests)
+# Debug with execution tracing
+npm run trace -e "(+ 1 2)"                    # Trace a simple expression
+npm run trace program.sl                      # Trace a file
+npm run trace --silent program.sl             # Summary only
+npm run trace --max-depth 3 program.sl        # Limit trace depth
+npm run trace --export-json program.sl        # Export as JSON
+
+# Run all tests (203 core tests including 15 TracingInterpreter tests)
 npm test
 
 # Run dependency injection tests (33 DI tests)
