@@ -293,12 +293,108 @@ The process system (`ProcessRuntime.ts`) provides concurrent execution:
 
 In the browser, each process appears in its own draggable window with visual status indicators.
 
+## Actor Library
+
+The actor library (`lib/Actor.sl`) provides a higher-level abstraction over processes, wrapping OO classes in processes for concurrent message-passing:
+
+```lisp
+(include "lib/Actor.sl")
+
+(class Counter (count)
+  (init (n) (set! count n))
+  (method increment ()
+    (begin
+      (set! count (+ count 1))
+      count))
+  (method get-value () count))
+
+; Create an actor (spawns a process wrapping the class)
+(def counter (actor/new-1 "Counter" 0))
+
+; Call methods via message passing (synchronous RPC-style)
+(call-0 counter "increment")  ; Returns 1
+(call-0 counter "increment")  ; Returns 2
+(call-0 counter "get-value")  ; Returns 2
+```
+
+**API:**
+- `actor/new-0 "ClassName"` - Create actor with 0 constructor args
+- `actor/new-1 "ClassName" arg1` - Create actor with 1 constructor arg
+- `actor/new-2 "ClassName" arg1 arg2` - Create actor with 2 constructor args
+- `call-0 pid "method-name"` - Call method with 0 args
+- `call-1 pid "method-name" arg1` - Call method with 1 arg
+- `call-2 pid "method-name" arg1 arg2` - Call method with 2 args
+
+**Implementation:**
+Each actor runs a loop in a spawned process that:
+1. Receives messages containing `[sender method-name args...]`
+2. Calls the method on the wrapped class instance
+3. Sends result back to sender
+4. Recursively continues the loop
+
+The numbered API is necessary because Slight doesn't yet support variadic function syntax `(fun (a . rest) ...)`.
+
+## Output Handling Architecture
+
+Slight uses a pipeline architecture with different output sinks for different use cases:
+
+**Output Token Types:**
+- `INFO` - Expression evaluation results (e.g., from `(+ 1 2)`)
+- `STDOUT` - Explicit output from `print`/`say`
+- `WARN`/`ERROR`/`DEBUG` - Log output from `log/` functions
+
+**Output Sinks:**
+- **StandardOutput** (`src/Slight/Outputs.ts`) - Shows all output including INFO (for tests)
+- **ScriptOutput** (`src/Slight/Outputs.ts`) - Filters out INFO tokens, only shows print/say/log output (for script execution)
+- **REPLOutput** (`src/Slight/REPL.ts`) - Shows everything with special formatting (for REPL)
+
+**Key Design:**
+- All expression results are emitted as INFO tokens
+- Different output sinks decide whether to show INFO
+- Scripts get clean output (no expression results)
+- REPL shows everything for debugging
+- Tests can verify both output and results
+
+## Critical Bug Fixes (November 2024)
+
+### Closure Recursion Bug
+**Problem:** Closures defined in local scope couldn't recursively call themselves.
+
+```lisp
+(def outer (fun (param)
+  (def loop (fun ()
+    (loop)))))  ; Error: Undefined symbol: loop
+```
+
+**Root Cause:** When a closure was created with `capturedEnv: new Map(params)`, the closure itself wasn't in the captured environment yet (it's added to `params` after evaluation).
+
+**Fix:** In `DefNode.evaluate()` (`src/Slight/AST.ts`), after creating a closure, add it to its own `capturedEnv`:
+```typescript
+if (value && typeof value === 'object' && 'capturedEnv' in value) {
+    value.capturedEnv.set(this.name, value);
+}
+```
+
+### Class Inheritance in Spawned Processes
+**Problem:** Spawned processes couldn't access class definitions from parent process.
+
+**Root Cause:** The `ParentState` interface and copy-on-write mechanism didn't include classes.
+
+**Fixes:**
+1. Added `classes` field to `ParentState` interface (`src/Slight/ProcessRuntime.ts`)
+2. Added `parentClasses` field to `CoreInterpreter` (`src/Slight/CoreInterpreter.ts`)
+3. Updated `ProcessRuntime.spawn()` to copy parent classes reference
+4. Updated `createInstance()` to check `parentClasses` if class not found locally
+
+These fixes enable actors to work correctly - spawned processes can now instantiate classes defined in the parent scope.
+
 ## File Organization
 
 - **Core interpreter logic**: `src/Slight/CoreInterpreter.ts`
 - **AST definitions**: `src/Slight/AST.ts`
 - **Platform-specific code**: `Interpreter.ts` (Node.js), `BrowserInterpreter.ts`
-- **Tests**: `tests/` directory with 27 test files
+- **Tests**: `tests/` directory with 27 test files, `t/` directory with TAP-format integration tests
+- **Standard library**: `lib/` directory (`Actor.sl`, `TestSimple.sl`)
 - **Entry points**: `bin/slight.ts` (CLI), `src/browser.ts` (browser)
 - **Browser UI**: `index.html` (multi-window terminal interface)
 
