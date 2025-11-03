@@ -49,7 +49,7 @@ test('Type: of for lists', async () => {
 
 test('Type: of for functions', async () => {
     assert.strictEqual(await evaluate('(type/of +)'), 'FUNCTION');
-    const code = '(def foo (x) x) (type/of foo)';
+    const code = '(defun foo (x) x) (type/of foo)';
     assert.strictEqual(await evaluate(code), 'FUNCTION');
 });
 

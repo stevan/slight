@@ -4,8 +4,8 @@
 (diag "Actor system tests")
 
 ; Test 1: Simple Counter actor
-(class Counter (count)
-  (init (initial)
+(defclass Counter (count)
+  (INIT (initial)
     (set! count initial))
 
   (method increment ()
@@ -24,7 +24,7 @@
   (method reset ()
     (set! count 0)))
 
-(def c (actor/new-1 "Counter" 10))
+(defvar c (actor/new-1 "Counter" 10))
 (is (call-0 c "get-value") 10 "... actor counter initialized to 10")
 (is (call-0 c "increment") 11 "... actor increment returns 11")
 (is (call-0 c "increment") 12 "... actor increment returns 12")
@@ -33,16 +33,16 @@
 (is (call-0 c "get-value") 0 "... actor reset sets value to 0")
 
 ; Test 2: Multiple independent actors
-(def c1 (actor/new-1 "Counter" 0))
-(def c2 (actor/new-1 "Counter" 100))
+(defvar c1 (actor/new-1 "Counter" 0))
+(defvar c2 (actor/new-1 "Counter" 100))
 (call-0 c1 "increment")
 (call-0 c2 "increment")
 (is (call-0 c1 "get-value") 1 "... actor counter 1 is 1")
 (is (call-0 c2 "get-value") 101 "... actor counter 2 is 101")
 
 ; Test 3: BankAccount actor with conditionals
-(class BankAccount (owner balance)
-  (init (owner-name initial-balance)
+(defclass BankAccount (owner balance)
+  (INIT (owner-name initial-balance)
     (begin
       (set! owner owner-name)
       (set! balance initial-balance)))
@@ -67,7 +67,7 @@
   (method get-owner ()
     owner))
 
-(def account (actor/new-2 "BankAccount" "Alice" 1000))
+(defvar account (actor/new-2 "BankAccount" "Alice" 1000))
 (is (call-0 account "get-owner") "Alice" "... actor account owner is Alice")
 (is (call-0 account "get-balance") 1000 "... actor initial balance is 1000")
 (is (call-1 account "deposit" 500) 1500 "... actor deposit 500 returns 1500")
@@ -76,8 +76,8 @@
 (is (call-0 account "get-balance") 1300 "... actor balance unchanged after failed withdrawal")
 
 ; Test 4: Accumulator actor
-(class Accumulator (total)
-  (init ()
+(defclass Accumulator (total)
+  (INIT ()
     (set! total 0))
 
   (method add (value)
@@ -88,7 +88,7 @@
   (method get-total ()
     total))
 
-(def acc (actor/new-0 "Accumulator"))
+(defvar acc (actor/new-0 "Accumulator"))
 (call-1 acc "add" 5)
 (call-1 acc "add" 10)
 (call-1 acc "add" 3)

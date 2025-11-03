@@ -11,7 +11,8 @@ import {
     CallNode,
     QuoteNode,
     CondNode,
-    DefNode,
+    DefvarNode,
+    DefunNode,
     DefMacroNode,
     LetNode,
     FunNode
@@ -112,9 +113,17 @@ export class MacroExpander {
             );
         }
 
-        // Expand def bodies
-        if (node instanceof DefNode) {
-            return new DefNode(
+        // Expand defvar value
+        if (node instanceof DefvarNode) {
+            return new DefvarNode(
+                node.name,
+                await this.expandUntilDone(node.value)
+            );
+        }
+
+        // Expand defun body
+        if (node instanceof DefunNode) {
+            return new DefunNode(
                 node.name,
                 node.params,
                 await this.expandUntilDone(node.body),
@@ -322,8 +331,15 @@ export class MacroExpander {
             return new CallNode(substitutedElements);
         }
 
-        if (node instanceof DefNode) {
-            return new DefNode(
+        if (node instanceof DefvarNode) {
+            return new DefvarNode(
+                node.name,
+                await this.substituteParams(node.value, bindings)
+            );
+        }
+
+        if (node instanceof DefunNode) {
+            return new DefunNode(
                 node.name,
                 node.params,
                 await this.substituteParams(node.body, bindings),

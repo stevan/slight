@@ -148,7 +148,7 @@ describe('Logging Functions', () => {
     });
 
     test('logging works in functions', async () => {
-        const code = `(def process (x)
+        const code = `(defun process (x)
             (begin
                 (log/debug "Processing" x)
                 (log/info "Result:" (* x 2))

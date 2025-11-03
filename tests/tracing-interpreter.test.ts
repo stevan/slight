@@ -197,7 +197,7 @@ test('TracingInterpreter - Traces builtin calls in recursive functions', async (
     });
 
     await evaluate(interp, `
-        (def factorial (fun (n)
+        (defvar factorial (fun (n)
             (cond
                 ((<= n 1) 1)
                 (else (* n (factorial (- n 1)))))))

@@ -63,7 +63,7 @@ test('JSON: stringify with pretty print', async () => {
 
 test('JSON: round-trip parse and stringify', async () => {
     const code = `
-        (def data (json/parse "[1, 2, 3]"))
+        (defvar data (json/parse "[1, 2, 3]"))
         (json/stringify data)
     `;
     const result = await evaluate(code);

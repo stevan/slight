@@ -91,7 +91,7 @@ describe('I/O Functions', () => {
 
     test('print/say/warn work in functions', async () => {
         const code = `
-            (def greet (name)
+            (defun greet (name)
                 (begin
                     (say "Hello" name)
                     (warn "Greeting complete")

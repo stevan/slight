@@ -33,7 +33,7 @@ async function evaluate(code: string): Promise<any> {
 
 test('Variadic: only rest parameter', async () => {
     const code = `
-        (def all-args (. args) args)
+        (defun all-args (. args) args)
         (all-args 1 2 3 4 5)
     `;
     const result = await evaluate(code);
@@ -42,7 +42,7 @@ test('Variadic: only rest parameter', async () => {
 
 test('Variadic: rest parameter with no args', async () => {
     const code = `
-        (def all-args (. args) args)
+        (defun all-args (. args) args)
         (all-args)
     `;
     const result = await evaluate(code);
@@ -51,7 +51,7 @@ test('Variadic: rest parameter with no args', async () => {
 
 test('Variadic: one required + rest', async () => {
     const code = `
-        (def greet (greeting . names)
+        (defun greet (greeting . names)
             (list greeting names))
         (greet "Hello" "Alice" "Bob" "Charlie")
     `;
@@ -61,7 +61,7 @@ test('Variadic: one required + rest', async () => {
 
 test('Variadic: two required + rest', async () => {
     const code = `
-        (def make-msg (prefix suffix . words)
+        (defun make-msg (prefix suffix . words)
             (list prefix words suffix))
         (make-msg "START" "END" "foo" "bar" "baz")
     `;
@@ -71,7 +71,7 @@ test('Variadic: two required + rest', async () => {
 
 test('Variadic: rest parameter gets empty list when only required args provided', async () => {
     const code = `
-        (def greet (greeting . names)
+        (defun greet (greeting . names)
             (list greeting names))
         (greet "Hello")
     `;
@@ -103,7 +103,7 @@ test('Variadic: anonymous function with required + rest', async () => {
 
 test('Variadic: using list/reduce to sum', async () => {
     const code = `
-        (def sum (. nums)
+        (defun sum (. nums)
             (list/reduce (fun (a b) (+ a b)) 0 nums))
         (sum 1 2 3 4 5)
     `;
@@ -113,7 +113,7 @@ test('Variadic: using list/reduce to sum', async () => {
 
 test('Variadic: using list/map on rest args', async () => {
     const code = `
-        (def double-all (. nums)
+        (defun double-all (. nums)
             (list/map (fun (x) (* x 2)) nums))
         (double-all 1 2 3)
     `;
@@ -123,7 +123,7 @@ test('Variadic: using list/map on rest args', async () => {
 
 test('Variadic: using list/filter on rest args', async () => {
     const code = `
-        (def filter-positive (. nums)
+        (defun filter-positive (. nums)
             (list/filter (fun (x) (> x 0)) nums))
         (filter-positive -5 3 -2 8 0 1)
     `;
@@ -137,7 +137,7 @@ test('Variadic: using list/filter on rest args', async () => {
 
 test('Variadic: simple recursive example', async () => {
     const code = `
-        (def count-items (. items)
+        (defun count-items (. items)
             (list/length items))
         (count-items "a" "b" "c" "d" "e")
     `;
@@ -148,7 +148,7 @@ test('Variadic: simple recursive example', async () => {
 // Note: Spread syntax not yet implemented - would need (func . args) to unpack args
 // test('Variadic: recursive sum implementation', async () => {
 //     const code = `
-//         (def sum-recursive (. nums)
+//         (defun sum-recursive (. nums)
 //             (cond
 //                 ((== (list/length nums) 0) 0)
 //                 (true (+ (list/head nums) (sum-recursive . (list/tail nums))))))
@@ -164,10 +164,10 @@ test('Variadic: simple recursive example', async () => {
 
 test('Variadic: closure with rest param', async () => {
     const code = `
-        (def make-adder (base)
+        (defun make-adder (base)
             (fun (. nums)
                 (list/map (fun (n) (+ base n)) nums)))
-        (def add5 (make-adder 5))
+        (defvar add5 (make-adder 5))
         (add5 1 2 3)
     `;
     const result = await evaluate(code);
@@ -176,9 +176,9 @@ test('Variadic: closure with rest param', async () => {
 
 test('Variadic: closure captures rest param', async () => {
     const code = `
-        (def make-lister (. items)
+        (defun make-lister (. items)
             (fun () items))
-        (def my-list (make-lister "a" "b" "c"))
+        (defvar my-list (make-lister "a" "b" "c"))
         (my-list)
     `;
     const result = await evaluate(code);
@@ -191,7 +191,7 @@ test('Variadic: closure captures rest param', async () => {
 
 test('Variadic: error when too few args (required params not satisfied)', async () => {
     const code = `
-        (def greet (greeting name . rest)
+        (defun greet (greeting name . rest)
             (string/concat greeting " " name))
         (greet "Hello")
     `;
@@ -203,7 +203,7 @@ test('Variadic: error when too few args (required params not satisfied)', async 
 
 test('Variadic: error when too few args (one required param)', async () => {
     const code = `
-        (def process (first . rest) first)
+        (defun process (first . rest) first)
         (process)
     `;
     await assert.rejects(
@@ -214,7 +214,7 @@ test('Variadic: error when too few args (one required param)', async () => {
 
 test('Variadic: still checks arity for non-variadic functions', async () => {
     const code = `
-        (def add2 (a b) (+ a b))
+        (defun add2 (a b) (+ a b))
         (add2 1 2 3)
     `;
     await assert.rejects(
@@ -257,11 +257,11 @@ test('Variadic: still checks arity for non-variadic functions', async () => {
 // Note: Requires spread syntax to unpack rest args
 // test('Variadic: max function', async () => {
 //     const code = `
-//         (def max-of (first . rest)
+//         (defun max-of (first . rest)
 //             (cond
 //                 ((== (list/length rest) 0) first)
 //                 (true
-//                     (def rest-max (max-of . rest))
+//                     (defun rest-max (max-of . rest))
 //                     (cond
 //                         ((> first rest-max) first)
 //                         (true rest-max)))))
@@ -273,7 +273,7 @@ test('Variadic: still checks arity for non-variadic functions', async () => {
 
 test('Variadic: string concatenation', async () => {
     const code = `
-        (def concat-all (. strings)
+        (defun concat-all (. strings)
             (list/reduce (fun (a b) (string/concat a b)) "" strings))
         (concat-all "Hello" " " "wonderful" " " "world")
     `;
@@ -283,7 +283,7 @@ test('Variadic: string concatenation', async () => {
 
 test('Variadic: list builder', async () => {
     const code = `
-        (def make-list (. items) items)
+        (defun make-list (. items) items)
         (make-list 1 2 3 4 5)
     `;
     const result = await evaluate(code);
@@ -297,8 +297,8 @@ test('Variadic: list builder', async () => {
 // Note: Requires spread syntax
 // test('Variadic: rest param with nested calls', async () => {
 //     const code = `
-//         (def outer (. args)
-//             (def inner (. args2) (list/length args2))
+//         (defun outer (. args)
+//             (defun inner (. args2) (list/length args2))
 //             (inner . args))
 //         (outer 1 2 3)
 //     `;
@@ -308,7 +308,7 @@ test('Variadic: list builder', async () => {
 
 test('Variadic: combining with let bindings', async () => {
     const code = `
-        (def process (. nums)
+        (defun process (. nums)
             (let ((doubled (list/map (fun (x) (* x 2)) nums))
                   (sum (list/reduce (fun (a b) (+ a b)) 0 nums)))
                 (list doubled sum)))
@@ -320,8 +320,8 @@ test('Variadic: combining with let bindings', async () => {
 
 test('Variadic: function taking zero required args', async () => {
     const code = `
-        (def make-list-v2 (. items) items)
-        (def empty-list (make-list-v2))
+        (defun make-list-v2 (. items) items)
+        (defvar empty-list (make-list-v2))
         empty-list
     `;
     const result = await evaluate(code);

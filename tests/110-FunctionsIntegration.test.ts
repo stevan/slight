@@ -13,10 +13,10 @@ test('full pipeline evaluates mutually recursive and nested function calls', asy
 
   const input = [
     // even? and odd? are mutually recursive
-    '(def even? (n) (cond ((== n 0) true) (else (odd? (- n 1)))))',
-    '(def odd? (n) (cond ((== n 0) false) (else (even? (- n 1)))))',
+    '(defun even? (n) (cond ((== n 0) true) (else (odd? (- n 1)))))',
+    '(defun odd? (n) (cond ((== n 0) false) (else (even? (- n 1)))))',
     // sum-to-n uses even? and odd?
-    '(def sum-to-n (n) (cond ((== n 0) 0) ((even? n) (+ n (sum-to-n (- n 1)))) (else (sum-to-n (- n 1)))))',
+    '(defun sum-to-n (n) (cond ((== n 0) 0) ((even? n) (+ n (sum-to-n (- n 1)))) (else (sum-to-n (- n 1)))))',
     // test cases
     '(even? 10)',
     '(odd? 10)',

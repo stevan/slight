@@ -231,7 +231,7 @@ test('try/catch - in function', async () => {
     const interpreter = new Interpreter();
 
     const input = [
-        '(def safe-eval (should-throw) (try (cond (should-throw (throw "error")) (else 42)) (catch e "caught")))',
+        '(defun safe-eval (should-throw) (try (cond (should-throw (throw "error")) (else 42)) (catch e "caught")))',
         '(safe-eval false)',
         '(safe-eval true)'
     ];
@@ -297,7 +297,7 @@ test('try/catch - conditional throw', async () => {
     const interpreter = new Interpreter();
 
     const input = [
-        '(def check (x) (try (cond ((< x 0) (throw "negative")) (else x)) (catch e e.message)))',
+        '(defun check (x) (try (cond ((< x 0) (throw "negative")) (else x)) (catch e e.message)))',
         '(check 5)',
         '(check -3)'
     ];
@@ -315,7 +315,7 @@ test('try/catch - with set!', async () => {
     const interpreter = new Interpreter();
 
     const input = [
-        '(def status "ok")',
+        '(defvar status "ok")',
         '(try (throw "failed") (catch e (set! status "error")))',
         'status'
     ];

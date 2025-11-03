@@ -1,5 +1,5 @@
 import { ASTNode, NumberNode, StringNode, BooleanNode, SymbolNode, CallNode,
-         QuoteNode, DefNode, CondNode, LetNode, FunNode, BeginNode } from './AST.js';
+         QuoteNode, DefvarNode, DefunNode, CondNode, LetNode, FunNode, BeginNode } from './AST.js';
 import { Tokenizer } from './Tokenizer.js';
 import { Parser } from './Parser.js';
 import { MacroExpander } from './MacroExpander.js';
@@ -105,8 +105,11 @@ export class DebugTools {
                 .join('\n');
             return `${spaces}CallNode {\n${elements}\n${spaces}}`;
         }
-        if (node instanceof DefNode) {
-            return `${spaces}DefNode { name: "${node.name}", params: ${JSON.stringify(node.params)} }`;
+        if (node instanceof DefvarNode) {
+            return `${spaces}DefvarNode { name: "${node.name}" }`;
+        }
+        if (node instanceof DefunNode) {
+            return `${spaces}DefunNode { name: "${node.name}", params: ${JSON.stringify(node.params)} }`;
         }
         if (node instanceof CondNode) {
             return `${spaces}CondNode { clauses: ${node.clauses.length} }`;
@@ -147,12 +150,11 @@ export class DebugTools {
             const elements = node.elements.map(el => this.astToCode(el)).join(' ');
             return `(${elements})`;
         }
-        if (node instanceof DefNode) {
-            if (node.params) {
-                return `(def ${node.name} (${node.params.join(' ')}) ${this.astToCode(node.body)})`;
-            } else {
-                return `(def ${node.name} ${this.astToCode(node.body)})`;
-            }
+        if (node instanceof DefvarNode) {
+            return `(def ${node.name} ${this.astToCode(node.value)})`;
+        }
+        if (node instanceof DefunNode) {
+            return `(def ${node.name} (${node.params.join(' ')}) ${this.astToCode(node.body)})`;
         }
         if (node instanceof CondNode) {
             const clauses = node.clauses

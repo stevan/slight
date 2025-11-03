@@ -157,8 +157,15 @@ export class QuoteNode extends ASTNode {
             return ['quote', QuoteNode.astToValue(ast.expr)];
         }
         // Handle special form nodes
-        if (ast instanceof DefNode) {
-            return ['def', ast.name, ast.params, QuoteNode.astToValue(ast.body)];
+        if (ast instanceof DefvarNode) {
+            return ['defvar', ast.name, QuoteNode.astToValue(ast.value)];
+        }
+        if (ast instanceof DefunNode) {
+            if (ast.restParam) {
+                return ['defun', ast.name, [...ast.params, '.', ast.restParam], QuoteNode.astToValue(ast.body)];
+            } else {
+                return ['defun', ast.name, ast.params, QuoteNode.astToValue(ast.body)];
+            }
         }
         if (ast instanceof CondNode) {
             const clauses = ast.clauses.map((c: any) => [QuoteNode.astToValue(c.test), QuoteNode.astToValue(c.result)]);
@@ -276,64 +283,71 @@ export class DefMacroNode extends ASTNode {
 // Definitions
 // -----------------------------------------------------------------------------
 
-export class DefNode extends ASTNode {
-    type = 'DEF';
+// Variable definition
+export class DefvarNode extends ASTNode {
+    type = 'DEFVAR';
     constructor(
         public name: string,
-        public params: string[] | null,
+        public value: ASTNode
+    ) { super(); }
+    async evaluate(interpreter: any, params: Map<string, any>): Promise<any> {
+        // Evaluate the value expression
+        const value = await this.value.evaluate(interpreter, params);
+
+        if (params.size > 0) {
+            // Local scope - store in local environment
+            params.set(this.name, value);
+
+            // If it's a closure, add it to its own capturedEnv for recursive calls
+            if (value && typeof value === 'object' && 'capturedEnv' in value) {
+                value.capturedEnv.set(this.name, value);
+            }
+
+            return value;
+        } else {
+            // Global scope - check if value is a function/closure
+            if (value && typeof value === 'object' && 'body' in value && 'params' in value) {
+                // It's a function/closure, store in functions map
+                interpreter.functions.set(this.name, value);
+            } else {
+                // It's a regular value, store in bindings
+                interpreter.bindings.set(this.name, value);
+            }
+            return true;
+        }
+    }
+}
+
+// Function definition
+export class DefunNode extends ASTNode {
+    type = 'DEFUN';
+    constructor(
+        public name: string,
+        public params: string[],
         public body: ASTNode,
         public restParam?: string
     ) { super(); }
     async evaluate(interpreter: any, params: Map<string, any>): Promise<any> {
-        // Check if this is a value definition (def name value) vs function definition
-        if (this.params === null) {
-            // Value definition (def name value)
-            const value = await this.body.evaluate(interpreter, params);
+        // Create a closure that captures the current environment
+        const closure = {
+            params: this.params,
+            body: this.body,
+            restParam: this.restParam,
+            capturedEnv: new Map(params) // Capture current lexical environment
+        };
 
-            if (params.size > 0) {
-                // Local scope - store in local environment
-                params.set(this.name, value);
+        // Add the function to its own capturedEnv for recursive calls
+        closure.capturedEnv.set(this.name, closure);
 
-                // If it's a closure, add it to its own capturedEnv for recursive calls
-                if (value && typeof value === 'object' && 'capturedEnv' in value) {
-                    value.capturedEnv.set(this.name, value);
-                }
-
-                return value;
-            } else {
-                // Global scope - check if value is a function/closure
-                if (value && typeof value === 'object' && 'body' in value && 'params' in value) {
-                    // It's a function/closure, store in functions map
-                    interpreter.functions.set(this.name, value);
-                } else {
-                    // It's a regular value, store in bindings
-                    interpreter.bindings.set(this.name, value);
-                }
-                return true;
-            }
+        // If we're in a local scope, return the function object
+        if (params.size > 0) {
+            // Still register it locally for recursive calls
+            params.set(this.name, closure);
+            return closure;
         } else {
-            // Function definition (def name (params...) body)
-            // Create a closure that captures the current environment
-            const closure = {
-                params: this.params,
-                body: this.body,
-                restParam: this.restParam,
-                capturedEnv: new Map(params) // Capture current lexical environment
-            };
-
-            // Add the function to its own capturedEnv for recursive calls
-            closure.capturedEnv.set(this.name, closure);
-
-            // If we're in a local scope, return the function object
-            if (params.size > 0) {
-                // Still register it locally for recursive calls
-                params.set(this.name, closure);
-                return closure;
-            } else {
-                // Global scope - register the function globally
-                interpreter.functions.set(this.name, closure);
-                return true;
-            }
+            // Global scope - register the function globally
+            interpreter.functions.set(this.name, closure);
+            return true;
         }
     }
 }

@@ -31,7 +31,7 @@ test('Include: basic file inclusion works', async () => {
     const utilFile = path.join(tmpDir, 'util.sl');
 
     // Create a simple utility file
-    fs.writeFileSync(utilFile, '(def util/add (a b) (+ a b))');
+    fs.writeFileSync(utilFile, '(defun util/add (a b) (+ a b))');
 
     // Include it and use the function
     const code = `
@@ -60,9 +60,9 @@ test('Include: multiple definitions in one file', async () => {
     const mathFile = path.join(tmpDir, 'math.sl');
 
     fs.writeFileSync(mathFile, `
-        (def mymath/double (x) (* x 2))
-        (def mymath/triple (x) (* x 3))
-        (def mymath/square (x) (* x x))
+        (defun mymath/double (x) (* x 2))
+        (defun mymath/triple (x) (* x 3))
+        (defun mymath/square (x) (* x x))
     `);
 
     const code = `

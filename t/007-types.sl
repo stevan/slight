@@ -19,12 +19,12 @@
 (is (type/of (list "a" "b")) "LIST" "... type of string list is LIST")
 
 ; type/of - function
-(def myfunc (x) (+ x 1))
+(defun myfunc (x) (+ x 1))
 (is (type/of myfunc) "FUNCTION" "... type of defined function is FUNCTION")
 
 ; type/of - closure
-(def make-adder (n) (fun (x) (+ x n)))
-(def add5 (make-adder 5))
+(defun make-adder (n) (fun (x) (+ x n)))
+(defvar add5 (make-adder 5))
 (is (type/of add5) "FUNCTION" "... type of closure is FUNCTION")
 
 ; type/is? - testing types
@@ -45,8 +45,7 @@
 (is (type/assert true "BOOLEAN") true "... assert BOOLEAN returns value")
 
 ; type/assert - failure case (using try/catch)
-(def result
-  (try
+(defvar result (try
     (begin
       (type/assert 42 "STRING")
       "should not reach here")
@@ -59,7 +58,7 @@
 (is (type/of (list/map (fun (x) (* x 2)) (list 1 2 3))) "LIST" "... type of map result")
 
 ; Type checking in conditionals
-(def check-type (val)
+(defun check-type (val)
   (cond
     ((type/is? val "NUMBER") "it's a number")
     ((type/is? val "STRING") "it's a string")

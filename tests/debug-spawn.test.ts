@@ -39,7 +39,7 @@ async function evaluate(code: string[]): Promise<any[]> {
 
 test('spawn creates a new process', async () => {
     const results = await evaluate([
-        '(def pid (spawn "(+ 1 2)"))',
+        '(defvar pid (spawn "(+ 1 2)"))',
         'pid'
     ]);
     if (process.env['DEBUG']) {

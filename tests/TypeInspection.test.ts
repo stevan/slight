@@ -25,7 +25,7 @@ describe('Type Inspection Primitives', () => {
             '(type/of (list))',
             '(type/of ())',
             '(type/of +)',
-            '(def add (fun (a b) (+ a b)))',
+            '(defvar add (fun (a b) (+ a b)))',
             '(type/of add)',
             '(try (throw "test error") (catch e (type/of e)))'
         ];
@@ -61,9 +61,9 @@ describe('Type Inspection Primitives', () => {
 
         const input = [
             '(type/of (+ 1 2))',
-            '(def x "hello")',
+            '(defvar x "hello")',
             '(type/of x)',
-            '(def get-list (fun () (list 1 2 3)))',
+            '(defvar get-list (fun () (list 1 2 3)))',
             '(type/of (get-list))'
         ];
 
@@ -139,10 +139,10 @@ describe('Type Inspection Primitives', () => {
         const interpreter = new Interpreter();
 
         const input = [
-            '(def x 10)',
-            '(def y 20)',
+            '(defvar x 10)',
+            '(defvar y 20)',
             '(type/is? x (type/of y))',
-            '(def z "string")',
+            '(defvar z "string")',
             '(type/is? x (type/of z))'
         ];
 
@@ -218,7 +218,7 @@ describe('Type Inspection Primitives', () => {
         const interpreter = new Interpreter();
 
         const input = [
-            '(def safe-add (fun (a b) (begin (type/assert a "NUMBER") (type/assert b "NUMBER") (+ a b))))',
+            '(defvar safe-add (fun (a b) (begin (type/assert a "NUMBER") (type/assert b "NUMBER") (+ a b))))',
             '(safe-add 10 20)',
             '(try (safe-add 10 "hello") (catch e e.message))'
         ];
@@ -246,7 +246,7 @@ describe('Type Inspection Primitives', () => {
 
         const input = [
             '(type/of (list (list 1 2) (list 3 4)))',
-            '(def nested (list (list 1 2) "hello" true))',
+            '(defvar nested (list (list 1 2) "hello" true))',
             '(type/of (head nested))',
             '(type/of (head (tail nested)))',
             '(type/of (head (tail (tail nested))))'
@@ -297,8 +297,8 @@ describe('Type Inspection Primitives', () => {
         const interpreter = new Interpreter();
 
         const input = [
-            '(def make-counter (fun () (let ((count 0)) (fun () (begin (set! count (+ count 1)) count)))))',
-            '(def counter (make-counter))',
+            '(defvar make-counter (fun () (let ((count 0)) (fun () (begin (set! count (+ count 1)) count)))))',
+            '(defvar counter (make-counter))',
             '(type/of counter)',
             '(counter)'
         ];

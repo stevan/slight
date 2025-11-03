@@ -23,10 +23,10 @@ async function runSlight(code: string) {
 
 test('closure captures lexical environment', async () => {
     const code = `
-        (def make-adder (x)
-          (def adder (y) (+ x y)))
+        (defun make-adder (x)
+          (defun adder (y) (+ x y)))
 
-        (def add5 (make-adder 5))
+        (defvar add5 (make-adder 5))
         (add5 3)
     `;
 
@@ -38,13 +38,13 @@ test('closure captures lexical environment', async () => {
 
 test('closure with let binding', async () => {
     const code = `
-        (def make-counter ()
+        (defun make-counter ()
           (let ((count 0))
-            (def increment ()
+            (defun increment ()
               (let ((new-count (+ count 1)))
                 new-count))))
 
-        (def counter (make-counter))
+        (defvar counter (make-counter))
         (list (counter) (counter) (counter))
     `;
 
@@ -57,12 +57,12 @@ test('closure with let binding', async () => {
 
 test('nested closures', async () => {
     const code = `
-        (def make-multiplier-factory (factor)
-          (def make-multiplier (base)
-            (def multiply (x) (* factor (* base x)))))
+        (defun make-multiplier-factory (factor)
+          (defun make-multiplier (base)
+            (defun multiply (x) (* factor (* base x)))))
 
-        (def make-double (make-multiplier-factory 2))
-        (def double-of-10 (make-double 10))
+        (defvar make-double (make-multiplier-factory 2))
+        (defvar double-of-10 (make-double 10))
         (double-of-10 5)
     `;
 
@@ -74,11 +74,11 @@ test('nested closures', async () => {
 
 test('closure captures multiple variables', async () => {
     const code = `
-        (def make-operation (op a b)
-          (def apply-op ()
+        (defun make-operation (op a b)
+          (defun apply-op ()
             (op a b)))
 
-        (def add-op (make-operation + 10 20))
+        (defvar add-op (make-operation + 10 20))
         (add-op)
     `;
 
@@ -90,12 +90,12 @@ test('closure captures multiple variables', async () => {
 
 test('closure with higher-order functions', async () => {
     const code = `
-        (def compose (f g)
-          (def composed (x) (f (g x))))
+        (defun compose (f g)
+          (defun composed (x) (f (g x))))
 
-        (def add1 (x) (+ x 1))
-        (def double (x) (* x 2))
-        (def add1-then-double (compose double add1))
+        (defun add1 (x) (+ x 1))
+        (defun double (x) (* x 2))
+        (defun add1-then-double (compose double add1))
 
         (add1-then-double 5)
     `;
@@ -108,12 +108,12 @@ test('closure with higher-order functions', async () => {
 
 test('closure preserves environment even after outer function returns', async () => {
     const code = `
-        (def make-greeter (greeting)
-          (def greet (name)
+        (defun make-greeter (greeting)
+          (defun greet (name)
             (list greeting name)))
 
-        (def hello (make-greeter "Hello"))
-        (def goodbye (make-greeter "Goodbye"))
+        (defvar hello (make-greeter "Hello"))
+        (defvar goodbye (make-greeter "Goodbye"))
 
         (list (hello "Alice") (goodbye "Bob"))
     `;
@@ -129,16 +129,16 @@ test('closure preserves environment even after outer function returns', async ()
 
 test('closure with let and function parameters', async () => {
     const code = `
-        (def make-bounded-counter (min max)
+        (defun make-bounded-counter (min max)
           (let ((current min))
-            (def next ()
+            (defun next ()
               (cond
                 ((< current max)
                   (let ((result current))
                     result))
                 (else max)))))
 
-        (def counter (make-bounded-counter 1 3))
+        (defvar counter (make-bounded-counter 1 3))
         (list (counter) (counter) (counter) (counter))
     `;
 
@@ -151,13 +151,13 @@ test('closure with let and function parameters', async () => {
 
 test('closure in map-like operation', async () => {
     const code = `
-        (def make-mapper (f)
+        (defun make-mapper (f)
           (fun (lst)
             (cond
               ((empty? lst) (list))
               (else (cons (f (head lst)) ((make-mapper f) (tail lst)))))))
 
-        (def double-mapper (make-mapper (fun (x) (* x 2))))
+        (defvar double-mapper (make-mapper (fun (x) (* x 2))))
         (double-mapper (list 1 2 3))
     `;
 
@@ -169,13 +169,13 @@ test('closure in map-like operation', async () => {
 
 test('closure with partial application', async () => {
     const code = `
-        (def curry-add (x)
-          (def add-x (y)
-            (def add-y (z)
+        (defun curry-add (x)
+          (defun add-x (y)
+            (defun add-y (z)
               (+ x (+ y z)))))
 
-        (def add1 (curry-add 1))
-        (def add1-2 (add1 2))
+        (defvar add1 (curry-add 1))
+        (defvar add1-2 (add1 2))
         (add1-2 3)
     `;
 
@@ -187,13 +187,13 @@ test('closure with partial application', async () => {
 
 test('closure scope isolation', async () => {
     const code = `
-        (def x 100)
+        (defvar x 100)
 
-        (def make-closure (x)
-          (def get-x () x))
+        (defun make-closure (x)
+          (defun get-x () x))
 
-        (def closure1 (make-closure 1))
-        (def closure2 (make-closure 2))
+        (defvar closure1 (make-closure 1))
+        (defvar closure2 (make-closure 2))
 
         (list (closure1) (closure2) x)
     `;

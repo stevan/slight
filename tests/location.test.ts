@@ -7,7 +7,7 @@ async function* stringSource(code: string) {
 }
 
 async function test() {
-    const code = `(def x 10)
+    const code = `(defvar x 10)
 (say x)
 (say y)`;
 

@@ -4,7 +4,7 @@ import { Tokenizer } from '../src/Slight/Tokenizer.js';
 import { Parser } from '../src/Slight/Parser.js';
 import { Interpreter } from '../src/Slight/Interpreter.js';
 import { isPipelineError, Token } from '../src/Slight/Types.js';
-import { ASTNode, NumberNode, StringNode, BooleanNode, SymbolNode, CallNode, QuoteNode, CondNode, DefNode } from '../src/Slight/AST.js';
+import { ASTNode, NumberNode, StringNode, BooleanNode, SymbolNode, CallNode, QuoteNode, CondNode, DefvarNode, DefunNode } from '../src/Slight/AST.js';
 
 test('Tokenizer yields error for invalid token @', async () => {
   async function* mockAsyncGen(items: string[]) { for (const i of items) yield i; }
@@ -42,13 +42,13 @@ test('Parser yields error for unmatched parenthesis', async () => {
   assert(results.find(isPipelineError)?.stage === 'Parser');
 });
 
-test('Parser yields error for invalid def syntax', async () => {
+test('Parser yields error for invalid defvar syntax', async () => {
   async function* mockAsyncGen(items: Token[]) { for (const i of items) yield i; }
   const parser = new Parser();
-  // Tokens for (def foo) -- missing params and body
+  // Tokens for (defvar foo) -- missing value
   const tokens: Token[] = [
     { type: 'LPAREN', source: '(', sequence_id: 1 },
-    { type: 'SYMBOL', source: 'def', sequence_id: 2 },
+    { type: 'SYMBOL', source: 'defvar', sequence_id: 2 },
     { type: 'SYMBOL', source: 'foo', sequence_id: 3 },
     { type: 'RPAREN', source: ')', sequence_id: 4 }
   ];

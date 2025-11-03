@@ -1,30 +1,30 @@
 
-(def *count* 0)
-(def *fails* 0)
+(defvar *count* 0)
+(defvar *fails* 0)
 
-(def diag (msg)
+(defun diag (msg)
     (say (string/concat "# " msg)))
 
-(def todo (msg)
+(defun todo (msg)
     (diag (string/concat "TODO:" msg)))
 
-(def pass (msg)
+(defun pass (msg)
     (begin
         (say (string/join (list "ok" *count* msg) " "))
         (set! *count* (+ *count* 1))))
 
-(def fail (msg)
+(defun fail (msg)
     (begin
         (say (string/join (list "not ok" *count* msg) " "))
         (set! *count* (+ *count* 1))
         (set! *fails* (+ *fails* 1))))
 
-(def ok (test msg)
+(defun ok (test msg)
     (cond
         (test (pass msg))
         (else (fail msg))))
 
-(def is (got expected msg)
+(defun is (got expected msg)
     (begin
     (ok (== got expected) msg)
     (cond ((!= got expected)
@@ -33,7 +33,7 @@
          (diag (string/concat "       got: " got))
          (diag (string/concat "  expected: " expected)))))))
 
-(def done ()
+(defun done ()
     (begin
     (say (string/concat "1.." *count*))
     (cond ((> *fails* 0)

@@ -12,7 +12,8 @@ import {
     CallNode,
     QuoteNode,
     CondNode,
-    DefNode,
+    DefvarNode,
+    DefunNode,
     DefMacroNode,
     BeginNode,
     SetNode,
@@ -206,7 +207,7 @@ export class Parser {
     }
 
     private nodeFromCall(elements: ASTNode[], location?: { line: number, column: number }): ASTNode {
-        // Special forms: quote, cond, def, defmacro, begin, set!, try, throw, let, fun
+        // Special forms: quote, cond, defvar, defun, defmacro, begin, set!, try, throw, let, fun, defclass
         if (elements.length > 0 && elements[0] instanceof SymbolNode) {
             const sym = elements[0].name;
             if (sym === 'quote' && elements.length === 2) {
@@ -312,21 +313,32 @@ export class Parser {
                 const { params, restParam } = this.parseParams(elements[2]);
                 return new DefMacroNode(name, params, elements[3], restParam);
             }
-            if (sym === 'def') {
-                if (elements.length === 4 && elements[1] instanceof SymbolNode && elements[2] instanceof CallNode) {
-                    // (def name (params...) body) - function definition
-                    // Supports variadic: (def name (a b . rest) body)
-                    const name = elements[1].name;
-                    const { params, restParam } = this.parseParams(elements[2]);
-                    return new DefNode(name, params, elements[3], restParam).setLocation(location?.line, location?.column);
-                } else if (elements.length === 3 && elements[1] instanceof SymbolNode) {
-                    // (def name value) - simple value definition
-                    const name = elements[1].name;
-                    // Use null params to indicate value definition (not function)
-                    return new DefNode(name, null as any, elements[2]).setLocation(location?.line, location?.column);
-                } else {
-                    throw new Error('Invalid def syntax: expected (def name value) or (def name (params...) body)')
+            if (sym === 'defvar') {
+                // (def name value) - variable definition
+                if (elements.length !== 3) {
+                    throw new Error('Invalid defvar syntax: expected (def name value)');
                 }
+                if (!(elements[1] instanceof SymbolNode)) {
+                    throw new Error('Invalid defvar syntax: name must be a symbol');
+                }
+                const name = elements[1].name;
+                return new DefvarNode(name, elements[2]).setLocation(location?.line, location?.column);
+            }
+            if (sym === 'defun') {
+                // (def name (params...) body) - function definition
+                // Supports variadic: (def name (a b . rest) body)
+                if (elements.length !== 4) {
+                    throw new Error('Invalid defun syntax: expected (def name (params...) body)');
+                }
+                if (!(elements[1] instanceof SymbolNode)) {
+                    throw new Error('Invalid defun syntax: name must be a symbol');
+                }
+                if (!(elements[2] instanceof CallNode)) {
+                    throw new Error('Invalid defun syntax: parameters must be a list');
+                }
+                const name = elements[1].name;
+                const { params, restParam } = this.parseParams(elements[2]);
+                return new DefunNode(name, params, elements[3], restParam).setLocation(location?.line, location?.column);
             }
             if (sym === 'set!') {
                 // (set! name value) - mutate existing variable
@@ -369,23 +381,23 @@ export class Parser {
 
                 return new LetNode(bindings, body);
             }
-            if (sym === 'class') {
-                // (class ClassName (slot1 slot2 ...) (init (params...) body) (method name (params...) body) ...)
+            if (sym === 'defclass') {
+                // (defclass ClassName (slot1 slot2 ...) (init (params...) body) (method name (params...) body) ...)
                 if (elements.length < 3) {
-                    throw new Error('Invalid class syntax: expected (class Name (slots...) ...)');
+                    throw new Error('Invalid defclass syntax: expected (defclass Name (slots...) ...)');
                 }
                 if (!(elements[1] instanceof SymbolNode)) {
-                    throw new Error('Invalid class syntax: class name must be a symbol');
+                    throw new Error('Invalid defclass syntax: class name must be a symbol');
                 }
                 const className = elements[1].name;
 
                 // Parse slots
                 if (!(elements[2] instanceof CallNode)) {
-                    throw new Error('Invalid class syntax: slots must be a list');
+                    throw new Error('Invalid defclass syntax: slots must be a list');
                 }
                 const slots = elements[2].elements.map((el: any) => {
                     if (!(el instanceof SymbolNode)) {
-                        throw new Error('Invalid class syntax: slot names must be symbols');
+                        throw new Error('Invalid defclass syntax: slot names must be symbols');
                     }
                     return el.name;
                 });
@@ -397,22 +409,22 @@ export class Parser {
                 for (let i = 3; i < elements.length; i++) {
                     const methodDef = elements[i];
                     if (!(methodDef instanceof CallNode) || methodDef.elements.length < 3) {
-                        throw new Error('Invalid class syntax: method must be (method name (params...) body) or (init (params...) body)');
+                        throw new Error('Invalid defclass syntax: method must be (method name (params...) body) or (INIT (params...) body)');
                     }
 
                     const methodKeyword = methodDef.elements[0];
                     if (!(methodKeyword instanceof SymbolNode)) {
-                        throw new Error('Invalid class syntax: expected method or init keyword');
+                        throw new Error('Invalid defclass syntax: expected method or INIT keyword');
                     }
 
-                    if (methodKeyword.name === 'init') {
-                        // (init (params...) body)
+                    if (methodKeyword.name === 'INIT') {
+                        // (INIT (params...) body)
                         if (!(methodDef.elements[1] instanceof CallNode)) {
-                            throw new Error('Invalid class syntax: init parameters must be a list');
+                            throw new Error('Invalid defclass syntax: INIT parameters must be a list');
                         }
                         const params = methodDef.elements[1].elements.map((el: any) => {
                             if (!(el instanceof SymbolNode)) {
-                                throw new Error('Invalid class syntax: init parameters must be symbols');
+                                throw new Error('Invalid defclass syntax: INIT parameters must be symbols');
                             }
                             return el.name;
                         });
@@ -420,21 +432,21 @@ export class Parser {
                     } else if (methodKeyword.name === 'method') {
                         // (method name (params...) body)
                         if (!(methodDef.elements[1] instanceof SymbolNode)) {
-                            throw new Error('Invalid class syntax: method name must be a symbol');
+                            throw new Error('Invalid defclass syntax: method name must be a symbol');
                         }
                         if (!(methodDef.elements[2] instanceof CallNode)) {
-                            throw new Error('Invalid class syntax: method parameters must be a list');
+                            throw new Error('Invalid defclass syntax: method parameters must be a list');
                         }
                         const methodName = methodDef.elements[1].name;
                         const params = methodDef.elements[2].elements.map((el: any) => {
                             if (!(el instanceof SymbolNode)) {
-                                throw new Error('Invalid class syntax: method parameters must be symbols');
+                                throw new Error('Invalid defclass syntax: method parameters must be symbols');
                             }
                             return el.name;
                         });
                         methods.set(methodName, { params, body: methodDef.elements[3] });
                     } else {
-                        throw new Error(`Invalid class syntax: unknown keyword ${methodKeyword.name}`);
+                        throw new Error(`Invalid defclass syntax: unknown keyword ${methodKeyword.name}`);
                     }
                 }
 

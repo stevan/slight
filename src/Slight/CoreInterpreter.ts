@@ -15,7 +15,8 @@ import {
     CallNode,
     QuoteNode,
     CondNode,
-    DefNode,
+    DefvarNode,
+    DefunNode,
     DefMacroNode,
     SetNode,
     LetNode

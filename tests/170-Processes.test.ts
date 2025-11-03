@@ -29,7 +29,7 @@ async function evaluate(code: string[]) {
 
 test('spawn creates a new process', async () => {
     const results = await evaluate([
-        '(def pid (spawn "(+ 1 2)"))',
+        '(defvar pid (spawn "(+ 1 2)"))',
         'pid'
     ]);
     assert.equal(typeof results[0], 'boolean'); // def returns true
@@ -47,13 +47,13 @@ test('self returns current process ID', async () => {
 test('send and recv basic message passing', async () => {
     const results = await evaluate([
         // Spawn an echo server that receives and sends back
-        '(def echo (spawn "(let ((msg (recv))) (send (head msg) (head (tail msg))))"))',
+        '(defvar echo (spawn "(let ((msg (recv))) (send (head msg) (head (tail msg))))"))',
         // Wait a bit for process to start
         '(+ 1 1)',
         // Send a message
         '(send echo 42)',
         // Receive the echo
-        '(def response (recv 1000))',
+        '(defvar response (recv 1000))',
         // Extract the data (second element)
         '(head (tail response))'
     ]);
@@ -69,7 +69,7 @@ test('recv with timeout returns null on timeout', async () => {
 
 test('recv without timeout blocks (tested with quick send)', async () => {
     const results = await evaluate([
-        '(def pid (spawn "(send 0 (quote hello))"))',
+        '(defvar pid (spawn "(send 0 (quote hello))"))',
         '(recv 1000)', // Should receive before timeout
     ]);
     // Should receive [pid "hello"]
@@ -80,17 +80,17 @@ test('recv without timeout blocks (tested with quick send)', async () => {
 test('multiple processes can communicate', async () => {
     const results = await evaluate([
         // Process 1: forwards messages
-        '(def p1 (spawn "(let ((msg (recv))) (send (head msg) (+ (head (tail msg)) 10)))"))',
+        '(defvar p1 (spawn "(let ((msg (recv))) (send (head msg) (+ (head (tail msg)) 10)))"))',
         // Process 2: forwards messages
-        '(def p2 (spawn "(let ((msg (recv))) (send (head msg) (* (head (tail msg)) 2)))"))',
+        '(defvar p2 (spawn "(let ((msg (recv))) (send (head msg) (* (head (tail msg)) 2)))"))',
         // Send to p1
         '(send p1 5)',
         // Receive from p1
-        '(def r1 (recv 1000))',
+        '(defvar r1 (recv 1000))',
         // Send to p2
         '(send p2 5)',
         // Receive from p2
-        '(def r2 (recv 1000))',
+        '(defvar r2 (recv 1000))',
         // Return both results
         '(list (head (tail r1)) (head (tail r2)))'
     ]);
@@ -99,7 +99,7 @@ test('multiple processes can communicate', async () => {
 
 test('is-alive? checks process status', async () => {
     const results = await evaluate([
-        '(def pid (spawn "(+ 1 2)"))',
+        '(defvar pid (spawn "(+ 1 2)"))',
         '(is-alive? pid)',
         // Wait a bit for process to complete
         '(+ 1 1)',
@@ -114,8 +114,8 @@ test('is-alive? checks process status', async () => {
 
 test('processes returns list of PIDs', async () => {
     const results = await evaluate([
-        '(def p1 (spawn "(+ 1 2)"))',
-        '(def p2 (spawn "(+ 1 2)"))',
+        '(defvar p1 (spawn "(+ 1 2)"))',
+        '(defvar p2 (spawn "(+ 1 2)"))',
         '(processes)'
     ]);
     assert.ok(Array.isArray(results[2]));
@@ -133,12 +133,12 @@ test('send to non-existent process throws error', async () => {
 test('process can receive multiple messages', async () => {
     const results = await evaluate([
         // Echo server that receives two messages
-        '(def echo (spawn "(let ((msg1 (recv))) (send (head msg1) (head (tail msg1)))) (let ((msg2 (recv))) (send (head msg2) (head (tail msg2))))"))',
+        '(defvar echo (spawn "(let ((msg1 (recv))) (send (head msg1) (head (tail msg1)))) (let ((msg2 (recv))) (send (head msg2) (head (tail msg2))))"))',
         '(+ 1 1)', // Wait for process to start
         '(send echo 10)',
         '(send echo 20)',
-        '(def r1 (recv 1000))',
-        '(def r2 (recv 1000))',
+        '(defvar r1 (recv 1000))',
+        '(defvar r2 (recv 1000))',
         '(list (head (tail r1)) (head (tail r2)))'
     ]);
     assert.deepEqual(results[6], [10, 20]);
@@ -146,8 +146,8 @@ test('process can receive multiple messages', async () => {
 
 test('process can use functions and closures', async () => {
     const results = await evaluate([
-        '(def pid (spawn "(def double (x) (* x 2)) (send 0 (double 21))"))',
-        '(def msg (recv 1000))',
+        '(defvar pid (spawn "(defun double (x) (* x 2)) (send 0 (double 21))"))',
+        '(defvar msg (recv 1000))',
         '(head (tail msg))'
     ]);
     assert.equal(results[2], 42);
@@ -156,12 +156,12 @@ test('process can use functions and closures', async () => {
 test('process can spawn other processes', async () => {
     const results = await evaluate([
         // Parent spawns a child
-        '(def parent (spawn "(def child (spawn \\"(send 0 (quote nested))\\")) (+ 1 1)"))',
+        '(defvar parent (spawn "(defvar child (spawn \\"(send 0 (quote nested))\\")) (+ 1 1)"))',
         // Wait for nested spawn
         '(+ 1 1)',
         '(+ 1 1)',
         // Check if we received the message from nested process
-        '(def msg (recv 1000))',
+        '(defvar msg (recv 1000))',
         '(head (tail msg))'
     ]);
     assert.equal(results[4], 'nested');
@@ -170,7 +170,7 @@ test('process can spawn other processes', async () => {
 test('kill terminates a process', async () => {
     const results = await evaluate([
         // Create a process that waits for a message
-        '(def pid (spawn "(recv)"))',
+        '(defvar pid (spawn "(recv)"))',
         '(is-alive? pid)',
         '(kill pid)',
         '(is-alive? pid)'
@@ -183,13 +183,13 @@ test('kill terminates a process', async () => {
 test('concurrent processes with fibonacci calculation', async () => {
     const results = await evaluate([
         // Define fibonacci function
-        '(def fib (n) (cond ((< n 2) n) (else (+ (fib (- n 1)) (fib (- n 2))))))',
+        '(defun fib (n) (cond ((< n 2) n) (else (+ (fib (- n 1)) (fib (- n 2))))))',
         // Spawn two processes calculating fibonacci
-        '(def p1 (spawn "(def fib (n) (cond ((< n 2) n) (else (+ (fib (- n 1)) (fib (- n 2)))))) (send 0 (fib 10))"))',
-        '(def p2 (spawn "(def fib (n) (cond ((< n 2) n) (else (+ (fib (- n 1)) (fib (- n 2)))))) (send 0 (fib 8))"))',
+        '(defvar p1 (spawn "(defun fib (n) (cond ((< n 2) n) (else (+ (fib (- n 1)) (fib (- n 2)))))) (send 0 (fib 10))"))',
+        '(defvar p2 (spawn "(defun fib (n) (cond ((< n 2) n) (else (+ (fib (- n 1)) (fib (- n 2)))))) (send 0 (fib 8))"))',
         // Receive results
-        '(def r1 (recv 5000))',
-        '(def r2 (recv 5000))',
+        '(defvar r1 (recv 5000))',
+        '(defvar r2 (recv 5000))',
         // Sum the results
         '(+ (head (tail r1)) (head (tail r2)))'
     ]);
@@ -198,8 +198,8 @@ test('concurrent processes with fibonacci calculation', async () => {
 
 test('message contains sender PID', async () => {
     const results = await evaluate([
-        '(def pid (spawn "(send 0 (quote hello))"))',
-        '(def msg (recv 1000))',
+        '(defvar pid (spawn "(send 0 (quote hello))"))',
+        '(defvar msg (recv 1000))',
         '(head msg)' // Should be the sender's PID
     ]);
     assert.ok(typeof results[2] === 'number');
@@ -208,9 +208,9 @@ test('message contains sender PID', async () => {
 
 test('spawn with named function and arguments', async () => {
     const results = await evaluate([
-        '(def worker (x) (send 0 (* x 2)))',
+        '(defun worker (x) (send 0 (* x 2)))',
         '(spawn worker 21)',
-        '(def msg (recv 1000))',
+        '(defvar msg (recv 1000))',
         '(head (tail msg))'
     ]);
     assert.equal(results[3], 42);
@@ -218,9 +218,9 @@ test('spawn with named function and arguments', async () => {
 
 test('spawn with named function - no arguments', async () => {
     const results = await evaluate([
-        '(def worker () (send 0 (quote done)))',
+        '(defun worker () (send 0 (quote done)))',
         '(spawn worker)',
-        '(def msg (recv 1000))',
+        '(defvar msg (recv 1000))',
         '(head (tail msg))'
     ]);
     assert.equal(results[3], 'done');
@@ -228,10 +228,10 @@ test('spawn with named function - no arguments', async () => {
 
 test('spawned process has access to parent functions', async () => {
     const results = await evaluate([
-        '(def helper (x) (* x 3))',
-        '(def worker (x) (send 0 (helper x)))',
+        '(defun helper (x) (* x 3))',
+        '(defun worker (x) (send 0 (helper x)))',
         '(spawn worker 7)',
-        '(def msg (recv 1000))',
+        '(defvar msg (recv 1000))',
         '(head (tail msg))'
     ]);
     assert.equal(results[4], 21); // 7 * 3
@@ -239,9 +239,9 @@ test('spawned process has access to parent functions', async () => {
 
 test('spawn with complex arguments', async () => {
     const results = await evaluate([
-        '(def worker (x y z) (send 0 (+ x (+ y z))))',
+        '(defun worker (x y z) (send 0 (+ x (+ y z))))',
         '(spawn worker 10 20 30)',
-        '(def msg (recv 1000))',
+        '(defvar msg (recv 1000))',
         '(head (tail msg))'
     ]);
     assert.equal(results[3], 60);
@@ -249,9 +249,9 @@ test('spawn with complex arguments', async () => {
 
 test('spawn with string argument', async () => {
     const results = await evaluate([
-        '(def worker (msg) (send 0 msg))',
+        '(defun worker (msg) (send 0 msg))',
         '(spawn worker "hello world")',
-        '(def result (recv 1000))',
+        '(defvar result (recv 1000))',
         '(head (tail result))'
     ]);
     assert.equal(results[3], 'hello world');
@@ -259,9 +259,9 @@ test('spawn with string argument', async () => {
 
 test('spawn with list argument', async () => {
     const results = await evaluate([
-        '(def worker (lst) (send 0 (head lst)))',
+        '(defun worker (lst) (send 0 (head lst)))',
         '(spawn worker (list 1 2 3))',
-        '(def msg (recv 1000))',
+        '(defvar msg (recv 1000))',
         '(head (tail msg))'
     ]);
     assert.equal(results[3], 1);

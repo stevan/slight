@@ -26,7 +26,7 @@ test('full pipeline evaluates function definition and call', async () => {
   const interpreter = new Interpreter();
 
   const input = [
-    '(def adder (x y) (+ x y))',
+    '(defun adder (x y) (+ x y))',
     '(adder 1 2)'
   ];
   const tokens = tokenizer.run(mockAsyncGen(input));
@@ -43,7 +43,7 @@ test('full pipeline evaluates recursive factorial function', async () => {
   const interpreter = new Interpreter();
 
   const input = [
-    '(def factorial (n) (cond ((== n 0) 1) (else (* n (factorial (- n 1))))))',
+    '(defun factorial (n) (cond ((== n 0) 1) (else (* n (factorial (- n 1))))))',
     '(factorial 5)'
   ];
   const tokens = tokenizer.run(mockAsyncGen(input));
@@ -183,7 +183,7 @@ test('full pipeline evaluates recursive sum-list', async () => {
   const interpreter = new Interpreter();
 
   const input = [
-    '(def sum-list (lst) (cond ((empty? lst) 0) (else (+ (head lst) (sum-list (tail lst))))))',
+    '(defun sum-list (lst) (cond ((empty? lst) 0) (else (+ (head lst) (sum-list (tail lst))))))',
     '(sum-list (list 1 2 3 4 5))'
   ];
   const tokens = tokenizer.run(mockAsyncGen(input));
@@ -274,7 +274,7 @@ test('full pipeline evaluates let with shadowing', async () => {
   const interpreter = new Interpreter();
 
   const input = [
-    '(def test-shadow (x) (let ((x 5)) x))', // function parameter x shadowed by let
+    '(defun test-shadow (x) (let ((x 5)) x))', // function parameter x shadowed by let
     '(test-shadow 100)', // pass 100 as x, but let shadows it with 5
     '(let ((x 1)) (let ((x 2)) x))' // nested shadowing
   ];
@@ -310,7 +310,7 @@ test('full pipeline evaluates let with function calls', async () => {
   const interpreter = new Interpreter();
 
   const input = [
-    '(def double (x) (* x 2))',
+    '(defun double (x) (* x 2))',
     '(let ((x 5) (y (double x))) y)',
     '(let ((f double) (x 10)) (f x))' // binding function to variable
   ];
@@ -328,7 +328,7 @@ test('full pipeline evaluates let in function body', async () => {
   const interpreter = new Interpreter();
 
   const input = [
-    '(def calc (a b) (let ((sum (+ a b)) (prod (* a b))) (list sum prod)))',
+    '(defun calc (a b) (let ((sum (+ a b)) (prod (* a b))) (list sum prod)))',
     '(calc 3 4)'
   ];
   const tokens = tokenizer.run(mockAsyncGen(input));

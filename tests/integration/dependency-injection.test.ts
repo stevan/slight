@@ -144,7 +144,7 @@ test('DI - Combined mock platform and output sink', async () => {
     });
 
     await evaluate(interpreter, `
-        (def config (json/parse (fs/read "/config.json")))
+        (defvar config (json/parse (fs/read "/config.json")))
         (say "Config loaded:")
         (say (json/stringify config true))
     `);
@@ -216,8 +216,8 @@ test('DI - Real-world scenario: config file reader', async () => {
 
     const result = await evaluate(interpreter, `
         (begin
-            (def config (fs/read "/etc/app.conf"))
-            (def env (sys/env "APP_ENV"))
+            (defvar config (fs/read "/etc/app.conf"))
+            (defvar env (sys/env "APP_ENV"))
             (say "Environment:" env)
             (say "Config:" config)
             (list env config))

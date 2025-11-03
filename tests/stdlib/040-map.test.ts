@@ -27,13 +27,13 @@ async function evaluate(code: string): Promise<any> {
 }
 
 test('Map: create empty map', async () => {
-    const code = '(def m (map/create)) (map/size m)';
+    const code = '(defun m (map/create)) (map/size m)';
     assert.strictEqual(await evaluate(code), 0);
 });
 
 test('Map: set and get', async () => {
     const code = `
-        (def m (map/create))
+        (defun m (map/create))
         (map/set! m "name" "Alice")
         (map/get m "name")
     `;
@@ -42,14 +42,14 @@ test('Map: set and get', async () => {
 
 test('Map: has? check', async () => {
     const code = `
-        (def m (map/create))
+        (defun m (map/create))
         (map/set! m "key" "value")
         (map/has? m "key")
     `;
     assert.strictEqual(await evaluate(code), true);
 
     const code2 = `
-        (def m (map/create))
+        (defun m (map/create))
         (map/has? m "missing")
     `;
     assert.strictEqual(await evaluate(code2), false);
@@ -57,7 +57,7 @@ test('Map: has? check', async () => {
 
 test('Map: keys and values', async () => {
     const code = `
-        (def m (map/create))
+        (defun m (map/create))
         (map/set! m "a" 1)
         (map/set! m "b" 2)
         (map/keys m)
@@ -68,7 +68,7 @@ test('Map: keys and values', async () => {
     assert.ok(keys.includes('b'));
 
     const code2 = `
-        (def m (map/create))
+        (defun m (map/create))
         (map/set! m "a" 1)
         (map/set! m "b" 2)
         (map/values m)
@@ -81,7 +81,7 @@ test('Map: keys and values', async () => {
 
 test('Map: entries', async () => {
     const code = `
-        (def m (map/create))
+        (defun m (map/create))
         (map/set! m "x" 10)
         (map/entries m)
     `;
@@ -93,7 +93,7 @@ test('Map: entries', async () => {
 
 test('Map: size', async () => {
     const code = `
-        (def m (map/create))
+        (defun m (map/create))
         (map/set! m "a" 1)
         (map/set! m "b" 2)
         (map/set! m "c" 3)
@@ -104,7 +104,7 @@ test('Map: size', async () => {
 
 test('Map: delete!', async () => {
     const code = `
-        (def m (map/create))
+        (defun m (map/create))
         (map/set! m "key" "value")
         (map/delete! m "key")
         (map/has? m "key")
@@ -114,7 +114,7 @@ test('Map: delete!', async () => {
 
 test('Map: clear!', async () => {
     const code = `
-        (def m (map/create))
+        (defun m (map/create))
         (map/set! m "a" 1)
         (map/set! m "b" 2)
         (map/clear! m)
@@ -125,7 +125,7 @@ test('Map: clear!', async () => {
 
 test('Map: from-list', async () => {
     const code = `
-        (def m (map/from-list (list (list "a" 1) (list "b" 2))))
+        (defvar m (map/from-list (list (list "a" 1) (list "b" 2))))
         (map/get m "a")
     `;
     assert.strictEqual(await evaluate(code), 1);
@@ -133,11 +133,11 @@ test('Map: from-list', async () => {
 
 test('Map: merge', async () => {
     const code = `
-        (def m1 (map/create))
+        (defun m1 (map/create))
         (map/set! m1 "a" 1)
-        (def m2 (map/create))
+        (defun m2 (map/create))
         (map/set! m2 "b" 2)
-        (def m3 (map/merge m1 m2))
+        (defun m3 (map/merge m1 m2))
         (map/size m3)
     `;
     assert.strictEqual(await evaluate(code), 2);

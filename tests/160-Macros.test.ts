@@ -130,7 +130,7 @@ test('macro works with function definitions', async () => {
 
   const input = [
     '(defmacro when (test body) (list (quote cond) (list test body)))',
-    '(def check (x) (when (> x 10) 100))',
+    '(defun check (x) (when (> x 10) 100))',
     '(check 15)',
     '(check 5)'
   ];

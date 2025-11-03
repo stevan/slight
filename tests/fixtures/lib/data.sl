@@ -1,5 +1,5 @@
-(def data/create-map () (map/create))
-(def data/create-person (name age)
+(defun data/create-map () (map/create))
+(defun data/create-person (name age)
   (let ((m (map/create))
         (x (map/set! m "name" name))
         (y (map/set! m "age" age)))

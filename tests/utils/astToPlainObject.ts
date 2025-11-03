@@ -1,4 +1,4 @@
-import { ASTNode, NumberNode, StringNode, BooleanNode, SymbolNode, CallNode, QuoteNode, CondNode, DefNode } from '../../src/Slight/AST.js';
+import { ASTNode, NumberNode, StringNode, BooleanNode, SymbolNode, CallNode, QuoteNode, CondNode, DefvarNode, DefunNode } from '../../src/Slight/AST.js';
 
 export function astToPlainObject(node: any): any {
     if (node instanceof NumberNode || node instanceof StringNode || node instanceof BooleanNode) {
@@ -23,7 +23,14 @@ export function astToPlainObject(node: any): any {
             elseClause: node.elseClause ? astToPlainObject(node.elseClause) : undefined
         };
     }
-    if (node instanceof DefNode) {
+    if (node instanceof DefvarNode) {
+        return {
+            type: node.type,
+            name: node.name,
+            value: astToPlainObject(node.value)
+        };
+    }
+    if (node instanceof DefunNode) {
         return {
             type: node.type,
             name: node.name,

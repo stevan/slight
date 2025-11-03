@@ -25,7 +25,7 @@ async function runSlight(code: string): Promise<any[]> {
 
 test('fun creates anonymous function', async () => {
     const code = `
-        (def add (fun (x y) (+ x y)))
+        (defvar add (fun (x y) (+ x y)))
         (add 3 4)
     `;
     const results = await runSlight(code);
@@ -36,7 +36,7 @@ test('fun creates anonymous function', async () => {
 
 test('fun can be passed as argument', async () => {
     const code = `
-        (def apply (f x) (f x))
+        (defun apply (f x) (f x))
         (apply (fun (n) (* n 2)) 5)
     `;
     const results = await runSlight(code);
@@ -57,10 +57,10 @@ test('fun can be immediately invoked', async () => {
 
 test('fun captures lexical environment (closure)', async () => {
     const code = `
-        (def make-adder (x)
+        (defun make-adder (x)
           (fun (y) (+ x y)))
 
-        (def add5 (make-adder 5))
+        (defvar add5 (make-adder 5))
         (add5 3)
     `;
     const results = await runSlight(code);
@@ -71,7 +71,7 @@ test('fun captures lexical environment (closure)', async () => {
 
 test('fun works with higher-order functions', async () => {
     const code = `
-        (def map (f lst)
+        (defun map (f lst)
           (cond
             ((empty? lst) (list))
             (else (cons (f (head lst)) (map f (tail lst))))))
@@ -86,8 +86,8 @@ test('fun works with higher-order functions', async () => {
 
 test('fun can return another function', async () => {
     const code = `
-        (def curry-add (fun (x) (fun (y) (+ x y))))
-        (def add3 (curry-add 3))
+        (defvar curry-add (fun (x) (fun (y) (+ x y))))
+        (defvar add3 (curry-add 3))
         (add3 7)
     `;
     const results = await runSlight(code);
@@ -98,7 +98,7 @@ test('fun can return another function', async () => {
 
 test('fun with let binding', async () => {
     const code = `
-        (def compute (fun (x)
+        (defvar compute (fun (x)
           (let ((doubled (* x 2)))
             (+ doubled 1))))
         (compute 5)
@@ -111,7 +111,7 @@ test('fun with let binding', async () => {
 
 test('fun with no parameters', async () => {
     const code = `
-        (def get-value (fun () 42))
+        (defvar get-value (fun () 42))
         (get-value)
     `;
     const results = await runSlight(code);
@@ -122,12 +122,12 @@ test('fun with no parameters', async () => {
 
 test('nested fun expressions', async () => {
     const code = `
-        (def compose (f g)
+        (defun compose (f g)
           (fun (x) (f (g x))))
 
-        (def add1 (fun (x) (+ x 1)))
-        (def double (fun (x) (* x 2)))
-        (def add1-then-double (compose double add1))
+        (defvar add1 (fun (x) (+ x 1)))
+        (defvar double (fun (x) (* x 2)))
+        (defun add1-then-double (compose double add1))
 
         (add1-then-double 5)
     `;
@@ -139,13 +139,13 @@ test('nested fun expressions', async () => {
 
 test('fun used in map-like operation', async () => {
     const code = `
-        (def make-mapper (f)
+        (defun make-mapper (f)
           (fun (lst)
             (cond
               ((empty? lst) (list))
               (else (cons (f (head lst)) ((make-mapper f) (tail lst)))))))
 
-        (def double-mapper (make-mapper (fun (x) (* x 2))))
+        (defvar double-mapper (make-mapper (fun (x) (* x 2))))
         (double-mapper (list 1 2 3))
     `;
     const results = await runSlight(code);

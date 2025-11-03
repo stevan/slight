@@ -110,8 +110,8 @@ test('Quote syntax - complex nested structure', async () => {
 });
 
 test('Quote syntax - quoted function definition', async () => {
-    const result = await evaluate("'(def foo (x) (+ x 1))");
-    assert.deepStrictEqual(result, ['def', 'foo', ['x'], ['+', 'x', 1]]);
+    const result = await evaluate("'(defun foo (x) (+ x 1))");
+    assert.deepStrictEqual(result, ['defun', 'foo', ['x'], ['+', 'x', 1]]);
 });
 
 test('Quote syntax in macro', async () => {

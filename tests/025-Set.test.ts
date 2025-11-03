@@ -86,7 +86,7 @@ test('set! - mutates global variable', async () => {
     const interpreter = new Interpreter();
 
     const input = [
-        '(def x 10)',
+        '(defvar x 10)',
         'x',
         '(set! x 20)',
         'x'
@@ -105,7 +105,7 @@ test('set! - mutates global variable with expression', async () => {
     const interpreter = new Interpreter();
 
     const input = [
-        '(def counter 0)',
+        '(defvar counter 0)',
         '(set! counter (+ counter 1))',
         'counter',
         '(set! counter (+ counter 1))',
@@ -164,7 +164,7 @@ test('set! - mutates function parameter', async () => {
     const interpreter = new Interpreter();
 
     const input = [
-        '(def increment (x) (begin (set! x (+ x 1)) x))',
+        '(defun increment (x) (begin (set! x (+ x 1)) x))',
         '(increment 10)'
     ];
     const tokens = tokenizer.run(mockAsyncGen(input));
@@ -181,7 +181,7 @@ test('set! - local mutation does not affect global', async () => {
     const interpreter = new Interpreter();
 
     const input = [
-        '(def x 10)',
+        '(defvar x 10)',
         '(let ((x 5)) (begin (set! x 99) x))',
         'x'
     ];
@@ -199,7 +199,7 @@ test('set! - mutates global from within let when no shadowing', async () => {
     const interpreter = new Interpreter();
 
     const input = [
-        '(def x 10)',
+        '(defvar x 10)',
         '(let ((y 5)) (begin (set! x 99) x))',
         'x'
     ];
@@ -221,7 +221,7 @@ test('set! - works in iterative function (accumulator)', async () => {
     const interpreter = new Interpreter();
 
     const input = [
-        '(def count-up (n) (let ((acc 0) (i 0)) (begin (set! i (+ i 1)) (set! acc (+ acc i)) (set! i (+ i 1)) (set! acc (+ acc i)) (set! i (+ i 1)) (set! acc (+ acc i)) (set! i (+ i 1)) (set! acc (+ acc i)) (set! i (+ i 1)) (set! acc (+ acc i)) acc)))',
+        '(defun count-up (n) (let ((acc 0) (i 0)) (begin (set! i (+ i 1)) (set! acc (+ acc i)) (set! i (+ i 1)) (set! acc (+ acc i)) (set! i (+ i 1)) (set! acc (+ acc i)) (set! i (+ i 1)) (set! acc (+ acc i)) (set! i (+ i 1)) (set! acc (+ acc i)) acc)))',
         '(count-up 5)'
     ];
     const tokens = tokenizer.run(mockAsyncGen(input));
@@ -238,9 +238,9 @@ test('set! - multiple variables in sequence', async () => {
     const interpreter = new Interpreter();
 
     const input = [
-        '(def a 1)',
-        '(def b 2)',
-        '(def c 3)',
+        '(defvar a 1)',
+        '(defvar b 2)',
+        '(defvar c 3)',
         '(set! a (+ a 10))',
         '(set! b (+ b 20))',
         '(set! c (+ c 30))',
@@ -260,8 +260,8 @@ test('set! - swap variables using let', async () => {
     const interpreter = new Interpreter();
 
     const input = [
-        '(def x 1)',
-        '(def y 2)',
+        '(defvar x 1)',
+        '(defvar y 2)',
         '(let ((temp x)) (begin (set! x y) (set! y temp) temp))',
         '(list x y)'
     ];

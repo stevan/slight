@@ -9,7 +9,7 @@
 (is (list/length (list/create)) 0 "... create empty list")
 
 ; list/head and list/tail
-(def mylist (list 1 2 3 4 5))
+(defvar mylist (list 1 2 3 4 5))
 (is (list/head mylist) 1 "... head of (1 2 3 4 5) is 1")
 (is (list/length (list/tail mylist)) 4 "... tail has 4 elements")
 (is (list/head (list/tail mylist)) 2 "... head of tail is 2")
@@ -51,24 +51,24 @@
 (ok (not (list/includes? (list 1 2 3) 5)) "... doesn't include 5")
 
 ; list/flatten
-(def nested (list (list 1 2) (list 3 (list 4 5))))
+(defvar nested (list (list 1 2) (list 3 (list 4 5))))
 (is (list/length (list/flatten nested)) 5 "... flatten nested list")
 (is (list/head (list/flatten nested)) 1 "... flatten preserves order")
 
 ; list/map
-(def doubled (list/map (fun (x) (* x 2)) (list 1 2 3)))
+(defvar doubled (list/map (fun (x) (* x 2)) (list 1 2 3)))
 (is (list/head doubled) 2 "... map doubles first element")
 (is (list/nth doubled 2) 6 "... map doubles third element")
 
 ; list/filter
-(def evens (list/filter (fun (x) (== (% x 2) 0)) (list 1 2 3 4 5 6)))
+(defvar evens (list/filter (fun (x) (== (% x 2) 0)) (list 1 2 3 4 5 6)))
 (is (list/length evens) 3 "... filter finds 3 evens")
 (is (list/head evens) 2 "... first even is 2")
 
 ; list/reduce
-(def sum (list/reduce (fun (acc x) (+ acc x)) 0 (list 1 2 3 4 5)))
+(defvar sum (list/reduce (fun (acc x) (+ acc x)) 0 (list 1 2 3 4 5)))
 (is sum 15 "... reduce sums to 15")
-(def product (list/reduce (fun (acc x) (* acc x)) 1 (list 2 3 4)))
+(defvar product (list/reduce (fun (acc x) (* acc x)) 1 (list 2 3 4)))
 (is product 24 "... reduce multiplies to 24")
 
 (done)

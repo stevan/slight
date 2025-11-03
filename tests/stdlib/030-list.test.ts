@@ -86,7 +86,7 @@ test('List: includes?', async () => {
 
 test('List: map with user-defined function', async () => {
     const code = `
-        (def double (x) (* x 2))
+        (defun double (x) (* x 2))
         (list/map double (list 1 2 3))
     `;
     const result = await evaluate(code);
@@ -101,7 +101,7 @@ test('List: map with anonymous function', async () => {
 
 test('List: filter with user-defined function', async () => {
     const code = `
-        (def gt2 (x) (> x 2))
+        (defun gt2 (x) (> x 2))
         (list/filter gt2 (list 1 2 3 4))
     `;
     const result = await evaluate(code);
@@ -124,7 +124,7 @@ test('List: reduce function', async () => {
 
     // Using user-defined function
     const withUserFunc = await evaluate(`
-        (def sum (acc x) (+ acc x))
+        (defun sum (acc x) (+ acc x))
         (list/reduce sum 0 (list 1 2 3 4))
     `);
     assert.strictEqual(withUserFunc, 10);

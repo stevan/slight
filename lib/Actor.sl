@@ -3,21 +3,20 @@
 ; Wraps OO classes in processes for concurrent message-passing actors.
 ;
 ; Usage:
-;   (class Counter (count)
-;     (init (n) (set! count n))
+;   (defclass Counter (count)
+;     (INIT (n) (set! count n))
 ;     (method increment () (set! count (+ count 1)) count))
 ;
-;   (def c (actor/new "Counter" 0))
+;   (defvar c (actor/new "Counter" 0))
 ;   (call c "increment")  ; => 1
 ;   (call c "get-value")  ; => 1
 
 ; Internal actor loop function (used by spawned processes)
 ; Now uses variadic arguments for constructor params
-(def __actor-loop__ (class-name . init-args)
+(defun __actor-loop__ (class-name . init-args)
   (begin
     ; Create instance with variadic constructor args
-    (def instance
-      (cond
+    (defvar instance (cond
         ((list/empty? init-args)
           (object/new class-name))
         ((== (list/length init-args) 1)
@@ -27,27 +26,24 @@
         (else
           (throw "Actor constructors with more than 2 args not yet supported"))))
 
-    (def loop ()
+    (defun loop ()
       (begin
-        (def msg (recv))
-        (def sender (head msg))
-        (def data (head (tail msg)))
+        (defun msg (recv))
+        (defun sender (head msg))
+        (defvar data (head (tail msg)))
 
         ; data is either a string (method name) or a list (method-name . args)
-        (def method-name
-          (cond
+        (defvar method-name (cond
             ((== (type/of data) "STRING") data)
             ((== (type/of data) "LIST") (head data))
             (else data)))
 
-        (def method-args
-          (cond
+        (defvar method-args (cond
             ((== (type/of data) "STRING") (list))
             ((== (type/of data) "LIST") (tail data))
             (else (list))))
 
-        (def result
-          (try
+        (defvar result (try
             (cond
               ((list/empty? method-args)
                 (method/call instance method-name))
@@ -67,7 +63,7 @@
 
 ; actor/new: Create an actor from a class
 ; Now variadic - supports any number of constructor arguments
-(def actor/new (class-name . init-args)
+(defun actor/new (class-name . init-args)
   (cond
     ((list/empty? init-args)
       (spawn __actor-loop__ class-name))
@@ -80,22 +76,21 @@
 
 ; call: Synchronous RPC-style call to an actor
 ; Now variadic - supports any number of method arguments
-(def call (actor-pid method-name . method-args)
+(defun call (actor-pid method-name . method-args)
   (begin
-    (def message
-      (cond
+    (defvar message (cond
         ((list/empty? method-args) method-name)
         (else (cons method-name method-args))))
 
     (send actor-pid message)
-    (def response (recv))
+    (defun response (recv))
     (head (tail response))))
 
 ; Legacy API for backward compatibility
-(def actor/new-0 (class-name) (actor/new class-name))
-(def actor/new-1 (class-name arg1) (actor/new class-name arg1))
-(def actor/new-2 (class-name arg1 arg2) (actor/new class-name arg1 arg2))
+(defun actor/new-0 (class-name) (actor/new class-name))
+(defun actor/new-1 (class-name arg1) (actor/new class-name arg1))
+(defun actor/new-2 (class-name arg1 arg2) (actor/new class-name arg1 arg2))
 
-(def call-0 (actor-pid method-name) (call actor-pid method-name))
-(def call-1 (actor-pid method-name arg1) (call actor-pid method-name arg1))
-(def call-2 (actor-pid method-name arg1 arg2) (call actor-pid method-name arg1 arg2))
+(defun call-0 (actor-pid method-name) (call actor-pid method-name))
+(defun call-1 (actor-pid method-name arg1) (call actor-pid method-name arg1))
+(defun call-2 (actor-pid method-name arg1 arg2) (call actor-pid method-name arg1 arg2))
