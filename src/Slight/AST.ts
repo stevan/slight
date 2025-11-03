@@ -284,6 +284,12 @@ export class DefNode extends ASTNode {
             if (params.size > 0) {
                 // Local scope - store in local environment
                 params.set(this.name, value);
+
+                // If it's a closure, add it to its own capturedEnv for recursive calls
+                if (value && typeof value === 'object' && 'capturedEnv' in value) {
+                    value.capturedEnv.set(this.name, value);
+                }
+
                 return value;
             } else {
                 // Global scope - check if value is a function/closure
@@ -304,6 +310,9 @@ export class DefNode extends ASTNode {
                 body: this.body,
                 capturedEnv: new Map(params) // Capture current lexical environment
             };
+
+            // Add the function to its own capturedEnv for recursive calls
+            closure.capturedEnv.set(this.name, closure);
 
             // If we're in a local scope, return the function object
             if (params.size > 0) {

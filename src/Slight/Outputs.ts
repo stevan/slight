@@ -227,3 +227,87 @@ export class CombinedOutput implements OutputSink {
         ]);
     }
 }
+
+/**
+ * ScriptOutput - For script execution: shows print/say/log output but hides INFO
+ * Filters out INFO tokens (expression results) while keeping STDOUT (print/say)
+ * and WARN/ERROR/DEBUG (log functions)
+ */
+export class ScriptOutput implements OutputSink {
+    private isNode: boolean;
+
+    constructor() {
+        this.isNode = typeof process !== 'undefined' && process.stdout != null && process.stderr != null;
+    }
+
+    async run(source: OutputStream): Promise<void> {
+        for await (const result of source) {
+            // Filter out INFO tokens (expression evaluation results)
+            if (result.type === OutputHandle.INFO) {
+                continue;
+            }
+
+            // Handle STDOUT (from print/say)
+            if (result.type === OutputHandle.STDOUT) {
+                const output = this.formatValue(result.value);
+                if (this.isNode) {
+                    process.stdout.write(output);
+                } else {
+                    console.log(output);
+                }
+                continue;
+            }
+
+            // Handle WARN/ERROR/DEBUG (from log functions)
+            const output = this.formatValue(result.value);
+            if (this.isNode) {
+                process.stderr.write(output);
+            } else {
+                switch (result.type) {
+                    case OutputHandle.ERROR:
+                        console.error(output);
+                        break;
+                    case OutputHandle.WARN:
+                        console.warn(output);
+                        break;
+                    case OutputHandle.DEBUG:
+                        console.log(output);
+                        break;
+                }
+            }
+        }
+    }
+
+    private formatValue(value: any): string {
+        if (isPipelineError(value)) {
+            // Format errors nicely
+            if (value.details?.formatted) {
+                return value.details.formatted + '\n';
+            }
+            if (value.details?.line !== undefined && value.details?.column !== undefined) {
+                return `Error at line ${value.details.line}, column ${value.details.column}:\n  ${value.message}\n`;
+            }
+            return `[${value.stage} Error] ${value.message}\n`;
+        }
+
+        if (value === null || value === undefined) {
+            return '';
+        }
+        if (typeof value === 'boolean') {
+            return value ? 'true' : 'false';
+        }
+        if (typeof value === 'number') {
+            return value.toString();
+        }
+        if (typeof value === 'string') {
+            return value;
+        }
+        if (Array.isArray(value)) {
+            if (value.length === 0) {
+                return '()';
+            }
+            return `(${value.map(v => this.formatValue(v)).join(' ')})`;
+        }
+        return String(value);
+    }
+}

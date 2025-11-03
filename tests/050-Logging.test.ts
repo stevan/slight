@@ -82,9 +82,9 @@ describe('Logging Functions', () => {
 
         const results = await runCode(code);
 
-        // Should only have: STDOUT (42 from begin)
+        // Should only have: INFO (42 from begin)
         assert.strictEqual(results.length, 1);
-        assert.strictEqual(results[0].type, OutputHandle.STDOUT);
+        assert.strictEqual(results[0].type, OutputHandle.INFO);
         assert.strictEqual(results[0].value, 42);
     });
 
@@ -113,9 +113,9 @@ describe('Logging Functions', () => {
 
         const results = await runCode(code);
 
-        // Should only have: STDOUT (42)
+        // Should only have: INFO (42)
         assert.strictEqual(results.length, 1);
-        assert.strictEqual(results[0].type, OutputHandle.STDOUT);
+        assert.strictEqual(results[0].type, OutputHandle.INFO);
         assert.strictEqual(results[0].value, 42);
     });
 

@@ -60,6 +60,11 @@ export class CoreInterpreter {
     public parentFunctions?: Map<string, { params: string[], body: ASTNode }>;
     public parentMacros?: Map<string, { params: string[], body: ASTNode }>;
     public parentBindings?: Map<string, any>;
+    public parentClasses?: Map<string, {
+        slots: string[],
+        methods: Map<string, { params: string[], body: ASTNode }>,
+        init?: { params: string[], body: ASTNode }
+    }>;
 
     constructor(deps?: InterpreterDependencies) {
         // Initialize dependencies with provided values or defaults
@@ -118,12 +123,9 @@ export class CoreInterpreter {
                     yield this.outputQueue.shift()!;
                 }
 
-                // Then yield the evaluation result
-                if (node instanceof DefNode || node instanceof DefMacroNode || node instanceof SetNode) {
-                    yield { type: OutputHandle.INFO, value: result };
-                } else {
-                    yield { type: OutputHandle.STDOUT, value: result };
-                }
+                // Then yield the evaluation result as INFO
+                // (INFO is filtered out in script execution but shown in REPL)
+                yield { type: OutputHandle.INFO, value: result };
             } catch (e) {
                 // Flush output queue even on error
                 while (this.outputQueue.length > 0) {
@@ -232,7 +234,13 @@ export class CoreInterpreter {
      * Create an instance of a class
      */
     public async createInstance(className: string, args: any[]): Promise<any> {
-        const classDef = this.classes.get(className);
+        let classDef = this.classes.get(className);
+
+        // Check parent classes if not found locally
+        if (!classDef && this.parentClasses) {
+            classDef = this.parentClasses.get(className);
+        }
+
         if (!classDef) {
             throw new Error(`Class ${className} not defined`);
         }
@@ -672,7 +680,8 @@ export class CoreInterpreter {
             const parentState: ParentState = {
                 functions: this.functions,
                 macros: this.macros,
-                bindings: this.bindings
+                bindings: this.bindings,
+                classes: this.classes
             };
 
             return runtime.spawn(code, parentState);

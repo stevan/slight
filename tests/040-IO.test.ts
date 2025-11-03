@@ -40,8 +40,8 @@ describe('I/O Functions', () => {
         assert.strictEqual(results[0].type, OutputHandle.STDOUT);
         assert.strictEqual(results[0].value, 'Hello World');
 
-        // Second token should be the return value (null -> ())
-        assert.strictEqual(results[1].type, OutputHandle.STDOUT);
+        // Second token should be the return value (null -> ()) as INFO
+        assert.strictEqual(results[1].type, OutputHandle.INFO);
         assert.strictEqual(results[1].value, null);
     });
 

@@ -53,6 +53,7 @@ export interface ParentState {
     functions: Map<string, any>;
     macros: Map<string, any>;
     bindings: Map<string, any>;
+    classes: Map<string, any>;
 }
 
 /**
@@ -113,6 +114,7 @@ export class ProcessRuntime {
             slight.interpreter.parentFunctions = parentState.functions;
             slight.interpreter.parentMacros = parentState.macros;
             slight.interpreter.parentBindings = parentState.bindings;
+            slight.interpreter.parentClasses = parentState.classes;
             // Local maps start empty - writes go here, reads fall back to parent
         }
 

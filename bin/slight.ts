@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { Slight } from '../src/Slight.js';
-import { ConsoleOutput, CombinedOutput, StandardOutput } from '../src/Slight/Outputs.js';
+import { ConsoleOutput, CombinedOutput, ScriptOutput } from '../src/Slight/Outputs.js';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
@@ -132,7 +132,7 @@ Examples:
         const filepath = resolve(remainingArgs[0]);
         const slight = new Slight(
             new FileSource(filepath),
-            new StandardOutput()
+            new ScriptOutput()
         );
         // Set include paths if any
         if (includePaths.length > 0) {
