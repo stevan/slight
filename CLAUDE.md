@@ -27,7 +27,7 @@ npm run trace --silent program.sl             # Summary only
 npm run trace --max-depth 3 program.sl        # Limit trace depth
 npm run trace --export-json program.sl        # Export as JSON
 
-# Run all tests (203 core tests including 15 TracingInterpreter tests)
+# Run all tests (223 tests including 20 variadic function tests)
 npm test
 
 # Run dependency injection tests (33 DI tests)
@@ -277,6 +277,43 @@ Special forms have custom evaluation rules in their AST nodes:
 - `set!` - Variable mutation
 - `try/catch/throw` - Exception handling
 
+## Variadic Functions
+
+Slight supports variadic functions using rest parameter syntax `(. rest)`:
+
+```lisp
+;; Only rest parameter
+(def sum (. nums)
+  (list/reduce (fun (a b) (+ a b)) 0 nums))
+(sum 1 2 3 4 5)  ; => 15
+
+;; Required parameters + rest
+(def greet (greeting . names)
+  (list greeting names))
+(greet "Hello" "Alice" "Bob")  ; => ("Hello" ("Alice" "Bob"))
+
+;; Multiple required + rest
+(def make-msg (prefix suffix . words)
+  (list prefix words suffix))
+(make-msg "START" "END" "foo" "bar")  ; => ("START" ("foo" "bar") "END")
+
+;; Anonymous variadic function
+(def count-args (fun (. args) (list/length args)))
+(count-args 1 2 3 4)  ; => 4
+```
+
+**Implementation Details:**
+- Rest parameters collect excess arguments into a list
+- Arity checking ensures minimum required parameters are provided
+- Works with regular functions, closures, and macros
+- Used extensively in the modernized Actor library (`lib/Actor.sl`)
+
+**Syntax:**
+- `(fun (. rest) body)` - All arguments go to rest
+- `(fun (a b . rest) body)` - First two are required, rest are collected
+- `(def name (. rest) body)` - Named variadic function
+- `(defmacro name (. rest) body)` - Variadic macro
+
 ## Working with Processes
 
 The process system (`ProcessRuntime.ts`) provides concurrent execution:
@@ -306,24 +343,28 @@ The actor library (`lib/Actor.sl`) provides a higher-level abstraction over proc
     (begin
       (set! count (+ count 1))
       count))
+  (method add (x)
+    (begin
+      (set! count (+ count x))
+      count))
   (method get-value () count))
 
 ; Create an actor (spawns a process wrapping the class)
-(def counter (actor/new-1 "Counter" 0))
+(def counter (actor/new "Counter" 10))
 
 ; Call methods via message passing (synchronous RPC-style)
-(call-0 counter "increment")  ; Returns 1
-(call-0 counter "increment")  ; Returns 2
-(call-0 counter "get-value")  ; Returns 2
+(call counter "increment")      ; Returns 11
+(call counter "add" 5)           ; Returns 16
+(call counter "get-value")       ; Returns 16
 ```
 
-**API:**
-- `actor/new-0 "ClassName"` - Create actor with 0 constructor args
-- `actor/new-1 "ClassName" arg1` - Create actor with 1 constructor arg
-- `actor/new-2 "ClassName" arg1 arg2` - Create actor with 2 constructor args
-- `call-0 pid "method-name"` - Call method with 0 args
-- `call-1 pid "method-name" arg1` - Call method with 1 arg
-- `call-2 pid "method-name" arg1 arg2` - Call method with 2 args
+**Modern Variadic API:**
+- `(actor/new class-name . init-args)` - Create actor with any number of constructor args
+- `(call pid method-name . args)` - Call method with any number of args
+
+**Legacy Numbered API (deprecated but still supported):**
+- `actor/new-0`, `actor/new-1`, `actor/new-2` - Numbered constructor variants
+- `call-0`, `call-1`, `call-2` - Numbered method call variants
 
 **Implementation:**
 Each actor runs a loop in a spawned process that:
@@ -332,7 +373,7 @@ Each actor runs a loop in a spawned process that:
 3. Sends result back to sender
 4. Recursively continues the loop
 
-The numbered API is necessary because Slight doesn't yet support variadic function syntax `(fun (a . rest) ...)`.
+The modern API uses variadic functions to eliminate the need for numbered variants.
 
 ## Output Handling Architecture
 
