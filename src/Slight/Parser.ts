@@ -26,6 +26,57 @@ import {
 } from './AST.js';
 
 export class Parser {
+    /**
+     * Parse a parameter list, detecting variadic rest parameters.
+     * Supports: (a b c), (a b . rest), (. rest)
+     * Returns: { params: string[], restParam?: string }
+     */
+    private parseParams(paramNode: CallNode): { params: string[], restParam?: string } {
+        const elements = paramNode.elements;
+        let dotIndex = -1;
+
+        // Find the dot symbol
+        for (let i = 0; i < elements.length; i++) {
+            if (elements[i] instanceof SymbolNode && (elements[i] as SymbolNode).name === '.') {
+                dotIndex = i;
+                break;
+            }
+        }
+
+        if (dotIndex >= 0) {
+            // Variadic: (a b . rest)
+            if (dotIndex + 1 >= elements.length) {
+                throw new Error('Invalid parameter list: dot must be followed by rest parameter name');
+            }
+            if (dotIndex + 2 < elements.length) {
+                throw new Error('Invalid parameter list: only one rest parameter allowed after dot');
+            }
+
+            const params = elements.slice(0, dotIndex).map((el: ASTNode) => {
+                if (!(el instanceof SymbolNode)) {
+                    throw new Error('Invalid parameter list: all parameters must be symbols');
+                }
+                return el.name;
+            });
+
+            const restParamNode = elements[dotIndex + 1];
+            if (!(restParamNode instanceof SymbolNode)) {
+                throw new Error('Invalid parameter list: rest parameter must be a symbol');
+            }
+
+            return { params, restParam: restParamNode.name };
+        } else {
+            // Regular: (a b c)
+            const params = elements.map((el: ASTNode) => {
+                if (!(el instanceof SymbolNode)) {
+                    throw new Error('Invalid parameter list: all parameters must be symbols');
+                }
+                return el.name;
+            });
+            return { params };
+        }
+    }
+
     async *run(source: TokenStream): ASTStream {
         let stack: { type: 'CALL', elements: ASTNode[], quotePending?: number, location?: { line: number, column: number } }[] = [];
         let quotePending = 0; // Track how many quote levels are pending
@@ -235,22 +286,19 @@ export class Parser {
             }
             if (sym === 'fun') {
                 // (fun (params...) body) - anonymous function
+                // Supports variadic: (fun (a b . rest) body)
                 if (elements.length !== 3) {
                     throw new Error('Invalid fun syntax: expected (fun (params...) body)');
                 }
                 if (!(elements[1] instanceof CallNode)) {
                     throw new Error('Invalid fun syntax: parameters must be a list');
                 }
-                const params = elements[1].elements.map((el: any) => {
-                    if (!(el instanceof SymbolNode)) {
-                        throw new Error('Invalid fun syntax: all parameters must be symbols');
-                    }
-                    return el.name;
-                });
-                return new FunNode(params, elements[2]);
+                const { params, restParam } = this.parseParams(elements[1]);
+                return new FunNode(params, elements[2], restParam);
             }
             if (sym === 'defmacro') {
                 // (defmacro name (params...) body) - macro definition
+                // Supports variadic: (defmacro name (a b . rest) body)
                 if (elements.length !== 4) {
                     throw new Error('Invalid defmacro syntax: expected (defmacro name (params...) body)');
                 }
@@ -261,20 +309,16 @@ export class Parser {
                     throw new Error('Invalid defmacro syntax: parameters must be a list');
                 }
                 const name = elements[1].name;
-                const params = elements[2].elements.map((el: any) => {
-                    if (!(el instanceof SymbolNode)) {
-                        throw new Error('Invalid defmacro syntax: all parameters must be symbols');
-                    }
-                    return el.name;
-                });
-                return new DefMacroNode(name, params, elements[3]);
+                const { params, restParam } = this.parseParams(elements[2]);
+                return new DefMacroNode(name, params, elements[3], restParam);
             }
             if (sym === 'def') {
                 if (elements.length === 4 && elements[1] instanceof SymbolNode && elements[2] instanceof CallNode) {
                     // (def name (params...) body) - function definition
+                    // Supports variadic: (def name (a b . rest) body)
                     const name = elements[1].name;
-                    const params = elements[2].elements.map((el: any) => el instanceof SymbolNode ? el.name : undefined).filter((n: string | undefined) => n !== undefined);
-                    return new DefNode(name, params, elements[3]).setLocation(location?.line, location?.column);
+                    const { params, restParam } = this.parseParams(elements[2]);
+                    return new DefNode(name, params, elements[3], restParam).setLocation(location?.line, location?.column);
                 } else if (elements.length === 3 && elements[1] instanceof SymbolNode) {
                     // (def name value) - simple value definition
                     const name = elements[1].name;

@@ -21,7 +21,7 @@ import {
 export type InterpreterFactory = () => any;
 
 export class MacroExpander {
-    private macros: Map<string, { params: string[], body: ASTNode }> = new Map();
+    private macros: Map<string, { params: string[], body: ASTNode, restParam?: string }> = new Map();
     private createInterpreter: InterpreterFactory;
 
     constructor(createInterpreter?: InterpreterFactory) {
@@ -41,10 +41,14 @@ export class MacroExpander {
             try {
                 // If it's a macro definition, register it but don't expand
                 if (node instanceof DefMacroNode) {
-                    this.macros.set(node.name, {
+                    const macroObj: { params: string[], body: ASTNode, restParam?: string } = {
                         params: node.params,
                         body: node.body
-                    });
+                    };
+                    if (node.restParam !== undefined) {
+                        macroObj.restParam = node.restParam;
+                    }
+                    this.macros.set(node.name, macroObj);
                     yield node;
                     continue;
                 }
@@ -103,7 +107,8 @@ export class MacroExpander {
             return new DefMacroNode(
                 node.name,
                 node.params,
-                await this.expandUntilDone(node.body)
+                await this.expandUntilDone(node.body),
+                node.restParam
             );
         }
 
@@ -112,7 +117,8 @@ export class MacroExpander {
             return new DefNode(
                 node.name,
                 node.params,
-                await this.expandUntilDone(node.body)
+                await this.expandUntilDone(node.body),
+                node.restParam
             );
         }
 
@@ -130,7 +136,7 @@ export class MacroExpander {
 
         // Expand fun body
         if (node instanceof FunNode) {
-            return new FunNode(node.params, await this.expandUntilDone(node.body));
+            return new FunNode(node.params, await this.expandUntilDone(node.body), node.restParam);
         }
 
         // Expand cond clauses
@@ -179,16 +185,33 @@ export class MacroExpander {
 
         const macro = this.macros.get(first.name)!;
         const args = node.elements.slice(1);
+        const requiredParams = macro.params.length;
+        const hasRest = macro.restParam !== undefined;
 
-        if (args.length !== macro.params.length) {
-            throw new Error(`Macro ${first.name}: expected ${macro.params.length} arguments, got ${args.length}`);
+        // Check arity
+        if (hasRest) {
+            if (args.length < requiredParams) {
+                throw new Error(`Macro ${first.name}: expected at least ${requiredParams} arguments, got ${args.length}`);
+            }
+        } else {
+            if (args.length !== requiredParams) {
+                throw new Error(`Macro ${first.name}: expected ${requiredParams} arguments, got ${args.length}`);
+            }
         }
 
         // Create bindings for macro parameters as quoted AST (unevaluated)
         const bindings = new Map<string, any>();
-        for (let i = 0; i < macro.params.length; i++) {
+
+        // Bind regular params
+        for (let i = 0; i < requiredParams; i++) {
             // Convert AST arg to value form for use in macro body
             bindings.set(macro.params[i], this.astToValue(args[i]));
+        }
+
+        // Bind rest param if present
+        if (hasRest && macro.restParam) {
+            const restArgs = args.slice(requiredParams).map(arg => this.astToValue(arg));
+            bindings.set(macro.restParam, restArgs);
         }
 
         // Evaluate the macro body to get the expansion (as a value)
@@ -303,7 +326,8 @@ export class MacroExpander {
             return new DefNode(
                 node.name,
                 node.params,
-                await this.substituteParams(node.body, bindings)
+                await this.substituteParams(node.body, bindings),
+                node.restParam
             );
         }
 
@@ -311,7 +335,8 @@ export class MacroExpander {
             return new DefMacroNode(
                 node.name,
                 node.params,
-                await this.substituteParams(node.body, bindings)
+                await this.substituteParams(node.body, bindings),
+                node.restParam
             );
         }
 
@@ -332,7 +357,8 @@ export class MacroExpander {
         if (node instanceof FunNode) {
             return new FunNode(
                 node.params,
-                await this.substituteParams(node.body, bindings)
+                await this.substituteParams(node.body, bindings),
+                node.restParam
             );
         }
 

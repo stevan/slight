@@ -172,7 +172,11 @@ export class QuoteNode extends ASTNode {
             return ['let', bindings, QuoteNode.astToValue(ast.body)];
         }
         if (ast instanceof FunNode) {
-            return ['fun', ast.params, QuoteNode.astToValue(ast.body)];
+            if (ast.restParam) {
+                return ['fun', [...ast.params, '.', ast.restParam], QuoteNode.astToValue(ast.body)];
+            } else {
+                return ['fun', ast.params, QuoteNode.astToValue(ast.body)];
+            }
         }
         if (ast instanceof DefMacroNode) {
             return ['defmacro', ast.name, ast.params, QuoteNode.astToValue(ast.body)];
@@ -228,13 +232,15 @@ export class FunNode extends ASTNode {
     type = 'FUN';
     constructor(
         public params: string[],
-        public body: ASTNode
+        public body: ASTNode,
+        public restParam?: string
     ) { super(); }
     async evaluate(interpreter: any, params: Map<string, any>): Promise<any> {
         // Create a closure that captures the current environment
         const closure = {
             params: this.params,
             body: this.body,
+            restParam: this.restParam,
             capturedEnv: new Map(params) // Capture current lexical environment
         };
         return closure;
@@ -250,14 +256,16 @@ export class DefMacroNode extends ASTNode {
     constructor(
         public name: string,
         public params: string[],
-        public body: ASTNode
+        public body: ASTNode,
+        public restParam?: string
     ) { super(); }
     async evaluate(interpreter: any, params: Map<string, any>): Promise<any> {
         // Store the macro in the interpreter's macro map
         // Macros receive unevaluated AST nodes as arguments
         const macro = {
             params: this.params,
-            body: this.body
+            body: this.body,
+            restParam: this.restParam
         };
         interpreter.macros.set(this.name, macro);
         return true;
@@ -273,7 +281,8 @@ export class DefNode extends ASTNode {
     constructor(
         public name: string,
         public params: string[] | null,
-        public body: ASTNode
+        public body: ASTNode,
+        public restParam?: string
     ) { super(); }
     async evaluate(interpreter: any, params: Map<string, any>): Promise<any> {
         // Check if this is a value definition (def name value) vs function definition
@@ -308,6 +317,7 @@ export class DefNode extends ASTNode {
             const closure = {
                 params: this.params,
                 body: this.body,
+                restParam: this.restParam,
                 capturedEnv: new Map(params) // Capture current lexical environment
             };
 

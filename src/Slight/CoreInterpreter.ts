@@ -162,27 +162,66 @@ export class CoreInterpreter {
         }
     }
 
-    public callUserFunction(func: { params: string[], body: ASTNode }, args: any[]): Promise<any> {
-        if (args.length !== func.params.length) {
-            throw new Error(`Wrong number of arguments: expected ${func.params.length}, got ${args.length}`);
+    public callUserFunction(func: { params: string[], body: ASTNode, restParam?: string }, args: any[]): Promise<any> {
+        const requiredParams = func.params.length;
+        const hasRest = func.restParam !== undefined;
+
+        // Check arity
+        if (hasRest) {
+            if (args.length < requiredParams) {
+                throw new Error(`Too few arguments: expected at least ${requiredParams}, got ${args.length}`);
+            }
+        } else {
+            if (args.length !== requiredParams) {
+                throw new Error(`Wrong number of arguments: expected ${requiredParams}, got ${args.length}`);
+            }
         }
+
         const localParams = new Map<string, any>();
-        for (let i = 0; i < func.params.length; i++) {
+
+        // Bind regular params
+        for (let i = 0; i < requiredParams; i++) {
             localParams.set(func.params[i], args[i]);
         }
+
+        // Bind rest param if present
+        if (hasRest && func.restParam) {
+            const restArgs = args.slice(requiredParams);
+            localParams.set(func.restParam, restArgs);
+        }
+
         return func.body.evaluate(this, localParams);
     }
 
-    public callClosure(func: { params: string[], body: ASTNode, capturedEnv: Map<string, any> }, args: any[]): Promise<any> {
-        if (args.length !== func.params.length) {
-            throw new Error(`Wrong number of arguments: expected ${func.params.length}, got ${args.length}`);
+    public callClosure(func: { params: string[], body: ASTNode, capturedEnv: Map<string, any>, restParam?: string }, args: any[]): Promise<any> {
+        const requiredParams = func.params.length;
+        const hasRest = func.restParam !== undefined;
+
+        // Check arity
+        if (hasRest) {
+            if (args.length < requiredParams) {
+                throw new Error(`Too few arguments: expected at least ${requiredParams}, got ${args.length}`);
+            }
+        } else {
+            if (args.length !== requiredParams) {
+                throw new Error(`Wrong number of arguments: expected ${requiredParams}, got ${args.length}`);
+            }
         }
+
         // Start with the captured environment
         const localParams = new Map(func.capturedEnv);
-        // Add the function arguments
-        for (let i = 0; i < func.params.length; i++) {
+
+        // Bind regular params
+        for (let i = 0; i < requiredParams; i++) {
             localParams.set(func.params[i], args[i]);
         }
+
+        // Bind rest param if present
+        if (hasRest && func.restParam) {
+            const restArgs = args.slice(requiredParams);
+            localParams.set(func.restParam, restArgs);
+        }
+
         return func.body.evaluate(this, localParams);
     }
 
