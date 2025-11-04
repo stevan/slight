@@ -127,7 +127,7 @@ test('nested fun expressions', async () => {
 
         (defvar add1 (fun (x) (+ x 1)))
         (defvar double (fun (x) (* x 2)))
-        (defun add1-then-double (compose double add1))
+        (defvar add1-then-double (compose double add1))
 
         (add1-then-double 5)
     `;

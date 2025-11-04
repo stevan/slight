@@ -95,7 +95,7 @@ test('closure with higher-order functions', async () => {
 
         (defun add1 (x) (+ x 1))
         (defun double (x) (* x 2))
-        (defun add1-then-double (compose double add1))
+        (defvar add1-then-double (compose double add1))
 
         (add1-then-double 5)
     `;

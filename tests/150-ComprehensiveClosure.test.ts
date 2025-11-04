@@ -87,7 +87,7 @@ test('comprehensive closure test - nested scopes', async () => {
 
 test('comprehensive closure test - accumulator pattern', async () => {
     const code = `
-        (defun make-accumulator (INIT op)
+        (defun make-accumulator (init op)
           (fun (lst)
             (cond
               ((empty? lst) init)
@@ -183,7 +183,7 @@ test('comprehensive closure test - memoization pattern', async () => {
                           result)))))))
 
         (defvar slow-double (fun (x) (* x 2)))
-        (defun fast-double (memoize slow-double))
+        (defvar fast-double (memoize slow-double))
 
         (list (fast-double 5) (fast-double 10) (fast-double 5))
     `;
