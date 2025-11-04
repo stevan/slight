@@ -409,12 +409,12 @@ export class Parser {
                 for (let i = 3; i < elements.length; i++) {
                     const methodDef = elements[i];
                     if (!(methodDef instanceof CallNode) || methodDef.elements.length < 3) {
-                        throw new Error('Invalid defclass syntax: method must be (method name (params...) body) or (INIT (params...) body)');
+                        throw new Error('Invalid defclass syntax: method must be (:method-name (params...) body) or (INIT (params...) body)');
                     }
 
                     const methodKeyword = methodDef.elements[0];
                     if (!(methodKeyword instanceof SymbolNode)) {
-                        throw new Error('Invalid defclass syntax: expected method or INIT keyword');
+                        throw new Error('Invalid defclass syntax: expected :method-name or INIT keyword');
                     }
 
                     if (methodKeyword.name === 'INIT') {
@@ -429,22 +429,21 @@ export class Parser {
                             return el.name;
                         });
                         initMethod = { params, body: methodDef.elements[2] };
-                    } else if (methodKeyword.name === 'method') {
-                        // (method name (params...) body)
-                        if (!(methodDef.elements[1] instanceof SymbolNode)) {
-                            throw new Error('Invalid defclass syntax: method name must be a symbol');
-                        }
-                        if (!(methodDef.elements[2] instanceof CallNode)) {
+                    } else if (methodKeyword.name.startsWith(':')) {
+                        // (:method-name (params...) body)
+                        // The method name is the keyword name without the ':'
+                        const methodName = methodKeyword.name.substring(1); // Remove ':'
+
+                        if (!(methodDef.elements[1] instanceof CallNode)) {
                             throw new Error('Invalid defclass syntax: method parameters must be a list');
                         }
-                        const methodName = methodDef.elements[1].name;
-                        const params = methodDef.elements[2].elements.map((el: any) => {
+                        const params = methodDef.elements[1].elements.map((el: any) => {
                             if (!(el instanceof SymbolNode)) {
                                 throw new Error('Invalid defclass syntax: method parameters must be symbols');
                             }
                             return el.name;
                         });
-                        methods.set(methodName, { params, body: methodDef.elements[3] });
+                        methods.set(methodName, { params, body: methodDef.elements[2] });
                     } else {
                         throw new Error(`Invalid defclass syntax: unknown keyword ${methodKeyword.name}`);
                     }

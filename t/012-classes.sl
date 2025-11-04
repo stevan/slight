@@ -8,20 +8,20 @@
   (INIT (initial)
     (set! count initial))
 
-  (method increment ()
+  (:increment  ()
     (begin
       (set! count (+ count 1))
       count))
 
-  (method decrement ()
+  (:decrement  ()
     (begin
       (set! count (- count 1))
       count))
 
-  (method get-value ()
+  (:get-value  ()
     count)
 
-  (method reset ()
+  (:reset  ()
     (set! count 0)))
 
 (defvar c (new Counter 10))
@@ -39,12 +39,12 @@
       (set! owner owner-name)
       (set! balance initial-balance)))
 
-  (method deposit (amount)
+  (:deposit  (amount)
     (begin
       (set! balance (+ balance amount))
       balance))
 
-  (method withdraw (amount)
+  (:withdraw  (amount)
     (cond
       ((>= balance amount)
         (begin
@@ -53,10 +53,10 @@
       (else
         -1)))
 
-  (method get-balance ()
+  (:get-balance  ()
     balance)
 
-  (method get-owner ()
+  (:get-owner  ()
     owner))
 
 (defvar account (new BankAccount "Alice" 1000))
@@ -77,13 +77,13 @@
 
 ; Test 4: Class without init
 (defclass Point (x y)
-  (method get-x ()
+  (:get-x  ()
     x)
 
-  (method get-y ()
+  (:get-y  ()
     y)
 
-  (method set-coords (new-x new-y)
+  (:set-coords  (new-x new-y)
     (begin
       (set! x new-x)
       (set! y new-y))))
@@ -100,10 +100,10 @@
       (set! width w)
       (set! height h)))
 
-  (method area ()
+  (:area  ()
     (* width height))
 
-  (method perimeter ()
+  (:perimeter  ()
     (* 2 (+ width height))))
 
 (defvar rect (new Rectangle 5 3))
@@ -115,12 +115,12 @@
   (INIT ()
     (set! total 0))
 
-  (method add (value)
+  (:add  (value)
     (begin
       (set! total (+ total value))
       total))
 
-  (method get-total ()
+  (:get-total  ()
     total))
 
 (defvar acc (new Accumulator))

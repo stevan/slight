@@ -5,7 +5,7 @@
 ; Usage:
 ;   (defclass Counter (count)
 ;     (INIT (n) (set! count n))
-;     (method increment () (set! count (+ count 1)) count))
+;     (:increment  () (set! count (+ count 1)) count))
 ;
 ;   (defvar c (actor/new "Counter" 0))
 ;   (call c "increment")  ; => 1
@@ -28,11 +28,11 @@
 
     (defun loop ()
       (begin
-        (defun msg (recv))
-        (defun sender (head msg))
+        (defvar msg (recv))
+        (defvar sender (head msg))
         (defvar data (head (tail msg)))
 
-        ; data is either a string (method name) or a list (method-name . args)
+        ; data is either a string (:name ) or a list (method-name . args)
         (defvar method-name (cond
             ((== (type/of data) "STRING") data)
             ((== (type/of data) "LIST") (head data))
@@ -83,7 +83,7 @@
         (else (cons method-name method-args))))
 
     (send actor-pid message)
-    (defun response (recv))
+    (defvar response (recv))
     (head (tail response))))
 
 ; Legacy API for backward compatibility

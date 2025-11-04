@@ -8,20 +8,20 @@
   (INIT (initial)
     (set! count initial))
 
-  (method increment ()
+  (:increment  ()
     (begin
       (set! count (+ count 1))
       count))
 
-  (method decrement ()
+  (:decrement  ()
     (begin
       (set! count (- count 1))
       count))
 
-  (method get-value ()
+  (:get-value  ()
     count)
 
-  (method reset ()
+  (:reset  ()
     (set! count 0)))
 
 (defvar c (actor/new-1 "Counter" 10))
@@ -47,12 +47,12 @@
       (set! owner owner-name)
       (set! balance initial-balance)))
 
-  (method deposit (amount)
+  (:deposit  (amount)
     (begin
       (set! balance (+ balance amount))
       balance))
 
-  (method withdraw (amount)
+  (:withdraw  (amount)
     (cond
       ((>= balance amount)
         (begin
@@ -61,10 +61,10 @@
       (else
         -1)))
 
-  (method get-balance ()
+  (:get-balance  ()
     balance)
 
-  (method get-owner ()
+  (:get-owner  ()
     owner))
 
 (defvar account (actor/new-2 "BankAccount" "Alice" 1000))
@@ -80,12 +80,12 @@
   (INIT ()
     (set! total 0))
 
-  (method add (value)
+  (:add  (value)
     (begin
       (set! total (+ total value))
       total))
 
-  (method get-total ()
+  (:get-total  ()
     total))
 
 (defvar acc (actor/new-0 "Accumulator"))
