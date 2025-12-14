@@ -43,7 +43,7 @@ class Str  extends Term {
         this.value = value;
     }
 
-    toNativeStr () : string { return this.value }
+    toNativeStr () : string { return `"${this.value}"` }
 }
 
 class Sym  extends Term {
@@ -242,7 +242,7 @@ class Environment extends List<Binding> {
 type ParseExpr = Term | ParseExpr[];
 
 function parse (source : string) : ParseExpr {
-    const SPLITTER = /'(?:[^'\\]|\\.)*'|[()]|[^\s()']+/g
+    const SPLITTER = /\(|\)|'|"(?:[^"\\]|\\.)*"|[^\s\(\)';]+/g;
 
     const tokenize = (src : string) : string[] => src.match(SPLITTER) ?? [];
 
@@ -255,7 +255,7 @@ function parse (source : string) : ParseExpr {
         case token == 'true'        : return [ new Bool(true),         rest ];
         case token == 'false'       : return [ new Bool(false),        rest ];
         case !isNaN(Number(token))  : return [ new Num(Number(token)), rest ];
-        case token.charAt(0) == '"' : return [ new Str(token),         rest ];
+        case token.charAt(0) == '"' : return [ new Str(token.slice(1, token.length - 1)), rest ];
         default                     : return [ new Sym(token),         rest ];
         }
     }
@@ -330,6 +330,15 @@ const liftNumBinOp = (f : (n : number, m : number) => number) : NativeFunc => {
     }
 }
 
+const liftStrBinOp = (f : (n : string, m : string) => string) : NativeFunc => {
+    return (args : Term[], env : Environment) => {
+        let [ lhs, rhs ] = args;
+        if (!(lhs instanceof Str)) throw new Error(`LHS must be a Str, not ${lhs.constructor}`);
+        if (!(rhs instanceof Str)) throw new Error(`RHS must be a Str, not ${rhs.constructor}`);
+        return new Str( f(lhs.value, rhs.value) );
+    }
+}
+
 const liftNumCompareOp = (f : (n : number, m : number) => boolean) : NativeFunc => {
     return (args : Term[], env : Environment) => {
         let [ lhs, rhs ] = args;
@@ -339,17 +348,32 @@ const liftNumCompareOp = (f : (n : number, m : number) => boolean) : NativeFunc 
     }
 }
 
+const liftStrCompareOp = (f : (n : string, m : string) => boolean) : NativeFunc => {
+    return (args : Term[], env : Environment) => {
+        let [ lhs, rhs ] = args;
+        if (!(lhs instanceof Str)) throw new Error(`LHS must be a Str, not ${lhs.constructor}`);
+        if (!(rhs instanceof Str)) throw new Error(`RHS must be a Str, not ${rhs.constructor}`);
+        return new Bool( f(lhs.value, rhs.value) );
+    }
+}
+
 
 let env = compile(
     parse(`(
+        (greet : (lambda (name) (~ "Hello " name)))
+
         (add  : (lambda (x y) (+ x y)))
+
         (main :
-
-            (add 10 20)
-
+            (list
+                (greet "world")
+                (add 10 20)
+            )
         )
     )`),
     {
+        'list' : new Native('list', (args, env) => new Cons(args)),
+
         '+'  : new Native('+',  liftNumBinOp((n, m) => n + m)),
         '-'  : new Native('-',  liftNumBinOp((n, m) => n - m)),
         '*'  : new Native('*',  liftNumBinOp((n, m) => n * m)),
@@ -362,11 +386,24 @@ let env = compile(
         '<'  : new Native('<',  liftNumCompareOp((n, m) => n <  m)),
         '==' : new Native('==', liftNumCompareOp((n, m) => n == m)),
         '!=' : new Native('!=', liftNumCompareOp((n, m) => n != m)),
+
+        '~'  : new Native('~',  liftStrBinOp((n, m) : string => {
+            console.log(`n(${n}), m(${m})`);
+            return n + m;
+        })),
+
+        'ge' : new Native('ge', liftStrCompareOp((n, m) => n >= m)),
+        'gt' : new Native('gt', liftStrCompareOp((n, m) => n >  m)),
+        'le' : new Native('le', liftStrCompareOp((n, m) => n <= m)),
+        'lt' : new Native('lt', liftStrCompareOp((n, m) => n <  m)),
+        'eq' : new Native('eq', liftStrCompareOp((n, m) => n == m)),
+        'ne' : new Native('ne', liftStrCompareOp((n, m) => n != m)),
     }
 ) as Environment;
 
 let program = env.map((b) => {
     if (b.second instanceof Lambda) {
+        // bind any closures in the base environment
         return new Binding( b.first, new Closure( b.second as Lambda, env ) );
     }
     return b;
