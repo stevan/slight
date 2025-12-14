@@ -387,10 +387,7 @@ let env = compile(
         '==' : new Native('==', liftNumCompareOp((n, m) => n == m)),
         '!=' : new Native('!=', liftNumCompareOp((n, m) => n != m)),
 
-        '~'  : new Native('~',  liftStrBinOp((n, m) : string => {
-            console.log(`n(${n}), m(${m})`);
-            return n + m;
-        })),
+        '~'  : new Native('~',  liftStrBinOp((n, m) => n + m)),
 
         'ge' : new Native('ge', liftStrCompareOp((n, m) => n >= m)),
         'gt' : new Native('gt', liftStrCompareOp((n, m) => n >  m)),
