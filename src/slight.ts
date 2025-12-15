@@ -219,7 +219,7 @@ class Environment extends Term {
 
 type ParseExpr = Term | ParseExpr[];
 
-function parse (source : string) : ParseExpr {
+function parse (source : string) : Term[] {
     const SPLITTER = /\(|\)|'|"(?:[^"\\]|\\.)*"|[^\s\(\)';]+/g;
 
     const tokenize = (src : string) : string[] => src.match(SPLITTER) ?? [];
@@ -245,7 +245,7 @@ function parse (source : string) : ParseExpr {
     }
 
     let [ expr, rest ] = parseTokens( tokenize( source ) );
-    return expr;
+    return [ expr, parseTokens( rest ) ];
 }
 
 function compile (expr : ParseExpr) : Term {
@@ -356,6 +356,18 @@ let env = new Environment((query : Sym) : Term => {
     }
 });
 
+let tree = parse(`
+
+    (def add (lambda (x y) (+ x y)))
+
+    (add 10 20)
+
+`);
+
+console.log(tree);
+
+/*
+
 let program = compile(
     parse(`
 
@@ -406,7 +418,7 @@ console.log(result);
 console.log(result.toNativeStr());
 
 
-
+*/
 
 
 
