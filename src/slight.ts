@@ -9,8 +9,10 @@ abstract class Term {
     toStr () : Str { return new Str(this.toNativeStr()) }
 }
 
+// -----------------------------------------------------------------------------
+
 class Nil extends Term {
-    toNativeStr () : string { return 'nil' }
+    override toNativeStr () : string { return 'nil' }
 }
 
 class Bool extends Term {
@@ -21,7 +23,7 @@ class Bool extends Term {
         this.value = value;
     }
 
-    toNativeStr () : string { return this.value ? 'true' : 'false' }
+    override toNativeStr () : string { return this.value ? 'true' : 'false' }
 }
 
 class Num  extends Term {
@@ -32,7 +34,7 @@ class Num  extends Term {
         this.value = value;
     }
 
-    toNativeStr () : string { return this.value.toString() }
+    override toNativeStr () : string { return this.value.toString() }
 }
 
 class Str  extends Term {
@@ -43,7 +45,7 @@ class Str  extends Term {
         this.value = value;
     }
 
-    toNativeStr () : string { return `"${this.value}"` }
+    override toNativeStr () : string { return `"${this.value}"` }
 }
 
 class Sym  extends Term {
@@ -54,8 +56,10 @@ class Sym  extends Term {
         this.ident = ident;
     }
 
-    toNativeStr () : string { return '`'+this.ident }
+    override toNativeStr () : string { return '`'+this.ident }
 }
+
+// -----------------------------------------------------------------------------
 
 class Pair extends Term {
     public first  : Term;
@@ -67,7 +71,7 @@ class Pair extends Term {
         this.second = snd;
     }
 
-    toNativeStr () : string {
+    override toNativeStr () : string {
         return `(${this.first.toNativeStr()} . ${this.second.toNativeStr()})`
     }
 }
@@ -100,7 +104,7 @@ abstract class List<T extends Term> extends Term {
 
     abstract get tail () : Term;
 
-    toNativeStr () : string {
+    override toNativeStr () : string {
         return `(${ this.items.slice(this.offset, this.items.length).map((i) => i.toNativeStr()).join(' ') })`
     }
 }
@@ -127,47 +131,22 @@ class PairList extends List<Pair> {
     }
 }
 
-class Binding extends Pair {
-    public first : Sym;
-
-    constructor (sym : Sym, value : Term) {
-        super(sym, value);
-    }
-
-    toNativeStr () : string {
-        return `(${this.first.toNativeStr()} : ${this.second.toNativeStr()})`
-    }
-}
+// -----------------------------------------------------------------------------
 
 class Lambda extends Term {
     public params : Cons;
     public body   : Cons;
+    public env    : Environment;
 
-    constructor (params : Cons, body : Cons) {
+    constructor (params : Cons, body : Cons, env : Environment) {
         super();
         this.params = params;
         this.body   = body;
-    }
-
-    toNativeStr () : string {
-        return `(& ${this.params.toNativeStr()} ${this.body.toNativeStr()})`
-    }
-}
-
-class Closure extends Term {
-    public lambda : Lambda;
-    public env    : Environment;
-
-    constructor (lambda : Lambda, env : Environment) {
-        super();
-        this.lambda = lambda;
         this.env    = env;
     }
 
-    // TODO - capture closed over vars for toNativeStr
-
-    toNativeStr () : string {
-        return `(@ ${this.lambda.toNativeStr()} %())`
+    override toNativeStr () : string {
+        return `(λ ${this.params.toNativeStr()} ${this.body.toNativeStr()})`
     }
 }
 
@@ -183,55 +162,57 @@ class Native extends Term {
         this.body = body;
     }
 
-    toNativeStr () : string {
-        return `(* ${this.name})`
+    override toNativeStr () : string {
+        return `❮${this.name}❯`
     }
 }
 
-interface Builtins {
-    [name : string] : Native;
+// -----------------------------------------------------------------------------
+
+class Binding extends Pair {
+    constructor (sym : Sym, value : Term) {
+        super(sym, value);
+    }
+
+    override toNativeStr () : string {
+        return `(${this.first.toNativeStr()} : ${this.second.toNativeStr()})`
+    }
 }
 
-class Environment extends List<Binding> {
-    public builtins : Builtins;
+type MaybeEnvironment = Environment | undefined;
 
-    constructor (items : Binding[], builtins : Builtins, offset : number = 0) {
-        super(items, offset);
-        this.builtins = builtins;
-    }
+class Environment extends Term {
+    public parent : MaybeEnvironment;
+    public locals : Map<string,Term>;
 
-    get tail () : Environment | Nil {
-        if (this.length == 1) return new Nil();
-        return new Environment(this.items, this.builtins, this.offset + 1);
-    }
-
-    map (f : (i : Binding) => Binding) : Environment {
-        return new Environment( this.mapItems<Binding>(f), this.builtins );
+    constructor (bindings : Binding[], parent : MaybeEnvironment = undefined) {
+        super();
+        this.parent = parent;
+        this.locals = new Map<string,Term>(
+            bindings.map((b) => [ (b.first as Sym).ident, b.second ])
+        );
     }
 
     lookup (sym : Sym) : Term {
-        if (this.builtins.hasOwnProperty(sym.ident)) {
-            return this.builtins[sym.ident];
-        }
+        if (this.locals.has(sym.ident))
+            return this.locals.get(sym.ident) as Term;
 
-        for (let i = 0; i < this.length; i++) {
-            let binding = this.at(i);
-            if (binding.first.ident == sym.ident) {
-                return binding.second;
-            }
-        }
+        if (this.parent != undefined)
+            return this.parent.lookup(sym);
+
         return new Nil();
     }
 
-    derive (bindings : Binding[]) {
-        return new Environment(
-            [
-                ...bindings,
-                ...this.items.slice(this.offset),
-            ],
-            this.builtins,
-            this.offset,
-        )
+    derive (bindings : Binding[]) : Environment {
+        return new Environment( bindings, this );
+    }
+
+    override toNativeStr () : string {
+        return `∈ [ ${
+            [...this.locals.keys()].map(
+                (k) => `*${k} := ${(this.locals.get(k) as Term).toNativeStr()}`
+            ).join(' ')
+        } ]`
     }
 }
 
@@ -270,12 +251,12 @@ function parse (source : string) : ParseExpr {
     return expr;
 }
 
-function compile (expr : ParseExpr, builtins : Builtins) : Term {
+function compile (expr : ParseExpr, env : Environment) : Term {
     if (!Array.isArray(expr)) return expr;
 
     if (expr.length == 0) return new Cons([]);
 
-    let rest = expr.map((e) => compile(e, builtins));
+    let rest = expr.map((e) => compile(e, env));
 
     // handle pairs and bindings
     if (rest.length == 3) {
@@ -300,7 +281,7 @@ function compile (expr : ParseExpr, builtins : Builtins) : Term {
             let body   = rest[2];
             if (!(params instanceof Cons)) throw new Error(`Lambda params must be a Cons not ${params.constructor}`);
             if (!(body   instanceof Cons)) throw new Error(`Lambda body must be a Cons not ${body.constructor}`);
-            return new Lambda( params, body );
+            return new Lambda( params, body, env );
         default:
             // let it fall through
         }
@@ -308,7 +289,7 @@ function compile (expr : ParseExpr, builtins : Builtins) : Term {
 
     // handle different list types ...
     if (rest.every((p) => p instanceof Binding)) {
-        return new Environment( rest, builtins );
+        return new Environment( rest, env );
     }
     else if (rest.every((p) => p instanceof Pair)) {
         return new PairList( rest );
@@ -324,8 +305,8 @@ function compile (expr : ParseExpr, builtins : Builtins) : Term {
 const liftNumBinOp = (f : (n : number, m : number) => number) : NativeFunc => {
     return (args : Term[], env : Environment) => {
         let [ lhs, rhs ] = args;
-        if (!(lhs instanceof Num)) throw new Error(`LHS must be a Num, not ${lhs.constructor}`);
-        if (!(rhs instanceof Num)) throw new Error(`RHS must be a Num, not ${rhs.constructor}`);
+        if (!(lhs instanceof Num)) throw new Error(`LHS must be a Num, not ${lhs.constructor.name}`);
+        if (!(rhs instanceof Num)) throw new Error(`RHS must be a Num, not ${rhs.constructor.name}`);
         return new Num( f(lhs.value, rhs.value) );
     }
 }
@@ -333,8 +314,8 @@ const liftNumBinOp = (f : (n : number, m : number) => number) : NativeFunc => {
 const liftStrBinOp = (f : (n : string, m : string) => string) : NativeFunc => {
     return (args : Term[], env : Environment) => {
         let [ lhs, rhs ] = args;
-        if (!(lhs instanceof Str)) throw new Error(`LHS must be a Str, not ${lhs.constructor}`);
-        if (!(rhs instanceof Str)) throw new Error(`RHS must be a Str, not ${rhs.constructor}`);
+        if (!(lhs instanceof Str)) throw new Error(`LHS must be a Str, not ${lhs.constructor.name}`);
+        if (!(rhs instanceof Str)) throw new Error(`RHS must be a Str, not ${rhs.constructor.name}`);
         return new Str( f(lhs.value, rhs.value) );
     }
 }
@@ -342,8 +323,8 @@ const liftStrBinOp = (f : (n : string, m : string) => string) : NativeFunc => {
 const liftNumCompareOp = (f : (n : number, m : number) => boolean) : NativeFunc => {
     return (args : Term[], env : Environment) => {
         let [ lhs, rhs ] = args;
-        if (!(lhs instanceof Num)) throw new Error(`LHS must be a Num, not ${lhs.constructor}`);
-        if (!(rhs instanceof Num)) throw new Error(`RHS must be a Num, not ${rhs.constructor}`);
+        if (!(lhs instanceof Num)) throw new Error(`LHS must be a Num, not ${lhs.constructor.name}`);
+        if (!(rhs instanceof Num)) throw new Error(`RHS must be a Num, not ${rhs.constructor.name}`);
         return new Bool( f(lhs.value, rhs.value) );
     }
 }
@@ -351,61 +332,52 @@ const liftNumCompareOp = (f : (n : number, m : number) => boolean) : NativeFunc 
 const liftStrCompareOp = (f : (n : string, m : string) => boolean) : NativeFunc => {
     return (args : Term[], env : Environment) => {
         let [ lhs, rhs ] = args;
-        if (!(lhs instanceof Str)) throw new Error(`LHS must be a Str, not ${lhs.constructor}`);
-        if (!(rhs instanceof Str)) throw new Error(`RHS must be a Str, not ${rhs.constructor}`);
+        if (!(lhs instanceof Str)) throw new Error(`LHS must be a Str, not ${lhs.constructor.name}`);
+        if (!(rhs instanceof Str)) throw new Error(`RHS must be a Str, not ${rhs.constructor.name}`);
         return new Bool( f(lhs.value, rhs.value) );
     }
 }
 
 
-let env = compile(
+let program = compile(
     parse(`(
         (greet : (lambda (name) (~ "Hello " name)))
 
         (add  : (lambda (x y) (+ x y)))
 
         (main :
-            (list
-                (greet "world")
+
                 (add 10 20)
-            )
         )
     )`),
-    {
-        'list' : new Native('list', (args, env) => new Cons(args)),
+    new Environment([
+        new Binding(new Sym('list'), new Native('list', (args, env) => new Cons(args))),
 
-        '+'  : new Native('+',  liftNumBinOp((n, m) => n + m)),
-        '-'  : new Native('-',  liftNumBinOp((n, m) => n - m)),
-        '*'  : new Native('*',  liftNumBinOp((n, m) => n * m)),
-        '/'  : new Native('/',  liftNumBinOp((n, m) => n / m)),
-        '%'  : new Native('%',  liftNumBinOp((n, m) => n % m)),
+        new Binding(new Sym('+'   ), new Native('+',    liftNumBinOp((n, m) => n + m))),
+        new Binding(new Sym('-'   ), new Native('-',    liftNumBinOp((n, m) => n - m))),
+        new Binding(new Sym('*'   ), new Native('*',    liftNumBinOp((n, m) => n * m))),
+        new Binding(new Sym('/'   ), new Native('/',    liftNumBinOp((n, m) => n / m))),
+        new Binding(new Sym('%'   ), new Native('%',    liftNumBinOp((n, m) => n % m))),
 
-        '>=' : new Native('>=', liftNumCompareOp((n, m) => n >= m)),
-        '>'  : new Native('>',  liftNumCompareOp((n, m) => n >  m)),
-        '<=' : new Native('<=', liftNumCompareOp((n, m) => n <= m)),
-        '<'  : new Native('<',  liftNumCompareOp((n, m) => n <  m)),
-        '==' : new Native('==', liftNumCompareOp((n, m) => n == m)),
-        '!=' : new Native('!=', liftNumCompareOp((n, m) => n != m)),
+        new Binding(new Sym('>='  ), new Native('>=',   liftNumCompareOp((n, m) => n >= m))),
+        new Binding(new Sym('>'   ), new Native('>',    liftNumCompareOp((n, m) => n >  m))),
+        new Binding(new Sym('<='  ), new Native('<=',   liftNumCompareOp((n, m) => n <= m))),
+        new Binding(new Sym('<'   ), new Native('<',    liftNumCompareOp((n, m) => n <  m))),
+        new Binding(new Sym('=='  ), new Native('==',   liftNumCompareOp((n, m) => n == m))),
+        new Binding(new Sym('!='  ), new Native('!=',   liftNumCompareOp((n, m) => n != m))),
 
-        '~'  : new Native('~',  liftStrBinOp((n, m) => n + m)),
+        new Binding(new Sym('~'   ), new Native('~',    liftStrBinOp((n, m) => n + m))),
 
-        'ge' : new Native('ge', liftStrCompareOp((n, m) => n >= m)),
-        'gt' : new Native('gt', liftStrCompareOp((n, m) => n >  m)),
-        'le' : new Native('le', liftStrCompareOp((n, m) => n <= m)),
-        'lt' : new Native('lt', liftStrCompareOp((n, m) => n <  m)),
-        'eq' : new Native('eq', liftStrCompareOp((n, m) => n == m)),
-        'ne' : new Native('ne', liftStrCompareOp((n, m) => n != m)),
-    }
+        new Binding(new Sym('ge'  ), new Native('ge',   liftStrCompareOp((n, m) => n >= m))),
+        new Binding(new Sym('gt'  ), new Native('gt',   liftStrCompareOp((n, m) => n >  m))),
+        new Binding(new Sym('le'  ), new Native('le',   liftStrCompareOp((n, m) => n <= m))),
+        new Binding(new Sym('lt'  ), new Native('lt',   liftStrCompareOp((n, m) => n <  m))),
+        new Binding(new Sym('eq'  ), new Native('eq',   liftStrCompareOp((n, m) => n == m))),
+        new Binding(new Sym('ne'  ), new Native('ne',   liftStrCompareOp((n, m) => n != m))),
+    ])
 ) as Environment;
 
-let program = env.map((b) => {
-    if (b.second instanceof Lambda) {
-        // bind any closures in the base environment
-        return new Binding( b.first, new Closure( b.second as Lambda, env ) );
-    }
-    return b;
-});
-
+//console.log(program);
 console.log(program.toNativeStr());
 
 function evaluate (expr : Term, env : Environment) : Term {
@@ -415,31 +387,31 @@ function evaluate (expr : Term, env : Environment) : Term {
     case Str    :
     case Bool   :
     case Pair   :
-    case Native : return expr;
+    case Native :
+    case Lambda : return expr;
     case Sym    : return env.lookup( expr as Sym );
-    case Lambda : return new Closure( expr as Lambda, env );
     case Cons   :
         let [ call, ...args ] = (expr as Cons).mapItems<Term>((e) => evaluate(e, env));
         switch (call.constructor) {
-        case Native  : return (call as Native).body(args, env);
-        case Closure :
-            let local  = (call as Closure).env;
-            let lambda = (call as Closure).lambda;
+        case Native : return (call as Native).body(args, env);
+        case Lambda :
+            let lambda = call as Lambda;
+            let local  = lambda.env;
             let bindings = [];
             for (let i = 0; i < args.length; i++) {
                 bindings[i] = new Binding( lambda.params.at(i) as Sym, args[i] );
             }
-            return evaluate( lambda.body, local.derive(bindings) );
+            return evaluate( lambda.body, local.derive( bindings ) );
         default:
-            throw new Error(`Must be Native or Closure, not ${call.constructor}`);
+            throw new Error(`Must be Native or Closure, not ${call.constructor.name}`);
         }
     }
+    throw new Error("WTDF!");
 }
 
 let result = evaluate(program.lookup(new Sym('main')), program);
 console.log(result);
 console.log(result.toNativeStr());
-
 
 
 
