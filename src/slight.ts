@@ -104,6 +104,14 @@ abstract class List<T extends Term> extends Term {
 
     abstract get tail () : Term;
 
+    toNativeArray () : Term[] {
+        let list = [];
+        for (let i = 0; i < this.length; i++) {
+            list.push( this.at(i) );
+        }
+        return list;
+    }
+
     override toNativeStr () : string {
         return `(${ this.items.slice(this.offset, this.items.length).map((i) => i.toNativeStr()).join(' ') })`
     }
@@ -176,7 +184,24 @@ class Native extends Term {
     }
 
     override toNativeStr () : string {
-        return `❮${this.name}❯`
+        return `n:❮${this.name}❯`
+    }
+}
+
+type NativeFExpr = (params : Term[], env : Environment) => Term;
+
+class FExpr extends Term {
+    public name : string;
+    public body : NativeFExpr;
+
+    constructor (name : string, body : NativeFExpr) {
+        super();
+        this.name = name;
+        this.body = body;
+    }
+
+    override toNativeStr () : string {
+        return `f:❮${this.name}❯`
     }
 }
 
@@ -186,10 +211,12 @@ type Scope = (n : Sym) => Term;
 
 class Environment extends Term {
     public scope : Scope;
+    public view  : string;
 
-    constructor (scope : Scope) {
+    constructor (scope : Scope, view : string = '') {
         super();
         this.scope = scope;
+        this.view  = view;
     }
 
     lookup (sym : Sym) : Term {
@@ -198,18 +225,21 @@ class Environment extends Term {
 
     define (name : Sym, value : Term) : void {
         let upper = this.scope;
+        this.view += `, { ${name.toNativeStr()} : ${value.toNativeStr()} }`;
+        console.log(`Updating view: ${this.view}`);
         this.scope = (query : Sym) : Term => {
+            console.log(`query // ${name.toNativeStr()} ?= ${query.toNativeStr()}`);
             if (query.ident == name.ident) return value;
             return upper(query);
         };
     }
 
     derive () : Environment {
-        return new Environment( this.scope );
+        return new Environment( this.scope, this.view );
     }
 
     override toNativeStr () : string {
-        return `∈ [ ... ]`
+        return `∈ [ ${this.view} ]`
     }
 }
 
@@ -244,49 +274,61 @@ function parse (source : string) : Term[] {
         return parseList( remaining, [ ...acc, expr ] );
     }
 
-    let [ expr, rest ] = parseTokens( tokenize( source ) );
-    return [ expr, parseTokens( rest ) ];
+    let exprs  = [];
+    let tokens = tokenize( source );
+    let rest   = tokens;
+    while (rest.length > 0) {
+        let [ expr, remaining ] = parseTokens( rest );
+        exprs.push(expr as Term);
+        rest = remaining;
+    }
+    return exprs;
 }
 
-function compile (expr : ParseExpr) : Term {
-    if (!Array.isArray(expr)) return expr;
+function compile (expr : Term[]) : Term[] {
 
-    if (expr.length == 0) return new Cons([]);
+    const compileExpression = (expr : ParseExpr) : Term => {
+        if (!Array.isArray(expr)) return expr;
 
-    let rest = expr.map((e) => compile(e));
+        if (expr.length == 0) return new Cons([]);
 
-    // handle pairs and bindings
-    if (rest.length == 3) {
-        let [ fst, sym, snd ] = rest;
-        if (sym instanceof Sym) {
-            switch(sym.ident) {
-            case ':' : return new Pair( fst, snd );
+        let rest = expr.map((e) => compileExpression(e));
+
+        // handle pairs and bindings
+        if (rest.length == 3) {
+            let [ fst, sym, snd ] = rest;
+            if (sym instanceof Sym) {
+                switch(sym.ident) {
+                case ':' : return new Pair( fst, snd );
+                default:
+                    // let it fall through
+                }
+            }
+        }
+
+        if (rest[0] instanceof Sym) {
+            switch (rest[0].ident) {
+            case 'lambda':
+                let params = rest[1];
+                let body   = rest[2];
+                if (!(params instanceof Cons)) throw new Error(`Lambda params must be a Cons not ${params.constructor}`);
+                if (!(body   instanceof Cons)) throw new Error(`Lambda body must be a Cons not ${body.constructor}`);
+                return new Lambda( params, body );
             default:
                 // let it fall through
             }
         }
-    }
 
-    if (rest[0] instanceof Sym) {
-        switch (rest[0].ident) {
-        case 'lambda':
-            let params = rest[1];
-            let body   = rest[2];
-            if (!(params instanceof Cons)) throw new Error(`Lambda params must be a Cons not ${params.constructor}`);
-            if (!(body   instanceof Cons)) throw new Error(`Lambda body must be a Cons not ${body.constructor}`);
-            return new Lambda( params, body );
-        default:
-            // let it fall through
+        // handle different list types ...
+        if (rest.every((p) => p instanceof Pair)) {
+            return new PairList( rest );
+        }
+        else {
+            return new Cons( rest );
         }
     }
 
-    // handle different list types ...
-    if (rest.every((p) => p instanceof Pair)) {
-        return new PairList( rest );
-    }
-    else {
-        return new Cons( rest );
-    }
+    return expr.map(compileExpression);
 }
 
 
@@ -328,7 +370,63 @@ const liftStrCompareOp = (f : (n : string, m : string) => boolean) : NativeFunc 
     }
 }
 
+function evaluate (exprs : Term[], env : Environment) : Term[] {
+
+    const evaluateExpr = (expr : Term, env : Environment) : Term => {
+        console.log(`EVAL ${expr.toNativeStr()}`);
+        switch (expr.constructor) {
+        case Nil    :
+        case Num    :
+        case Str    :
+        case Bool   :
+        case Native :
+        case FExpr  : return expr;
+        case Sym    : return env.lookup( expr as Sym );
+        case Lambda : return new Closure( expr as Lambda, env.derive() );
+        case Pair   :
+            return new Pair(
+                evaluateExpr( (expr as Pair).first,  env ),
+                evaluateExpr( (expr as Pair).second, env ),
+            );
+        case Cons   :
+            let call = evaluateExpr( (expr as Cons).head, env );
+            let tail = (expr as Cons).tail;
+
+            if (call instanceof FExpr) {
+                let args = tail instanceof Nil ? [] : tail.toNativeArray();
+                return (call as FExpr).body( args, env );
+            }
+
+            console.group('EVAL args ...');
+            let args = (tail as Cons).mapItems<Term>((e) => evaluateExpr(e, env));
+            console.groupEnd();
+
+            //console.log("CALL", call);
+
+            switch (call.constructor) {
+            case Native  : return (call as Native).body(args, env);
+            case Closure :
+                let lambda = (call as Closure).lambda;
+                let local  = (call as Closure).env.derive();
+                for (let i = 0; i < args.length; i++) {
+                    local.define( lambda.params.at(i) as Sym, args[i] );
+                }
+                return evaluateExpr( lambda.body, local );
+            default:
+                throw new Error(`Must be Native or Closure, not ${call.constructor.name}`);
+            }
+        default:
+            throw new Error(`Unrecognized Expression ${expr.constructor.name}`);
+        }
+    }
+
+    let results = exprs.map((e) => evaluateExpr(e, env));
+
+    return results;
+}
+
 let env = new Environment((query : Sym) : Term => {
+    console.log(`query // ${query.toNativeStr()} isa builtin?`);
     switch (query.ident) {
     case '+'  : return new Native('+',    liftNumBinOp((n, m) => n + m));
     case '-'  : return new Native('-',    liftNumBinOp((n, m) => n - m));
@@ -349,24 +447,22 @@ let env = new Environment((query : Sym) : Term => {
     case 'eq' : return new Native('eq',   liftStrCompareOp((n, m) => n == m));
     case 'ne' : return new Native('ne',   liftStrCompareOp((n, m) => n != m));
 
-    case 'list' : return new Native('list', (args, env) => new Cons(args));
-    // TODO - head/tail, etc.
+    case 'list' :
+        return new Native('list', (args, env) => new Cons(args));
+
+    case 'def' :
+        return new FExpr('def', (args, env) => {
+            let [ name, value ] = args;
+            let [ evaled ] = evaluate([ value ], env );
+            env.define( name as Sym, evaled );
+            return new Nil();
+        });
+
     default:
         throw new Error(`Unable to find ${query.ident} in Scope`);
     }
 });
 
-let tree = parse(`
-
-    (def add (lambda (x y) (+ x y)))
-
-    (add 10 20)
-
-`);
-
-console.log(tree);
-
-/*
 
 let program = compile(
     parse(`
@@ -378,47 +474,12 @@ let program = compile(
     `)
 );
 
-//console.log(program);
-console.log(program.toNativeStr());
+console.log(program.map((e) => e.toNativeStr()).join("\n"));
 
-function evaluate (expr : Term, env : Environment) : Term {
-    switch (expr.constructor) {
-    case Nil    :
-    case Num    :
-    case Str    :
-    case Bool   :
-    case Native : return expr;
-    case Sym    : return env.lookup( expr as Sym );
-    case Lambda : return new Closure( expr as Lambda, env.derive() );
-    case Pair   :
-        return new Pair(
-            evaluate( (expr as Pair).first,  env ),
-            evaluate( (expr as Pair).second, env ),
-        );
-    case Cons   :
-        let [ call, ...args ] = (expr as Cons).mapItems<Term>((e) => evaluate(e, env));
-        switch (call.constructor) {
-        case Native  : return (call as Native).body(args, env);
-        case Closure :
-            let lambda = (call as Closure).lambda;
-            let local  = (call as Closure).env.derive();
-            for (let i = 0; i < args.length; i++) {
-                local.define( lambda.params.at(i) as Sym, args[i] );
-            }
-            return evaluate( lambda.body, local );
-        default:
-            throw new Error(`Must be Native or Closure, not ${call.constructor.name}`);
-        }
-    }
-    throw new Error("WTDF!");
-}
+let results = evaluate(program, env);
+console.log(results);
+console.log(results.map((e) => e.toNativeStr()).join("\n"));
 
-let result = evaluate(program, env);
-console.log(result);
-console.log(result.toNativeStr());
-
-
-*/
 
 
 
