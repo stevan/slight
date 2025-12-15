@@ -372,9 +372,10 @@ const liftStrCompareOp = (f : (n : string, m : string) => boolean) : NativeFunc 
 function evaluate (exprs : Term[], env : Environment) : Term[] {
 
     const evaluateExpr = (expr : Term, env : Environment) : Term => {
-        console.log('-'.repeat(80));
+        console.log('='.repeat(80));
         console.log(`%ENV ${env.toNativeStr()}`);
         console.log(`EVAL ${expr.toNativeStr()}`);
+        console.log('-'.repeat(80));
         switch (expr.constructor) {
         case Nil    :
         case Num    :
@@ -402,10 +403,18 @@ function evaluate (exprs : Term[], env : Environment) : Term[] {
             let call = evaluateExpr( (expr as Cons).head, env );
             let tail = (expr as Cons).tail;
 
+            // -----------------------------------------------------------------
+            // Operative
+            // -----------------------------------------------------------------
+
             if (call instanceof FExpr) {
                 let args = tail instanceof Nil ? [] : tail.toNativeArray();
                 return (call as FExpr).body( args, env );
             }
+
+            // -----------------------------------------------------------------
+            // Applicative
+            // -----------------------------------------------------------------
 
             console.group(`EVAL args ... ${tail.toNativeStr()}`);
             let args = tail instanceof Nil ? [] : (tail as Cons).mapItems<Term>((e) => evaluateExpr(e, env));
@@ -425,6 +434,8 @@ function evaluate (exprs : Term[], env : Environment) : Term[] {
             default:
                 throw new Error(`Must be Native or Closure, not ${call.constructor.name}`);
             }
+
+            // -----------------------------------------------------------------
         default:
             throw new Error(`Unrecognized Expression ${expr.constructor.name}`);
         }
