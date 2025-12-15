@@ -143,9 +143,9 @@ class PairList extends List<Pair> {
 
 class Lambda extends Term {
     public params : Cons;
-    public body   : Cons;
+    public body   : Term;
 
-    constructor (params : Cons, body : Cons) {
+    constructor (params : Cons, body : Term) {
         super();
         this.params = params;
         this.body   = body;
@@ -167,7 +167,7 @@ class Closure extends Term {
     }
 
     override toNativeStr () : string {
-        return `< ${this.lambda.toNativeStr()} @ ${this.env.toNativeStr()} >`
+        return `< ${this.lambda.toNativeStr()} ${this.env.toNativeStr()} >`
     }
 }
 
@@ -225,10 +225,10 @@ class Environment extends Term {
 
     define (name : Sym, value : Term) : void {
         let upper = this.scope;
-        this.view += `, { ${name.toNativeStr()} : ${value.toNativeStr()} }`;
-        console.log(`Updating view: ${this.view}`);
+        this.view += `${name.toNativeStr()} : ${value.toNativeStr()} ~ `;
+        console.log(`∈ ~ view // ${this.view}`);
         this.scope = (query : Sym) : Term => {
-            console.log(`query // ${name.toNativeStr()} ?= ${query.toNativeStr()}`);
+            console.log(`∈ ~ query // ${name.toNativeStr()} ?= ${query.toNativeStr()}`);
             if (query.ident == name.ident) return value;
             return upper(query);
         };
@@ -239,7 +239,7 @@ class Environment extends Term {
     }
 
     override toNativeStr () : string {
-        return `∈ [ ${this.view} ]`
+        return `∈[${this.view}]`
     }
 }
 
@@ -312,8 +312,7 @@ function compile (expr : Term[]) : Term[] {
                 let params = rest[1];
                 let body   = rest[2];
                 if (!(params instanceof Cons)) throw new Error(`Lambda params must be a Cons not ${params.constructor}`);
-                if (!(body   instanceof Cons)) throw new Error(`Lambda body must be a Cons not ${body.constructor}`);
-                return new Lambda( params, body );
+                return new Lambda( params, compileExpression( body ) );
             default:
                 // let it fall through
             }
@@ -373,6 +372,8 @@ const liftStrCompareOp = (f : (n : string, m : string) => boolean) : NativeFunc 
 function evaluate (exprs : Term[], env : Environment) : Term[] {
 
     const evaluateExpr = (expr : Term, env : Environment) : Term => {
+        console.log('-'.repeat(80));
+        console.log(`%ENV ${env.toNativeStr()}`);
         console.log(`EVAL ${expr.toNativeStr()}`);
         switch (expr.constructor) {
         case Nil    :
@@ -381,13 +382,22 @@ function evaluate (exprs : Term[], env : Environment) : Term[] {
         case Bool   :
         case Native :
         case FExpr  : return expr;
-        case Sym    : return env.lookup( expr as Sym );
+        case Sym    :
+            console.group(`... lookup ${expr.toNativeStr()}`);
+            let result = env.lookup( expr as Sym );
+            console.groupEnd();
+            console.log(`<<< got ${result.toNativeStr()}`);
+            return result;
         case Lambda : return new Closure( expr as Lambda, env.derive() );
         case Pair   :
-            return new Pair(
+            console.group(`... evaluate Pair ${expr.toNativeStr()}`);
+            let pair = new Pair(
                 evaluateExpr( (expr as Pair).first,  env ),
                 evaluateExpr( (expr as Pair).second, env ),
             );
+            console.groupEnd();
+            console.log(`<<< got ${pair.toNativeStr()}`);
+            return pair;
         case Cons   :
             let call = evaluateExpr( (expr as Cons).head, env );
             let tail = (expr as Cons).tail;
@@ -397,8 +407,8 @@ function evaluate (exprs : Term[], env : Environment) : Term[] {
                 return (call as FExpr).body( args, env );
             }
 
-            console.group('EVAL args ...');
-            let args = (tail as Cons).mapItems<Term>((e) => evaluateExpr(e, env));
+            console.group(`EVAL args ... ${tail.toNativeStr()}`);
+            let args = tail instanceof Nil ? [] : (tail as Cons).mapItems<Term>((e) => evaluateExpr(e, env));
             console.groupEnd();
 
             //console.log("CALL", call);
@@ -466,10 +476,14 @@ let env = new Environment((query : Sym) : Term => {
 
 let program = compile(
     parse(`
-
         (def add (lambda (x y) (+ x y)))
 
-        (add 10 20)
+        (def adder
+            (lambda (x)
+                (lambda (y) (+ x y)) )
+        )
+
+        ((adder 10) 20)
 
     `)
 );
