@@ -76,6 +76,8 @@ class Pair extends Term {
     }
 }
 
+// -----------------------------------------------------------------------------
+
 abstract class List<T extends Term> extends Term {
     public items  : T[];
     public offset : number;
@@ -156,7 +158,15 @@ class Lambda extends Term {
     }
 }
 
-class Closure extends Term {
+// -----------------------------------------------------------------------------
+
+type NativeFunc  = (params : Term[], env : Environment) => Term;
+type NativeFExpr = (params : Term[], env : Environment) => Term;
+
+abstract class Applicative extends Term {}
+abstract class Operative   extends Term {}
+
+class Closure extends Applicative {
     public lambda : Lambda;
     public env    : Environment;
 
@@ -171,9 +181,7 @@ class Closure extends Term {
     }
 }
 
-type NativeFunc = (params : Term[], env : Environment) => Term;
-
-class Native extends Term {
+class Native extends Applicative {
     public name : string;
     public body : NativeFunc;
 
@@ -188,9 +196,7 @@ class Native extends Term {
     }
 }
 
-type NativeFExpr = (params : Term[], env : Environment) => Term;
-
-class FExpr extends Term {
+class FExpr extends Operative {
     public name : string;
     public body : NativeFExpr;
 
@@ -311,7 +317,8 @@ function compile (expr : Term[]) : Term[] {
             case 'lambda':
                 let params = rest[1];
                 let body   = rest[2];
-                if (!(params instanceof Cons)) throw new Error(`Lambda params must be a Cons not ${params.constructor}`);
+                if (!(params instanceof Cons))
+                    throw new Error(`Lambda params must be a Cons not ${params.constructor}`);
                 return new Lambda( params, compileExpression( body ) );
             default:
                 // let it fall through
@@ -369,6 +376,8 @@ const liftStrCompareOp = (f : (n : string, m : string) => boolean) : NativeFunc 
     }
 }
 
+// -----------------------------------------------------------------------------
+
 let env = new Environment((query : Sym) : Term => {
     console.log(`query // ${query.toNativeStr()} isa builtin?`);
     switch (query.ident) {
@@ -399,6 +408,7 @@ let env = new Environment((query : Sym) : Term => {
     }
 });
 
+// -----------------------------------------------------------------------------
 
 type Kontinuation =
     | { mode : 'EVAL',    op : 'JUST',        value  : Term }
@@ -409,12 +419,10 @@ type Kontinuation =
 
     | { mode : 'EVAL',    op : 'CONS/head',   head   : Term }
     | { mode : 'EVAL',    op : 'CONS/tail',   tail   : Term }
-    | { mode : 'EVAL',    op : 'CONS/build' }
+    | { mode : 'EVAL',    op : 'CALL',        args   : Term }
 
-    | { mode : 'APPLY',   op : 'OPERATIVE',   call : FExpr,   args : Term[] }
-    | { mode : 'APPLY',   op : 'APPLICATIVE', call : Closure, args : Term[] }
-    | { mode : 'APPLY',   op : 'NATIVE',      call : Native,  args : Term[] }
-
+    | { mode : 'APPLY',   op : 'OPERATIVE',   call : Operative, args : Term }
+    | { mode : 'APPLY',   op : 'APPLICATIVE', call : Applicative }
 
 
 function step (expr : Term, env : Environment) : any {
@@ -459,8 +467,30 @@ function step (expr : Term, env : Environment) : any {
                 });
                 break;
             case 'CONS/head':
+                kont.push(...evaluateTerm( k.head, env ));
                 break;
             case 'CONS/tail':
+                if (k.tail instanceof Nil) break;
+                let args = (k.tail as Cons).toNativeArray();
+                kont.push(...(args.flatMap((arg) => evaluateTerm( arg, env ))));
+                break;
+            case 'CALL':
+                let call = stack.pop();
+                if (call == undefined) throw new Error('Expected call on stack');
+                if (call instanceof Operative) {
+                    kont.push(
+                        { mode : 'APPLY', op : 'OPERATIVE', call : (call as FExpr), args : k.args }
+                    );
+                }
+                else if (call instanceof Applicative) {
+                    kont.push(
+                        { mode : 'APPLY', op : 'APPLICATIVE', call : (call as Closure) },
+                        { mode : 'EVAL',  op : 'CONS/tail',   tail : k.args }
+                    );
+                }
+                else {
+                    throw new Error(`What to do with call -> ${call.constructor.name}??`);
+                }
                 break;
             default:
                 throw new Error(`Unknown EVAL op ${JSON.stringify(k)}`);
@@ -471,8 +501,17 @@ function step (expr : Term, env : Environment) : any {
             case 'OPERATIVE':
                 break;
             case 'APPLICATIVE':
-                break;
-            case 'NATIVE':
+                switch (k.call.constructor) {
+                case Native:
+                    kont.unshift({
+                        mode  : 'EVAL',
+                        op    : 'JUST',
+                        value : (k.call as Native).body(stack.splice(0), env)
+                    });
+                    break;
+                case Closure:
+                    throw new Error('TODO!');
+                }
                 break;
             default:
                 throw new Error(`Unknown APPLY op ${JSON.stringify(k)}`);
@@ -513,7 +552,7 @@ function evaluateTerm (expr : Term, env : Environment) : Kontinuation[] {
         ];
     case Cons   :
         return [
-            { mode : 'EVAL', op : 'CONS/tail', tail : (expr as Cons).tail },
+            { mode : 'EVAL', op : 'CALL', args : (expr as Cons).tail },
             { mode : 'EVAL', op : 'CONS/head', head : (expr as Cons).head },
         ];
     default:
@@ -523,7 +562,7 @@ function evaluateTerm (expr : Term, env : Environment) : Kontinuation[] {
 
 let program = compile(
     parse(`
-        ( 10 : 20 )
+        (+ 10 20)
     `)
 );
 
