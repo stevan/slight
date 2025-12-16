@@ -369,6 +369,171 @@ const liftStrCompareOp = (f : (n : string, m : string) => boolean) : NativeFunc 
     }
 }
 
+let env = new Environment((query : Sym) : Term => {
+    console.log(`query // ${query.toNativeStr()} isa builtin?`);
+    switch (query.ident) {
+    case '+'  : return new Native('+',    liftNumBinOp((n, m) => n + m));
+    case '-'  : return new Native('-',    liftNumBinOp((n, m) => n - m));
+    case '*'  : return new Native('*',    liftNumBinOp((n, m) => n * m));
+    case '/'  : return new Native('/',    liftNumBinOp((n, m) => n / m));
+    case '%'  : return new Native('%',    liftNumBinOp((n, m) => n % m));
+    case '>=' : return new Native('>=',   liftNumCompareOp((n, m) => n >= m));
+    case '>'  : return new Native('>',    liftNumCompareOp((n, m) => n >  m));
+    case '<=' : return new Native('<=',   liftNumCompareOp((n, m) => n <= m));
+    case '<'  : return new Native('<',    liftNumCompareOp((n, m) => n <  m));
+    case '==' : return new Native('==',   liftNumCompareOp((n, m) => n == m));
+    case '!=' : return new Native('!=',   liftNumCompareOp((n, m) => n != m));
+    case '~'  : return new Native('~',    liftStrBinOp((n, m) => n + m));
+    case 'ge' : return new Native('ge',   liftStrCompareOp((n, m) => n >= m));
+    case 'gt' : return new Native('gt',   liftStrCompareOp((n, m) => n >  m));
+    case 'le' : return new Native('le',   liftStrCompareOp((n, m) => n <= m));
+    case 'lt' : return new Native('lt',   liftStrCompareOp((n, m) => n <  m));
+    case 'eq' : return new Native('eq',   liftStrCompareOp((n, m) => n == m));
+    case 'ne' : return new Native('ne',   liftStrCompareOp((n, m) => n != m));
+
+    case 'list' :
+        return new Native('list', (args, env) => new Cons(args));
+
+    default:
+        throw new Error(`Unable to find ${query.ident} in Scope`);
+    }
+});
+
+
+type Kontinuation =
+    | { mode : 'EVAL',    op : 'JUST',        value  : Term }
+
+    | { mode : 'EVAL',    op : 'PAIR/first',  first  : Term }
+    | { mode : 'EVAL',    op : 'PAIR/second', second : Term }
+    | { mode : 'EVAL',    op : 'PAIR/build' }
+
+    | { mode : 'EVAL',    op : 'CONS/head',   head   : Term }
+    | { mode : 'EVAL',    op : 'CONS/tail',   tail   : Term }
+    | { mode : 'EVAL',    op : 'CONS/build' }
+
+    | { mode : 'APPLY',   op : 'OPERATIVE',   call : FExpr,   args : Term[] }
+    | { mode : 'APPLY',   op : 'APPLICATIVE', call : Closure, args : Term[] }
+    | { mode : 'APPLY',   op : 'NATIVE',      call : Native,  args : Term[] }
+
+
+
+function step (expr : Term, env : Environment) : any {
+    let stack = [];
+    let kont  = evaluateTerm(expr, env);
+
+    console.log('^ STEP','='.repeat(80));
+    console.log(`EXPR ${expr.toNativeStr()}`);
+    console.log(`%ENV ${env.toNativeStr()}`);
+    console.log(`KONT `, kont);
+    console.log('='.repeat(80));
+
+    while (kont.length > 0) {
+        let k = kont.pop() as Kontinuation;
+        console.log('^ NEXT','-'.repeat(80));
+        console.log(`K =>> `, k);
+        console.log(`STACK `, stack);
+        console.log('-'.repeat(80));
+        console.group('...');
+        switch (k.mode) {
+        case 'EVAL':
+            switch (k.op) {
+            case 'JUST':
+                if (kont.length == 0) return [ k.value, ...stack ];
+                stack.push(k.value);
+                break;
+            case 'PAIR/first':
+                kont.push(...evaluateTerm( k.first, env ));
+                break;
+            case 'PAIR/second':
+                kont.push(...evaluateTerm( k.second, env ));
+                break;
+            case 'PAIR/build':
+                let fst = stack.pop();
+                let snd = stack.pop();
+                if (fst == undefined) throw new Error('Expected fst on stack');
+                if (snd == undefined) throw new Error('Expected snd on stack');
+                kont.unshift({
+                    mode  : 'EVAL',
+                    op    : 'JUST',
+                    value : new Pair( fst as Term, snd as Term )
+                });
+                break;
+            case 'CONS/head':
+                break;
+            case 'CONS/tail':
+                break;
+            default:
+                throw new Error(`Unknown EVAL op ${JSON.stringify(k)}`);
+            }
+            break;
+        case 'APPLY':
+            switch (k.op) {
+            case 'OPERATIVE':
+                break;
+            case 'APPLICATIVE':
+                break;
+            case 'NATIVE':
+                break;
+            default:
+                throw new Error(`Unknown APPLY op ${JSON.stringify(k)}`);
+            }
+            break;
+        default:
+            throw new Error(`Unknown mode ${JSON.stringify(k)}`);
+        }
+        console.groupEnd();
+        console.log('/'.repeat(80));
+        console.log(`%ENV ${env.toNativeStr()}`);
+        console.log(`KONT `, kont);
+        console.log('/'.repeat(80));
+    }
+
+    return true;
+}
+
+function evaluateTerm (expr : Term, env : Environment) : Kontinuation[] {
+    console.log('^ EVALUATE','.'.repeat(80));
+    console.log(`%ENV ${env.toNativeStr()}`);
+    console.log(`EXPR ${expr.toNativeStr()}`);
+    console.log('.'.repeat(80));
+    switch (expr.constructor) {
+    case Nil    :
+    case Num    :
+    case Str    :
+    case Bool   :
+    case Native :
+    case FExpr  : return [{ mode : 'EVAL', op : 'JUST', value : expr }];
+    case Sym    : return [{ mode : 'EVAL', op : 'JUST', value : env.lookup( expr as Sym ) }];
+    case Lambda : return [{ mode : 'EVAL', op : 'JUST', value : new Closure( expr as Lambda, env.derive() ) }];
+    case Pair   :
+        return [
+            { mode : 'EVAL', op : 'PAIR/build' },
+            { mode : 'EVAL', op : 'PAIR/second', second : (expr as Pair).second },
+            { mode : 'EVAL', op : 'PAIR/first',   first : (expr as Pair).first  },
+        ];
+    case Cons   :
+        return [
+            { mode : 'EVAL', op : 'CONS/tail', tail : (expr as Cons).tail },
+            { mode : 'EVAL', op : 'CONS/head', head : (expr as Cons).head },
+        ];
+    default:
+        throw new Error(`Unrecognized Expression ${expr.constructor.name}`);
+    }
+}
+
+let program = compile(
+    parse(`
+        ( 10 : 20 )
+    `)
+);
+
+console.log(program.map((e) => e.toNativeStr()).join("\n"));
+
+let result = step(program[0] as Term, env);
+console.log("RESULT", result);
+
+
+/*
 function evaluate (exprs : Term[], env : Environment) : Term[] {
 
     const evaluateExpr = (expr : Term, env : Environment) : Term => {
@@ -446,6 +611,8 @@ function evaluate (exprs : Term[], env : Environment) : Term[] {
     return results;
 }
 
+
+
 let env = new Environment((query : Sym) : Term => {
     console.log(`query // ${query.toNativeStr()} isa builtin?`);
     switch (query.ident) {
@@ -506,6 +673,5 @@ console.log(results);
 console.log(results.map((e) => e.toNativeStr()).join("\n"));
 
 
-
-
+*/
 
