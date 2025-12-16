@@ -411,22 +411,22 @@ let env = new Environment((query : Sym) : Term => {
 // -----------------------------------------------------------------------------
 
 type Kontinuation =
-    | { mode : 'EVAL',    op : 'RETURN', value  : Term }
-    | { mode : 'EVAL',    op : 'PAIR/first',  first  : Term }
-    | { mode : 'EVAL',    op : 'PAIR/second', second : Term }
-    | { mode : 'EVAL',    op : 'PAIR/build' }
-    | { mode : 'EVAL',    op : 'CONS/head',   head   : Term }
-    | { mode : 'EVAL',    op : 'CONS/tail',   tail   : Term }
-    | { mode : 'EVAL',    op : 'CONS/apply',  args   : Term }
-    | { mode : 'APPLY',   op : 'OPERATIVE',   call : Operative, args : Term }
-    | { mode : 'APPLY',   op : 'APPLICATIVE', call : Applicative }
+    | { mode : 'EVAL',  op : 'JUST',        value  : Term }
+    | { mode : 'EVAL',  op : 'PAIR/first',  first  : Term }
+    | { mode : 'EVAL',  op : 'PAIR/second', second : Term }
+    | { mode : 'EVAL',  op : 'PAIR/build' }
+    | { mode : 'EVAL',  op : 'CONS/head',   head   : Term }
+    | { mode : 'EVAL',  op : 'CONS/tail',   tail   : Term }
+    | { mode : 'EVAL',  op : 'CONS/apply',  args   : Term }
+    | { mode : 'APPLY', op : 'OPERATIVE',   call : Operative, args : Term }
+    | { mode : 'APPLY', op : 'APPLICATIVE', call : Applicative }
 
 
 function step (expr : Term, env : Environment) : any {
     let stack = [];
     let kont  = evaluateTerm(expr, env);
 
-    console.log('^ STEP','='.repeat(80));
+    console.log('^^ STEP','^'.repeat(72));
     console.log(`EXPR ${expr.toNativeStr()}`);
     console.log(`%ENV ${env.toNativeStr()}`);
     console.log(`KONT `, kont);
@@ -434,7 +434,7 @@ function step (expr : Term, env : Environment) : any {
 
     while (kont.length > 0) {
         let k = kont.pop() as Kontinuation;
-        console.log('^ NEXT','-'.repeat(80));
+        console.log('TICK','='.repeat(75));
         console.log(`K =>> `, k);
         console.log(`STACK `, stack);
         console.log('-'.repeat(80));
@@ -442,7 +442,7 @@ function step (expr : Term, env : Environment) : any {
         switch (k.mode) {
         case 'EVAL':
             switch (k.op) {
-            case 'RETURN':
+            case 'JUST':
                 if (kont.length == 0) return [ k.value, ...stack ];
                 stack.push(k.value);
                 break;
@@ -459,7 +459,7 @@ function step (expr : Term, env : Environment) : any {
                 if (snd == undefined) throw new Error('Expected snd on stack');
                 kont.push({
                     mode  : 'EVAL',
-                    op    : 'RETURN',
+                    op    : 'JUST',
                     value : new Pair( fst as Term, snd as Term )
                 });
                 break;
@@ -505,7 +505,7 @@ function step (expr : Term, env : Environment) : any {
                 case Native:
                     kont.push({
                         mode  : 'EVAL',
-                        op    : 'RETURN',
+                        op    : 'JUST',
                         value : (k.call as Native).body(stack.splice(0), env),
                     });
                     break;
@@ -522,16 +522,15 @@ function step (expr : Term, env : Environment) : any {
         }
         console.groupEnd();
         console.log('/'.repeat(80));
-        console.log(`%ENV ${env.toNativeStr()}`);
         console.log(`KONT `, kont);
-        console.log('/'.repeat(80));
+        console.log('='.repeat(80));
     }
 
     return true;
 }
 
-function evaluateTerm (expr : Term, env : Environment) : Kontinuation[] {
-    console.log('^ EVALUATE','.'.repeat(80));
+function evaluateTerm (expr : Term, env : Environment) : Term | Kontinuation[] {
+    console.log('@@ EVALUATE','@'.repeat(68));
     console.log(`%ENV ${env.toNativeStr()}`);
     console.log(`EXPR ${expr.toNativeStr()}`);
     console.log('.'.repeat(80));
@@ -541,9 +540,9 @@ function evaluateTerm (expr : Term, env : Environment) : Kontinuation[] {
     case Str    :
     case Bool   :
     case Native :
-    case FExpr  : return [{ mode : 'EVAL', op : 'RETURN', value : expr }];
-    case Sym    : return [{ mode : 'EVAL', op : 'RETURN', value : env.lookup( expr as Sym ) }];
-    case Lambda : return [{ mode : 'EVAL', op : 'RETURN', value : new Closure( expr as Lambda, env.derive() ) }];
+    case FExpr  : return [{ mode : 'EVAL', op : 'JUST', value : expr }];
+    case Sym    : return [{ mode : 'EVAL', op : 'JUST', value : env.lookup( expr as Sym ) }];
+    case Lambda : return [{ mode : 'EVAL', op : 'JUST', value : new Closure( expr as Lambda, env.derive() ) }];
     case Pair   :
         return [
             { mode : 'EVAL', op : 'PAIR/build' },
