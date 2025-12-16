@@ -411,16 +411,13 @@ let env = new Environment((query : Sym) : Term => {
 // -----------------------------------------------------------------------------
 
 type Kontinuation =
-    | { mode : 'EVAL',    op : 'JUST',        value  : Term }
-
+    | { mode : 'EVAL',    op : 'RETURN', value  : Term }
     | { mode : 'EVAL',    op : 'PAIR/first',  first  : Term }
     | { mode : 'EVAL',    op : 'PAIR/second', second : Term }
     | { mode : 'EVAL',    op : 'PAIR/build' }
-
     | { mode : 'EVAL',    op : 'CONS/head',   head   : Term }
     | { mode : 'EVAL',    op : 'CONS/tail',   tail   : Term }
-    | { mode : 'EVAL',    op : 'CALL',        args   : Term }
-
+    | { mode : 'EVAL',    op : 'CONS/apply',  args   : Term }
     | { mode : 'APPLY',   op : 'OPERATIVE',   call : Operative, args : Term }
     | { mode : 'APPLY',   op : 'APPLICATIVE', call : Applicative }
 
@@ -445,7 +442,7 @@ function step (expr : Term, env : Environment) : any {
         switch (k.mode) {
         case 'EVAL':
             switch (k.op) {
-            case 'JUST':
+            case 'RETURN':
                 if (kont.length == 0) return [ k.value, ...stack ];
                 stack.push(k.value);
                 break;
@@ -456,13 +453,13 @@ function step (expr : Term, env : Environment) : any {
                 kont.push(...evaluateTerm( k.second, env ));
                 break;
             case 'PAIR/build':
-                let fst = stack.pop();
                 let snd = stack.pop();
+                let fst = stack.pop();
                 if (fst == undefined) throw new Error('Expected fst on stack');
                 if (snd == undefined) throw new Error('Expected snd on stack');
-                kont.unshift({
+                kont.push({
                     mode  : 'EVAL',
-                    op    : 'JUST',
+                    op    : 'RETURN',
                     value : new Pair( fst as Term, snd as Term )
                 });
                 break;
@@ -474,13 +471,16 @@ function step (expr : Term, env : Environment) : any {
                 let args = (k.tail as Cons).toNativeArray();
                 kont.push(...(args.flatMap((arg) => evaluateTerm( arg, env ))));
                 break;
-            case 'CALL':
+            case 'CONS/apply':
                 let call = stack.pop();
                 if (call == undefined) throw new Error('Expected call on stack');
                 if (call instanceof Operative) {
-                    kont.push(
-                        { mode : 'APPLY', op : 'OPERATIVE', call : (call as FExpr), args : k.args }
-                    );
+                    kont.push({
+                        mode : 'APPLY',
+                        op   : 'OPERATIVE',
+                        call : (call as FExpr),
+                        args : k.args
+                    });
                 }
                 else if (call instanceof Applicative) {
                     kont.push(
@@ -503,10 +503,10 @@ function step (expr : Term, env : Environment) : any {
             case 'APPLICATIVE':
                 switch (k.call.constructor) {
                 case Native:
-                    kont.unshift({
+                    kont.push({
                         mode  : 'EVAL',
-                        op    : 'JUST',
-                        value : (k.call as Native).body(stack.splice(0), env)
+                        op    : 'RETURN',
+                        value : (k.call as Native).body(stack.splice(0), env),
                     });
                     break;
                 case Closure:
@@ -541,9 +541,9 @@ function evaluateTerm (expr : Term, env : Environment) : Kontinuation[] {
     case Str    :
     case Bool   :
     case Native :
-    case FExpr  : return [{ mode : 'EVAL', op : 'JUST', value : expr }];
-    case Sym    : return [{ mode : 'EVAL', op : 'JUST', value : env.lookup( expr as Sym ) }];
-    case Lambda : return [{ mode : 'EVAL', op : 'JUST', value : new Closure( expr as Lambda, env.derive() ) }];
+    case FExpr  : return [{ mode : 'EVAL', op : 'RETURN', value : expr }];
+    case Sym    : return [{ mode : 'EVAL', op : 'RETURN', value : env.lookup( expr as Sym ) }];
+    case Lambda : return [{ mode : 'EVAL', op : 'RETURN', value : new Closure( expr as Lambda, env.derive() ) }];
     case Pair   :
         return [
             { mode : 'EVAL', op : 'PAIR/build' },
@@ -552,8 +552,8 @@ function evaluateTerm (expr : Term, env : Environment) : Kontinuation[] {
         ];
     case Cons   :
         return [
-            { mode : 'EVAL', op : 'CALL', args : (expr as Cons).tail },
-            { mode : 'EVAL', op : 'CONS/head', head : (expr as Cons).head },
+            { mode : 'EVAL', op : 'CONS/apply', args : (expr as Cons).tail },
+            { mode : 'EVAL', op : 'CONS/head',  head : (expr as Cons).head },
         ];
     default:
         throw new Error(`Unrecognized Expression ${expr.constructor.name}`);
@@ -562,7 +562,7 @@ function evaluateTerm (expr : Term, env : Environment) : Kontinuation[] {
 
 let program = compile(
     parse(`
-        (+ 10 20)
+        (+ 10 (* 4 5))
     `)
 );
 
@@ -570,6 +570,7 @@ console.log(program.map((e) => e.toNativeStr()).join("\n"));
 
 let result = step(program[0] as Term, env);
 console.log("RESULT", result);
+console.log("RESULT", (result[0] as Term).toNativeStr());
 
 
 /*
