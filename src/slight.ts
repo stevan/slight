@@ -27,11 +27,11 @@ abstract class Term {
 
 // -----------------------------------------------------------------------------
 
-class Nil extends Term {
+export class Nil extends Term {
     override toNativeStr () : string { return 'nil' }
 }
 
-class Bool extends Term {
+export class Bool extends Term {
     public value : boolean;
 
     constructor (value : boolean) {
@@ -42,7 +42,7 @@ class Bool extends Term {
     override toNativeStr () : string { return this.value ? 'true' : 'false' }
 }
 
-class Num  extends Term {
+export class Num  extends Term {
     public value : number;
 
     constructor (value : number) {
@@ -53,7 +53,7 @@ class Num  extends Term {
     override toNativeStr () : string { return this.value.toString() }
 }
 
-class Str  extends Term {
+export class Str  extends Term {
     public value : string;
 
     constructor (value : string) {
@@ -64,7 +64,7 @@ class Str  extends Term {
     override toNativeStr () : string { return `"${this.value}"` }
 }
 
-class Sym  extends Term {
+export class Sym  extends Term {
     public ident : string;
 
     constructor (ident : string) {
@@ -77,7 +77,7 @@ class Sym  extends Term {
 
 // -----------------------------------------------------------------------------
 
-class Pair extends Term {
+export class Pair extends Term {
     public first  : Term;
     public second : Term;
 
@@ -135,7 +135,7 @@ abstract class List<T extends Term> extends Term {
     }
 }
 
-class Cons extends List<Term> {
+export class Cons extends List<Term> {
     get tail () : Cons | Nil {
         if (this.length == 1) return new Nil();
         return new Cons(this.items, this.offset + 1);
@@ -146,7 +146,7 @@ class Cons extends List<Term> {
     }
 }
 
-class PairList extends List<Pair> {
+export class PairList extends List<Pair> {
     get tail () : PairList | Nil {
         if (this.length == 1) return new Nil();
         return new PairList(this.items, this.offset + 1);
@@ -159,7 +159,7 @@ class PairList extends List<Pair> {
 
 // -----------------------------------------------------------------------------
 
-class Lambda extends Term {
+export class Lambda extends Term {
     public params : Cons;
     public body   : Term;
 
@@ -170,7 +170,7 @@ class Lambda extends Term {
     }
 
     override toNativeStr () : string {
-        return `(λ ${this.params.toNativeStr()} ${this.body.toNativeStr()})`
+        return `(lambda ${this.params.toNativeStr()} ${this.body.toNativeStr()})`
     }
 }
 
@@ -182,7 +182,7 @@ type NativeFExpr = (params : Term[], env : Environment) => Term;
 abstract class Applicative extends Term {}
 abstract class Operative   extends Term {}
 
-class Closure extends Applicative {
+export class Closure extends Applicative {
     public lambda : Lambda;
     public env    : Environment;
 
@@ -193,11 +193,11 @@ class Closure extends Applicative {
     }
 
     override toNativeStr () : string {
-        return `< ${this.lambda.toNativeStr()} ${this.env.toNativeStr()} >`
+        return `{ ${this.lambda.toNativeStr()} @ ${this.env.toNativeStr()} }`
     }
 }
 
-class Native extends Applicative {
+export class Native extends Applicative {
     public name : string;
     public body : NativeFunc;
 
@@ -208,11 +208,11 @@ class Native extends Applicative {
     }
 
     override toNativeStr () : string {
-        return `n:❮${this.name}❯`
+        return `n:(${this.name})`
     }
 }
 
-class FExpr extends Operative {
+export class FExpr extends Operative {
     public name : string;
     public body : NativeFExpr;
 
@@ -223,7 +223,7 @@ class FExpr extends Operative {
     }
 
     override toNativeStr () : string {
-        return `f:❮${this.name}❯`
+        return `f:(${this.name})`
     }
 }
 
@@ -325,7 +325,7 @@ export function compile (expr : Term[]) : Term[] {
 
 type Scope = (n : Sym) => Term;
 
-class Environment extends Term {
+export class Environment extends Term {
     public scope : Scope;
     public view  : string;
 
@@ -341,10 +341,10 @@ class Environment extends Term {
 
     define (name : Sym, value : Term) : void {
         let upper = this.scope;
-        this.view += `${name.toNativeStr()} : ${value.toNativeStr()} ~ `;
-        console.log(`∈ ~ view // ${this.view}`);
+        this.view += `${name.toNativeStr()} : ${value.toNativeStr()}, `;
+        console.log(` ~ define := ${this.view}`);
         this.scope = (query : Sym) : Term => {
-            console.log(`∈ ~ query // ${name.toNativeStr()} ?= ${query.toNativeStr()}`);
+            console.log(` ~ lookup // ${query.toNativeStr()} in scope(${name.toNativeStr()})`);
             if (query.ident == name.ident) return value;
             return upper(query);
         };
@@ -375,7 +375,7 @@ class Environment extends Term {
     }
 
     override toNativeStr () : string {
-        return `∈[${this.view}]`
+        return `~{${this.view}}`
     }
 }
 
@@ -449,12 +449,12 @@ class Halt extends Kontinue {
 }
 
 // -----------------------------------------------------------------------------
-// Just a Value
+// Return a Value
 
-class Just extends Kontinue {
+class Return extends Kontinue {
     constructor(public value : Term, env : Environment) { super(env) }
     override toString () : string {
-        return `Just[${this.value.toNativeStr()}]`+super.toString()
+        return `Return[${this.value.toNativeStr()}]`+super.toString()
     }
 }
 
@@ -570,8 +570,8 @@ class ApplyApplicative extends Apply {
 
 // the base environment
 
-const ROOT_ENV = new Environment((query : Sym) : Term => {
-    console.log(`query // ${query.toNativeStr()} isa builtin?`);
+export const ROOT_ENV = new Environment((query : Sym) : Term => {
+    console.log(` ~ lookup || ${query.toNativeStr()} in scope(_) `);
     switch (query.ident) {
     case '+'  : return new Native('+',    liftNumBinOp((n, m) => n + m));
     case '-'  : return new Native('-',    liftNumBinOp((n, m) => n - m));
@@ -608,6 +608,8 @@ const ROOT_ENV = new Environment((query : Sym) : Term => {
 // - the stack of the Halt continuation
 // - the current Environment
 // - the continuation stack
+// - the step number
+// - the number of ticks run
 //
 // The step function returns this after each expression
 // and run function just collects them in a list
@@ -617,16 +619,15 @@ const ROOT_ENV = new Environment((query : Sym) : Term => {
 // everything that is going on.
 // -----------------------------------------------------------------------------
 
-type State = [ Term[], Environment, Kontinue[] ];
+type State = [ Term[], Environment, Kontinue[], number, number ];
 
 export function run (program : Term[]) : State[] {
 
     // provides the starting continuation
     // for evaluating any expression
     const evaluateTerm = (expr : Term, env : Environment) : Kontinue => {
-        console.log('@@ EVALUATE','@'.repeat(68));
-        console.log(`%ENV ${env.toNativeStr()}`);
-        console.log(`EXPR ${expr.toNativeStr()}`);
+        console.log('.'.repeat(80));
+        console.log(`>> EVAL [ ${expr.toNativeStr()} ] + ENV ${env.toNativeStr()}`);
         console.log('.'.repeat(80));
         switch (expr.constructor) {
         case Nil    :
@@ -634,9 +635,9 @@ export function run (program : Term[]) : State[] {
         case Str    :
         case Bool   :
         case Native :
-        case FExpr  : return new Just(expr, env);
-        case Sym    : return new Just(env.lookup( expr as Sym ), env);
-        case Lambda : return new Just(new Closure( expr as Lambda, env.capture() ), env);
+        case FExpr  : return new Return(expr, env);
+        case Sym    : return new Return(env.lookup( expr as Sym ), env);
+        case Lambda : return new Return(new Closure( expr as Lambda, env.capture() ), env);
         case Pair   : return new EvalPair( expr as Pair, env );
         case Cons   : return new EvalCons( expr as Cons, env );
         default:
@@ -654,33 +655,53 @@ export function run (program : Term[]) : State[] {
     }
 
     // the step function ... !!!
-    const step = (stepExpr : Term, stepEnv : Environment, kont : Kontinue[]) : State => {
+    const step = (stepExpr : Term, stepEnv : Environment, kont : Kontinue[], stepNum : number = 0) : State => {
         kont.push( new EvalExpr( stepExpr, stepEnv ) );
 
-        console.log('^^ STEP','^'.repeat(72));
-        console.log(`%ENV ${stepEnv.toNativeStr()}`);
-        console.log(`KONT\n `, kont.map((k) => k.toString()).join("\n  "));
         console.log('='.repeat(80));
+        console.group(`STEP[${stepNum}] [ ${stepExpr.toNativeStr()} ] + ENV ${stepEnv.toNativeStr()}`);
+
+        let tick = 0;
 
         while (kont.length > 0) {
+            tick++;
             let k = kont.pop() as Kontinue;
-            console.log('TICK','='.repeat(75));
-            console.log(`   K =>> `, k.toString());
             console.log('-'.repeat(80));
-            console.group('..!');
+            console.group(`TICK(${tick})`);
+            console.log(`=> K : `, k.toString());
+            if (kont.length == 0) {
+                console.log(`KONT : ~`);
+            }
+            else {
+                console.log(`KONT :\n `, kont.toReversed().map((k) => k.toString()).join("\n  "));
+            }
             switch (k.constructor) {
+            // ---------------------------------------------------------------------
+            // This is the end of a statement, main exit point
             // ---------------------------------------------------------------------
             case Halt:
                 console.groupEnd();
-                return [ k.stack, (k as Kontinue).env, kont ];
+                console.log('-'.repeat(80));
+                console.log(`Halting!`);
+                console.groupEnd();
+                return [ k.stack, (k as Kontinue).env, kont, stepNum, tick ];
             // ---------------------------------------------------------------------
-            case Just:
-                returnValues( kont, (k as Just).value );
+            // This is a literal value to be returned to the
+            // previous continuation in the stack
+            // ---------------------------------------------------------------------
+            case Return:
+                returnValues( kont, (k as Return).value );
                 break;
+            // =====================================================================
+            // Eval
+            // =====================================================================
+            // Main entry point
             // ---------------------------------------------------------------------
             case EvalExpr:
                 kont.push( evaluateTerm( (k as EvalExpr).expr, (k as Kontinue).env ) );
                 break;
+            // ---------------------------------------------------------------------
+            // Eval Pairs
             // ---------------------------------------------------------------------
             case EvalPair:
                 let pair  = (k as EvalPair).pair;
@@ -701,8 +722,10 @@ export function run (program : Term[]) : State[] {
                 let fst = k.stack.pop();
                 if (fst == undefined) throw new Error('Expected fst on stack');
                 if (snd == undefined) throw new Error('Expected snd on stack');
-                kont.push( new Just( new Pair( fst as Term, snd as Term ), (k as Kontinue).env ) );
+                kont.push( new Return( new Pair( fst as Term, snd as Term ), (k as Kontinue).env ) );
                 break;
+            // ---------------------------------------------------------------------
+            // Eval Lists
             // ---------------------------------------------------------------------
             case EvalCons:
                 let cons  = (k as EvalCons).cons;
@@ -711,10 +734,7 @@ export function run (program : Term[]) : State[] {
                 break;
             case EvalConsTail:
                 let tail = (k as EvalConsTail).tail;
-                if (tail instanceof Nil) {
-                    console.log("*************** GOT NIL ************************");
-                    break;
-                }
+                if (tail instanceof Nil) throw new Error(`Tail is Nil!`);
 
                 if (!((tail as Cons).tail instanceof Nil)) {
                     kont.push( new EvalConsTail( (tail as Cons).tail, (k as Kontinue).env ) );
@@ -727,6 +747,8 @@ export function run (program : Term[]) : State[] {
 
                 kont.push( evaluateTerm( (tail as Cons).head, (k as Kontinue).env ) );
                 break;
+            // ---------------------------------------------------------------------
+            // Handle function calls
             // ---------------------------------------------------------------------
             case CallProc:
                 let call = k.stack.pop();
@@ -744,18 +766,27 @@ export function run (program : Term[]) : State[] {
                     throw new Error(`What to do with call -> ${call.constructor.name}??`);
                 }
                 break;
+            // =====================================================================
+            // APPLY
+            // =====================================================================
+            // Operatives, or FExprs
+            // - the arguments are not evaluated
             // ---------------------------------------------------------------------
             case ApplyOperative:
                 let opResult = ((k as ApplyOperative).call as FExpr).body(
                     ((k as ApplyOperative).args as Cons).toNativeArray(),
                     (k as Kontinue).env
                 );
-                kont.push( new Just( opResult, (k as Kontinue).env ) );
+                kont.push( new Return( opResult, (k as Kontinue).env ) );
                 break;
+            // ---------------------------------------------------------------------
+            // Applicatives, or Lambdas & Native Functions
+            // - arguments are evaluated
+            // ---------------------------------------------------------------------
             case ApplyApplicative:
                 switch ((k as ApplyApplicative).call.constructor) {
                 case Native:
-                    kont.push(new Just(
+                    kont.push(new Return(
                         ((k as ApplyApplicative).call as Native).body( k.stack, (k as Kontinue).env ),
                         (k as Kontinue).env
                     ));
@@ -770,26 +801,31 @@ export function run (program : Term[]) : State[] {
                     kont.push( new EvalExpr( lambda.body, local.derive( params as Sym[], args ) ) );
                 }
                 break;
+            // ---------------------------------------------------------------------
+            // .. the end
+            // ---------------------------------------------------------------------
             default:
-                throw new Error(`Unknown APPLY op ${JSON.stringify(k)}`);
+                throw new Error(`Unknown Continuation op ${JSON.stringify(k)}`);
             }
             console.groupEnd();
-            console.log('/'.repeat(80));
-            console.log(`KONT\n `, kont.map((k) => k.toString()).join("\n  "));
-            console.log('='.repeat(80));
         }
 
+        console.groupEnd();
+        console.log('='.repeat(80));
+
         // should never happen
-        return [ [ stepExpr ], stepEnv, kont ];
+        return [ [], stepEnv, kont, stepNum, tick ];
     }
 
     // run the program statements
     // and collect the results
     let results : State[] = [];
 
+    console.log("PROGRAM:\n ", program.map((e) => e.toNativeStr()).join("\n  "));
+
     let env = ROOT_ENV.capture(); // start with a fresh one!
-    program.forEach((expr) => {
-        let state = step( expr, env, [ new Halt(env) ] );
+    program.forEach((expr, i) => {
+        let state = step( expr, env, [ new Halt(env) ], i );
 
         //let [ stack, Senv, Skont ] = state;
         //console.log('!!!!!!!!!!!!', [
@@ -802,6 +838,20 @@ export function run (program : Term[]) : State[] {
         // thread environment through
         env = state[1] as Environment;
     });
+
+    console.log('='.repeat(80));
+    console.log(`The End`);
+    console.log('='.repeat(80));
+
+   console.log("RESULT(s):\n ", results.map((state) => {
+        let [ stack, env, kont, stepNum, tick ] = state;
+        return [
+            `STEP[${stepNum.toString().padStart(3, '0')}]+TICK[${tick.toString().padStart(3, '0')}] =>`,
+            `STACK : ${stack.map((t) => t.toNativeStr()).join(', ')};`,
+            `ENV : ${env.toNativeStr()};`,
+            `KONT : [${kont.map((k) => k.toString()).join(', ')}]`,
+        ].join(' ')
+    }).join("\n  "));
 
     // return the array of State objects
     return results;
