@@ -579,7 +579,9 @@ class ApplyApplicative extends Apply {
 }
 
 
-function run (program : Term[], rootEnv : Environment) : [ Term[][], Environment[] ] {
+type State = [ Term[], Environment, Kontinue[] ];
+
+function run (program : Term[], rootEnv : Environment) : State[] {
 
     const evaluateTerm = (expr : Term, env : Environment) : Kontinue => {
         console.log('@@ EVALUATE','@'.repeat(68));
@@ -609,11 +611,8 @@ function run (program : Term[], rootEnv : Environment) : [ Term[][], Environment
         top.stack.push( ...values );
     }
 
-    const step = (stepExpr : Term, stepEnv : Environment) : [ Term[], Environment ] => {
-        let kont = [
-            new Halt(stepEnv),
-            new EvalExpr(stepExpr, stepEnv),
-        ];
+    const step = (stepExpr : Term, stepEnv : Environment, kont : Kontinue[]) : State => {
+        kont.push( new EvalExpr( stepExpr, stepEnv ) );
 
         console.log('^^ STEP','^'.repeat(72));
         console.log(`%ENV ${stepEnv.toNativeStr()}`);
@@ -630,7 +629,7 @@ function run (program : Term[], rootEnv : Environment) : [ Term[][], Environment
             // ---------------------------------------------------------------------
             case Halt:
                 console.groupEnd();
-                return [ k.stack, (k as Kontinue).env ];
+                return [ k.stack, (k as Kontinue).env, kont ];
             // ---------------------------------------------------------------------
             case Just:
                 returnValues( kont, (k as Just).value );
@@ -704,7 +703,12 @@ function run (program : Term[], rootEnv : Environment) : [ Term[][], Environment
                 break;
             // ---------------------------------------------------------------------
             case ApplyOperative:
-                throw new Error('OPERATIVE!');
+                let opResult = ((k as ApplyOperative).call as FExpr).body(
+                    ((k as ApplyOperative).args as Cons).toNativeArray(),
+                    (k as Kontinue).env
+                );
+                kont.push( new Just( opResult, (k as Kontinue).env ) );
+                break;
             case ApplyApplicative:
                 switch ((k as ApplyApplicative).call.constructor) {
                 case Native:
@@ -733,19 +737,30 @@ function run (program : Term[], rootEnv : Environment) : [ Term[][], Environment
         }
 
         // should never happen
-        return [ [ stepExpr ], stepEnv ];
+        return [ [ stepExpr ], stepEnv, kont ];
     }
 
+    // ... run them ...
 
-    let env     : Environment[] = [ rootEnv ];
-    let results : Term[][]      = [];
+    let results : State[] = [];
+
+    let env  = rootEnv;
     program.forEach((expr) => {
-        let [ stack, local ] = step(expr, env.at(-1) as Environment);
-        results.push(stack);
-        env.push(local);
+        let state = step( expr, env, [ new Halt(env) ] );
+
+        //let [ stack, Senv, Skont ] = state;
+        //console.log('!!!!!!!!!!!!', [
+        //    `STACK : ${stack.map((t) => t.toNativeStr()).join(', ')}`,
+        //    `ENV : ${Senv.toNativeStr()}`,
+        //    `KONT :\n  ${Skont.map((k) => k.toString()).join("\n  ")}`,
+        //]);
+
+        results.push(state);
+        // thread environment through
+        env = state[1] as Environment;
     });
 
-    return [ results, env ];
+    return results;
 }
 
 let program = compile(
@@ -766,7 +781,20 @@ let program = compile(
 
 console.log(program.map((e) => e.toNativeStr()).join("\n"));
 
-let [ stacks, envs ] = run(program, env);
-console.log("RESULT", stacks.flatMap((s) => s.map((t) => t.toNativeStr())));
-console.log("ENVS",   envs.map((e) => e.toNativeStr()));
+let results = run(program, env);
+console.log("RESULT(s)", results.map((state) => {
+    let [ stack, env, kont ] = state;
+    return [
+        `STACK : ${stack.map((t) => t.toNativeStr()).join(', ')};`,
+        `ENV : ${env.toNativeStr()};`,
+        `KONT :  ${kont.map((k) => k.toString()).join(', ')};`,
+    ].join(' ')
+}));
 
+
+
+/*
+
+
+
+*/
