@@ -1,19 +1,8 @@
 
 import * as util from 'node:util';
 
-const originalConsoleLog = console.log;
-console.log = (...args) => {
-    originalConsoleLog(
-        ...args.map((arg) =>
-            typeof arg === 'string'
-                ? arg
-                : util.inspect(arg, {
-                    depth: null,
-                    colors: true,
-                })
-        )
-    );
-};
+const OCL = console.log;
+console.log = (...as) => OCL(...as.map((a) => String(a) ? a : util.inspect(a,{depth:null,colors:true})));
 
 // -----------------------------------------------------------------------------
 // Runtime
