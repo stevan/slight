@@ -1,4 +1,20 @@
 
+import * as util from 'node:util';
+
+const originalConsoleLog = console.log;
+console.log = (...args) => {
+    originalConsoleLog(
+        ...args.map((arg) =>
+            typeof arg === 'string'
+                ? arg
+                : util.inspect(arg, {
+                    depth: null,
+                    colors: true,
+                })
+        )
+    );
+};
+
 // -----------------------------------------------------------------------------
 // Terms
 // -----------------------------------------------------------------------------
@@ -410,158 +426,289 @@ let env = new Environment((query : Sym) : Term => {
 
 // -----------------------------------------------------------------------------
 
-type Kontinuation =
-    | { mode : 'EVAL',  op : 'JUST',        value  : Term }
-    | { mode : 'EVAL',  op : 'PAIR/first',  first  : Term }
-    | { mode : 'EVAL',  op : 'PAIR/second', second : Term }
-    | { mode : 'EVAL',  op : 'PAIR/build' }
-    | { mode : 'EVAL',  op : 'CONS/head',   head   : Term }
-    | { mode : 'EVAL',  op : 'CONS/tail',   tail   : Term }
-    | { mode : 'EVAL',  op : 'CONS/apply',  args   : Term }
-    | { mode : 'APPLY', op : 'OPERATIVE',   call : Operative, args : Term }
-    | { mode : 'APPLY', op : 'APPLICATIVE', call : Applicative }
+/*
+Eval answers:
+    "What does this expression mean in this environment?"
+Apply answers:
+    "What happens when I invoke this procedure with these arguments?"
+*/
+
+class Kontinue {
+    public stack : Term[] = [];
+
+    toString () : string {
+        if (this.stack.length == 0) return '';
+        return ` ^(${this.stack.map((t) => t.toNativeStr()).join(';')})`
+    }
+}
+
+class Halt extends Kontinue {
+    override toString () : string {
+        return `HALT!`+super.toString()
+    }
+}
+
+class Check extends Kontinue {
+    constructor(public args  : Term) { super() }
+    override toString () : string {
+        return `Check[${this.args.toNativeStr()}]`+super.toString()
+    }
+}
+
+class Just extends Kontinue {
+    constructor(public value : Term) { super() }
+    override toString () : string {
+        return `Just[${this.value.toNativeStr()}]`+super.toString()
+    }
+}
+
+class Return extends Kontinue {
+    constructor(public value : Term) { super() }
+    override toString () : string {
+        return `Return[${this.value.toNativeStr()}]`+super.toString()
+    }
+}
+
+class MakePair extends Kontinue {
+    override toString () : string {
+        return `MakePair`+super.toString()
+    }
+}
+
+class MakeCons extends Kontinue {
+    override toString () : string {
+        return `MakeCons`+super.toString()
+    }
+}
+
+class Eval extends Kontinue {}
+
+class EvalExpr extends Eval {
+    constructor(public expr : Term) { super() }
+    override toString () : string {
+        return `EvalExpr[${this.expr.toNativeStr()}]`+super.toString()
+    }
+}
+
+class EvalPair  extends Eval {
+    constructor(public pair  : Pair) { super() }
+    override toString () : string {
+        return `EvalPair[${this.pair.toNativeStr()}]`+super.toString()
+    }
+}
+
+class EvalPairFirst  extends Eval {
+    constructor(public first  : Term) { super() }
+    override toString () : string {
+        return `EvalPairFirst[${this.first.toNativeStr()}]`+super.toString()
+    }
+}
+
+class EvalPairSecond extends Eval {
+    constructor(public second : Term) { super() }
+    override toString () : string {
+        return `EvalPairSecond[${this.second.toNativeStr()}]`+super.toString()
+    }
+}
+
+class EvalCons  extends Eval {
+    constructor(public cons  : Cons) { super() }
+    override toString () : string {
+        return `EvalCons[${this.cons.toNativeStr()}]`+super.toString()
+    }
+}
+
+class EvalConsHead   extends Eval {
+    constructor(public head   : Term) { super() }
+    override toString () : string {
+        return `EvalConsHead[${this.head.toNativeStr()}]`+super.toString()
+    }
+}
+
+class EvalConsTail   extends Eval {
+    constructor(public tail   : Term) { super() }
+    override toString () : string {
+        return `EvalConsTail[${this.tail.toNativeStr()}]`+super.toString()
+    }
+}
+
+
+class Apply extends Kontinue {}
+
+class ApplyOperative extends Apply {
+    constructor(
+        public call : Operative,
+        public args : Term,
+    ) { super() }
+
+    override toString () : string {
+        return `ApplyOperative[${this.call.toNativeStr()} ${this.args.toNativeStr()}]`+super.toString()
+    }
+}
+
+class ApplyApplicative extends Apply {
+    constructor(public call : Applicative) { super() }
+
+    override toString () : string {
+        return `ApplyApplicative[${this.call.toNativeStr()}]`+super.toString()
+    }
+}
 
 
 function step (expr : Term, env : Environment) : any {
-    let stack = [];
-    let kont  = evaluateTerm(expr, env);
+
+    const evaluateTerm = (expr : Term, env : Environment) : Kontinue => {
+        console.log('@@ EVALUATE','@'.repeat(68));
+        console.log(`%ENV ${env.toNativeStr()}`);
+        console.log(`EXPR ${expr.toNativeStr()}`);
+        console.log('.'.repeat(80));
+        switch (expr.constructor) {
+        case Nil    :
+        case Num    :
+        case Str    :
+        case Bool   :
+        case Native :
+        case FExpr  : return new Just(expr);
+        case Sym    : return new Just(env.lookup( expr as Sym ));
+        case Lambda : return new Just(new Closure( expr as Lambda, env.derive() ));
+        case Pair   : return new EvalPair( expr as Pair );
+        case Cons   : return new EvalCons( expr as Cons );
+        default:
+            throw new Error(`Unrecognized Expression ${expr.constructor.name}`);
+        }
+    }
+
+    const returnValues = (kont : Kontinue[], ...values : Term[]) : void => {
+        if (kont.length == 0)
+            throw new Error(`Cannot return value ${values.map((v) => v.toNativeStr()).join(', ')} without continuation`);
+        let top = (kont.at(-1) as Kontinue);
+        top.stack.push( ...values );
+    }
+
+    let kont = [
+        new Halt(),
+        new EvalExpr(expr),
+    ];
 
     console.log('^^ STEP','^'.repeat(72));
-    console.log(`EXPR ${expr.toNativeStr()}`);
     console.log(`%ENV ${env.toNativeStr()}`);
-    console.log(`KONT `, kont);
+    console.log(`KONT\n `, kont.map((k) => k.toString()).join("\n  "));
     console.log('='.repeat(80));
 
     while (kont.length > 0) {
-        let k = kont.pop() as Kontinuation;
+        let k = kont.pop() as Kontinue;
         console.log('TICK','='.repeat(75));
-        console.log(`K =>> `, k);
-        console.log(`STACK `, stack);
+        console.log(`   K =>> `, k.toString());
         console.log('-'.repeat(80));
-        console.group('...');
-        switch (k.mode) {
-        case 'EVAL':
-            switch (k.op) {
-            case 'JUST':
-                if (kont.length == 0) return [ k.value, ...stack ];
-                stack.push(k.value);
+        console.group('..!');
+        switch (k.constructor) {
+        // ---------------------------------------------------------------------
+        case Halt:
+            return [ ...k.stack ];
+        // ---------------------------------------------------------------------
+        case Just:
+            returnValues( kont, (k as Just).value );
+            break;
+        case Return:
+            returnValues( kont, (k as Return).value );
+            break;
+        // ---------------------------------------------------------------------
+        case EvalExpr:
+            kont.push( evaluateTerm( (k as EvalExpr).expr, env ) );
+            break;
+        // ---------------------------------------------------------------------
+        case EvalPair:
+            let pair  = (k as EvalPair).pair;
+            kont.push(
+                new EvalPairSecond( pair.second ),
+                evaluateTerm( pair.first, env ),
+            );
+            break;
+        case EvalPairSecond:
+            let second = evaluateTerm( (k as EvalPairSecond).second, env );
+            let efirst = k.stack.pop() as Term;
+            let mkPair = new MakePair();
+            mkPair.stack.push(efirst);
+            kont.push( mkPair, second );
+            break;
+        case MakePair:
+            let snd = k.stack.pop();
+            let fst = k.stack.pop();
+            if (fst == undefined) throw new Error('Expected fst on stack');
+            if (snd == undefined) throw new Error('Expected snd on stack');
+            kont.push(new Return(new Pair( fst as Term, snd as Term )));
+            break;
+        // ---------------------------------------------------------------------
+        case EvalCons:
+            let cons  = (k as EvalCons).cons;
+            let check = new Check( cons.tail );
+            kont.push( check, evaluateTerm( cons.head, env ) );
+            break;
+        case EvalConsTail:
+            let tail = (k as EvalConsTail).tail;
+            if (tail instanceof Nil) {
+                console.log("*************** GOT NIL ************************");
                 break;
-            case 'PAIR/first':
-                kont.push(...evaluateTerm( k.first, env ));
-                break;
-            case 'PAIR/second':
-                kont.push(...evaluateTerm( k.second, env ));
-                break;
-            case 'PAIR/build':
-                let snd = stack.pop();
-                let fst = stack.pop();
-                if (fst == undefined) throw new Error('Expected fst on stack');
-                if (snd == undefined) throw new Error('Expected snd on stack');
-                kont.push({
-                    mode  : 'EVAL',
-                    op    : 'JUST',
-                    value : new Pair( fst as Term, snd as Term )
-                });
-                break;
-            case 'CONS/head':
-                kont.push(...evaluateTerm( k.head, env ));
-                break;
-            case 'CONS/tail':
-                if (k.tail instanceof Nil) break;
-                let args = (k.tail as Cons).toNativeArray();
-                kont.push(...(args.flatMap((arg) => evaluateTerm( arg, env ))));
-                break;
-            case 'CONS/apply':
-                let call = stack.pop();
-                if (call == undefined) throw new Error('Expected call on stack');
-                if (call instanceof Operative) {
-                    kont.push({
-                        mode : 'APPLY',
-                        op   : 'OPERATIVE',
-                        call : (call as FExpr),
-                        args : k.args
-                    });
-                }
-                else if (call instanceof Applicative) {
-                    kont.push(
-                        { mode : 'APPLY', op : 'APPLICATIVE', call : (call as Closure) },
-                        { mode : 'EVAL',  op : 'CONS/tail',   tail : k.args }
-                    );
-                }
-                else {
-                    throw new Error(`What to do with call -> ${call.constructor.name}??`);
-                }
-                break;
-            default:
-                throw new Error(`Unknown EVAL op ${JSON.stringify(k)}`);
+            }
+
+            if (!((tail as Cons).tail instanceof Nil)) {
+                kont.push( new EvalConsTail( (tail as Cons).tail ) );
+            }
+
+            let evaled = k.stack.pop();
+            if (evaled != undefined) {
+                returnValues( kont, evaled );
+            }
+
+            kont.push( evaluateTerm( (tail as Cons).head, env ) );
+            break;
+        // ---------------------------------------------------------------------
+        case Check:
+            let call = k.stack.pop();
+            if (call == undefined) throw new Error('Expected call on stack');
+            if (call instanceof Operative) {
+                kont.push(new ApplyOperative( (call as FExpr), (k as Check).args ));
+            }
+            else if (call instanceof Applicative) {
+                kont.push(
+                    new ApplyApplicative( (call as Closure) ),
+                    new EvalConsTail( (k as Check).args )
+                );
+            }
+            else {
+                throw new Error(`What to do with call -> ${call.constructor.name}??`);
             }
             break;
-        case 'APPLY':
-            switch (k.op) {
-            case 'OPERATIVE':
+        // ---------------------------------------------------------------------
+        case ApplyOperative:
+            throw new Error('OPERATIVE!');
+        case ApplyApplicative:
+            switch ((k as ApplyApplicative).call.constructor) {
+            case Native:
+                kont.push(new Return(
+                    ((k as ApplyApplicative).call as Native)
+                        .body(k.stack, env)
+                ));
                 break;
-            case 'APPLICATIVE':
-                switch (k.call.constructor) {
-                case Native:
-                    kont.push({
-                        mode  : 'EVAL',
-                        op    : 'JUST',
-                        value : (k.call as Native).body(stack.splice(0), env),
-                    });
-                    break;
-                case Closure:
-                    throw new Error('TODO!');
-                }
-                break;
-            default:
-                throw new Error(`Unknown APPLY op ${JSON.stringify(k)}`);
+            case Closure:
+                throw new Error('TODO!');
             }
             break;
         default:
-            throw new Error(`Unknown mode ${JSON.stringify(k)}`);
+            throw new Error(`Unknown APPLY op ${JSON.stringify(k)}`);
         }
         console.groupEnd();
         console.log('/'.repeat(80));
-        console.log(`KONT `, kont);
+        console.log(`KONT\n `, kont.map((k) => k.toString()).join("\n  "));
         console.log('='.repeat(80));
     }
 
     return true;
 }
 
-function evaluateTerm (expr : Term, env : Environment) : Term | Kontinuation[] {
-    console.log('@@ EVALUATE','@'.repeat(68));
-    console.log(`%ENV ${env.toNativeStr()}`);
-    console.log(`EXPR ${expr.toNativeStr()}`);
-    console.log('.'.repeat(80));
-    switch (expr.constructor) {
-    case Nil    :
-    case Num    :
-    case Str    :
-    case Bool   :
-    case Native :
-    case FExpr  : return [{ mode : 'EVAL', op : 'JUST', value : expr }];
-    case Sym    : return [{ mode : 'EVAL', op : 'JUST', value : env.lookup( expr as Sym ) }];
-    case Lambda : return [{ mode : 'EVAL', op : 'JUST', value : new Closure( expr as Lambda, env.derive() ) }];
-    case Pair   :
-        return [
-            { mode : 'EVAL', op : 'PAIR/build' },
-            { mode : 'EVAL', op : 'PAIR/second', second : (expr as Pair).second },
-            { mode : 'EVAL', op : 'PAIR/first',   first : (expr as Pair).first  },
-        ];
-    case Cons   :
-        return [
-            { mode : 'EVAL', op : 'CONS/apply', args : (expr as Cons).tail },
-            { mode : 'EVAL', op : 'CONS/head',  head : (expr as Cons).head },
-        ];
-    default:
-        throw new Error(`Unrecognized Expression ${expr.constructor.name}`);
-    }
-}
-
 let program = compile(
     parse(`
-        (+ 10 (* 4 5))
+        ( "foo" : (+ (/ 20 2) (* 4 5)))
     `)
 );
 
@@ -572,7 +719,25 @@ console.log("RESULT", result);
 console.log("RESULT", (result[0] as Term).toNativeStr());
 
 
+
 /*
+
+type Kontinuation =
+    | { mode : 'EVAL',  op : 'JUST',        value  : Term }
+    | { mode : 'EVAL',  op : 'RETURN',      value  : Term }
+    | { mode : 'EVAL',  op : 'PAIR/first',  first  : Term }
+    | { mode : 'EVAL',  op : 'PAIR/second', second : Term }
+    | { mode : 'EVAL',  op : 'PAIR/build' }
+    | { mode : 'EVAL',  op : 'CONS/head',   head   : Term }
+    | { mode : 'EVAL',  op : 'CONS/tail',   tail   : Term }
+    | { mode : 'EVAL',  op : 'CONS/apply',  args   : Term }
+    | { mode : 'APPLY', op : 'OPERATIVE',   call : Operative, args : Term }
+    | { mode : 'APPLY', op : 'APPLICATIVE', call : Applicative }
+
+*/
+
+/*
+
 function evaluate (exprs : Term[], env : Environment) : Term[] {
 
     const evaluateExpr = (expr : Term, env : Environment) : Term => {
