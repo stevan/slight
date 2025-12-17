@@ -817,23 +817,17 @@ export function run (program : Term[]) : State[] {
         return [ [], stepEnv, kont, stepNum, tick ];
     }
 
-    // run the program statements
-    // and collect the results
-    let results : State[] = [];
-
+    // ... program
     console.log("PROGRAM:\n ", program.map((e) => e.toNativeStr()).join("\n  "));
 
-    let env = ROOT_ENV.capture(); // start with a fresh one!
+    // and collect the results
+    let results : State[] = [];
+    // start with a fresh one!
+    let env = ROOT_ENV.capture();
+
+    // run the program
     program.forEach((expr, i) => {
         let state = step( expr, env, [ new Halt(env) ], i );
-
-        //let [ stack, Senv, Skont ] = state;
-        //console.log('!!!!!!!!!!!!', [
-        //    `STACK : ${stack.map((t) => t.toNativeStr()).join(', ')}`,
-        //    `ENV : ${Senv.toNativeStr()}`,
-        //    `KONT :\n  ${Skont.map((k) => k.toString()).join("\n  ")}`,
-        //]);
-
         results.push(state);
         // thread environment through
         env = state[1] as Environment;
@@ -842,8 +836,7 @@ export function run (program : Term[]) : State[] {
     console.log('='.repeat(80));
     console.log(`The End`);
     console.log('='.repeat(80));
-
-   console.log("RESULT(s):\n ", results.map((state) => {
+    console.log("RESULT(s):\n ", results.map((state) => {
         let [ stack, env, kont, stepNum, tick ] = state;
         return [
             `STEP[${stepNum.toString().padStart(3, '0')}]+TICK[${tick.toString().padStart(3, '0')}] =>`,
@@ -853,7 +846,7 @@ export function run (program : Term[]) : State[] {
         ].join(' ')
     }).join("\n  "));
 
-    // return the array of State objects
+    // return the results
     return results;
 }
 
