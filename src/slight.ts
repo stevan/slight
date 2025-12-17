@@ -257,11 +257,20 @@ class Environment extends Term {
     }
 
     capture () : Environment {
+        // XXX - consider passing in the lambda
+        // and looking for free variables that
+        // need capturing, not sure if it actually
+        // matters, but we could do it.
         return new Environment( this.scope, this.view );
     }
 
     derive (params : Sym[], args : Term[]) : Environment {
         if (params.length != args.length) throw new Error(`Not Enough args!`);
+
+        // TODO - don't define() it all, but
+        // create a custom param/bind Scope
+        // function similar to how builtins
+        // are handled.
 
         let local = new Environment( this.scope, this.view );
         for (let i = 0; i < params.length; i++) {
@@ -757,6 +766,7 @@ let program = compile(
 
 console.log(program.map((e) => e.toNativeStr()).join("\n"));
 
-let result = run(program, env);
-console.log("RESULT", result);
+let [ stacks, envs ] = run(program, env);
+console.log("RESULT", stacks.flatMap((s) => s.map((t) => t.toNativeStr())));
+console.log("ENVS",   envs.map((e) => e.toNativeStr()));
 
