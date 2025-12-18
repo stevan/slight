@@ -68,7 +68,7 @@ abstract class Term {
 // -----------------------------------------------------------------------------
 
 export class Nil extends Term {
-    override toNativeStr () : string { return 'nil' }
+    override toNativeStr () : string { return '()' }
 }
 
 export class Bool extends Term {
@@ -334,19 +334,6 @@ export function compile (expr : Term[]) : Term[] {
             }
         }
 
-        if (rest[0] instanceof Sym) {
-            switch (rest[0].ident) {
-            case 'lambda':
-                let params = rest[1];
-                let body   = rest[2];
-                if (!(params instanceof Cons))
-                    throw new Error(`Lambda params must be a Cons not ${params.constructor}`);
-                return new Lambda( params, compileExpression( body ) );
-            default:
-                // let it fall through
-            }
-        }
-
         // handle different list types ...
         if (rest.every((p) => p instanceof Pair)) {
             return new PairList( rest );
@@ -583,10 +570,10 @@ class EvalConsTail   extends Eval {
 
 // call procedures
 
-class CallProc extends Kontinue {
+class ApplyExpr extends Kontinue {
     constructor(public args  : Term, env : Environment) { super(env) }
     override toString () : string {
-        return `CallProc[${this.args.toNativeStr()}]`+super.toString()
+        return `ApplyExpr[${this.args.toNativeStr()}]`+super.toString()
     }
 }
 
@@ -655,16 +642,32 @@ export const ROOT_ENV = new Environment((query : Sym) : Term => {
     case 'list' :
         return new Native('list', (args, env) => new Cons(args));
 
+    case 'lambda' :
+        return new FExpr('lambda', (args, env) => {
+            let [ params, body ] = args;
+            return [
+                new Return(
+                    new Closure(
+                        new Lambda(
+                            params as Cons,
+                            body
+                        ),
+                        env.capture()
+                    ),
+                    env
+                )
+            ]
+        });
 
     case 'define' :
         return new FExpr('define', (args, env) => {
             let [ name, body ] = args;
+            //env.define( name as Sym, body );
             return [
                 new Definition( name as Sym, env ),
                 new EvalExpr( body, env ),
             ]
-        })
-
+        });
     default:
         throw new Error(`Unable to find ${query.ident} in Scope`);
     }
@@ -706,7 +709,6 @@ export function run (program : Term[]) : State[] {
         case Native :
         case FExpr  : return new Return(expr, env);
         case Sym    : return new Return(env.lookup( expr as Sym ), env);
-        case Lambda : return new Return(new Closure( expr as Lambda, env.capture() ), env);
         case Pair   : return new EvalPair( expr as Pair, env );
         case Cons   : return new EvalCons( expr as Cons, env );
         default:
@@ -802,7 +804,7 @@ export function run (program : Term[]) : State[] {
             // ---------------------------------------------------------------------
             case EvalCons:
                 let cons  = (k as EvalCons).cons;
-                let check = new CallProc( cons.tail, (k as Kontinue).env );
+                let check = new ApplyExpr( cons.tail, (k as Kontinue).env );
                 kont.push( check, evaluateTerm( cons.head, (k as Kontinue).env ) );
                 break;
             case EvalConsTail:
@@ -823,16 +825,16 @@ export function run (program : Term[]) : State[] {
             // ---------------------------------------------------------------------
             // Handle function calls
             // ---------------------------------------------------------------------
-            case CallProc:
+            case ApplyExpr:
                 let call = k.stack.pop();
                 if (call == undefined) throw new Error('Expected call on stack');
                 if (call instanceof Operative) {
-                    kont.push(new ApplyOperative( (call as FExpr), (k as CallProc).args, (k as Kontinue).env ));
+                    kont.push(new ApplyOperative( (call as FExpr), (k as ApplyExpr).args, (k as Kontinue).env ));
                 }
                 else if (call instanceof Applicative) {
                     kont.push(
                         new ApplyApplicative( (call as Closure), (k as Kontinue).env ),
-                        new EvalConsTail( (k as CallProc).args, (k as Kontinue).env )
+                        new EvalConsTail( (k as ApplyExpr).args, (k as Kontinue).env )
                     );
                 }
                 else {

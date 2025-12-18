@@ -8,10 +8,7 @@ import {
 
 
 let program = compile(parse(`
-    (define add (lambda (x y) (+ x y)))
-    (define adder (lambda (x) (lambda (y) (add x y))))
-
-    ((adder 10) 20)
+    (lambda (x) (+ x x))
 `));
 
 let results = run(program);
