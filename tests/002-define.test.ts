@@ -8,8 +8,8 @@ import {
 
 
 let program = compile(parse(`
-    (define add (lambda (x y) (+ x y)))
-    (define adder (lambda (x) (lambda (y) (add x y))))
+    (def add (lambda (x y) (+ x y)))
+    (def adder (lambda (x) (lambda (y) (add x y))))
 
     (add 10 20)
     ((adder 10) 20)

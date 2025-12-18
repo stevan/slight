@@ -199,41 +199,26 @@ export class PairList extends List<Pair> {
 
 // -----------------------------------------------------------------------------
 
-export class Lambda extends Term {
-    public params : Cons;
-    public body   : Term;
-
-    constructor (params : Cons, body : Term) {
-        super();
-        this.params = params;
-        this.body   = body;
-    }
-
-    override toNativeStr () : string {
-        return `(λ ${this.params.toNativeStr()} ${this.body.toNativeStr()})`
-    }
-}
-
-// -----------------------------------------------------------------------------
-
 type NativeFunc  = (params : Term[], env : Environment) => Term;
 type NativeFExpr = (params : Term[], env : Environment) => Kontinue[];
 
 abstract class Applicative extends Term {}
 abstract class Operative   extends Term {}
 
-export class Closure extends Applicative {
-    public lambda : Lambda;
+export class Lambda extends Applicative {
+    public params : Cons;
+    public body   : Term;
     public env    : Environment;
 
-    constructor (lambda : Lambda, env : Environment) {
+    constructor (params : Cons, body : Term, env : Environment) {
         super();
-        this.lambda = lambda;
+        this.params = params;
+        this.body   = body;
         this.env    = env;
     }
 
     override toNativeStr () : string {
-        return `<${this.lambda.toNativeStr()}>`
+        return `(λ ${this.params.toNativeStr()} ${this.body.toNativeStr()} ${this.env.toNativeStr()})`
     }
 }
 
@@ -639,35 +624,29 @@ export const ROOT_ENV = new Environment((query : Sym) : Term => {
     case 'eq' : return new Native('eq',   liftStrCompareOp((n, m) => n == m));
     case 'ne' : return new Native('ne',   liftStrCompareOp((n, m) => n != m));
 
-    case 'list' :
-        return new Native('list', (args, env) => new Cons(args));
+    case 'list' : return new Native('list', (args, env) => new Cons(args));
 
-    case 'lambda' :
-        return new FExpr('lambda', (args, env) => {
-            let [ params, body ] = args;
-            return [
-                new Return(
-                    new Closure(
-                        new Lambda(
-                            params as Cons,
-                            body
-                        ),
-                        env.capture()
-                    ),
-                    env
-                )
-            ]
-        });
 
-    case 'define' :
-        return new FExpr('define', (args, env) => {
-            let [ name, body ] = args;
-            //env.define( name as Sym, body );
-            return [
-                new Definition( name as Sym, env ),
-                new EvalExpr( body, env ),
-            ]
-        });
+    // Special Forms ...
+
+    case 'lambda' : return new FExpr('lambda', (args, env) => {
+        let [ params, body ] = args;
+        return [
+            new Return(
+                new Lambda( params as Cons, body, env.capture() ),
+                env
+            )
+        ]
+    });
+
+    case 'def' : return new FExpr('define', (args, env) => {
+        let [ name, body ] = args;
+        //env.define( name as Sym, body );
+        return [
+            new Definition( name as Sym, env ),
+            new EvalExpr( body, env ),
+        ]
+    });
     default:
         throw new Error(`Unable to find ${query.ident} in Scope`);
     }
@@ -707,7 +686,8 @@ export function run (program : Term[]) : State[] {
         case Str    :
         case Bool   :
         case Native :
-        case FExpr  : return new Return(expr, env);
+        case FExpr  :
+        case Lambda : return new Return(expr, env);
         case Sym    : return new Return(env.lookup( expr as Sym ), env);
         case Pair   : return new EvalPair( expr as Pair, env );
         case Cons   : return new EvalCons( expr as Cons, env );
@@ -833,7 +813,7 @@ export function run (program : Term[]) : State[] {
                 }
                 else if (call instanceof Applicative) {
                     kont.push(
-                        new ApplyApplicative( (call as Closure), (k as Kontinue).env ),
+                        new ApplyApplicative( (call as Applicative), (k as Kontinue).env ),
                         new EvalConsTail( (k as ApplyExpr).args, (k as Kontinue).env )
                     );
                 }
@@ -865,10 +845,9 @@ export function run (program : Term[]) : State[] {
                         (k as Kontinue).env
                     ));
                     break;
-                case Closure:
-                    let closure = (k as ApplyApplicative).call as Closure;
-                    let lambda  = closure.lambda;
-                    let local   = closure.env;
+                case Lambda:
+                    let lambda  = (k as ApplyApplicative).call as Lambda;
+                    let local   = lambda.env;
 
                     let params  = lambda.params.toNativeArray();
                     let args    = k.stack;
