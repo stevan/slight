@@ -706,11 +706,10 @@ export function run (program : Term[]) : State[] {
     }
 
     // the step function ... !!!
-    const step = (stepExpr : Term, stepEnv : Environment, kont : Kontinue[], stepNum : number = 0) : State => {
-        kont.push( new EvalExpr( stepExpr, stepEnv ) );
+    const step() = (stepEnv : Environment, kont : Kontinue[], stepNum : number = 0) : State => {
 
         HEADER(GREEN, `STEP[${stepNum}]`, '=');
-        LOG(GREEN, `EVAL : ${stepExpr.toNativeStr()} + ${stepEnv.toNativeStr()}`);
+        LOG(GREEN, `EVAL in ${stepEnv.toNativeStr()}`);
         if (kont.length == 0) {
             LOG(GREY, `KONT : ~`);
         }
@@ -884,23 +883,41 @@ export function run (program : Term[]) : State[] {
     let env = ROOT_ENV.capture();
 
     // run the program
-    program.forEach((expr, i) => {
-        let state = step( expr, env, [ new EndStatement(env) ], i );
-        results.push(state);
-        // thread environment through
-        env = state[1] as Environment;
-    });
+    let result = step(
+        env,
+        [ ...program.map((expr) => new EvalExpr(expr, env)), new Halt(env) ].reverse()
+    );
 
     HEADER(ORANGE, `RESULT(s)`, '=');
-    LOG(ORANGE, results.map((state) => {
-        let [ stack, env, kont, stepNum, tick ] = state;
-        return [
+    if (result != undefined) {
+        let [ stack, env, kont, stepNum, tick ] = result;
+        LOG(ORANGE, [
             `STEP[${stepNum.toString().padStart(3, '0')}]+TICK[${tick.toString().padStart(3, '0')}] =>`,
             `STACK : ${stack.map((t) => t.toNativeStr()).join(', ')};`,
             `ENV : ${env.toNativeStr()};`,
             `KONT : [${kont.map((k) => k.toString()).join(', ')}]`,
-        ].join(' ')
-    }).join("\n"));
+        ].join(' '));
+    } else {
+        throw new Error('Expected result from step, got undefined')
+    }
+
+    //program.forEach((expr, i) => {
+    //    let state = step( expr, env, [ new EndStatement(env) ], i );
+    //    results.push(state);
+    //    // thread environment through
+    //    env = state[1] as Environment;
+    //});
+
+    //HEADER(ORANGE, `RESULT(s)`, '=');
+    //LOG(ORANGE, results.map((state) => {
+    //    let [ stack, env, kont, stepNum, tick ] = state;
+    //    return [
+    //        `STEP[${stepNum.toString().padStart(3, '0')}]+TICK[${tick.toString().padStart(3, '0')}] =>`,
+    //        `STACK : ${stack.map((t) => t.toNativeStr()).join(', ')};`,
+    //        `ENV : ${env.toNativeStr()};`,
+    //        `KONT : [${kont.map((k) => k.toString()).join(', ')}]`,
+    //    ].join(' ')
+    //}).join("\n"));
     FOOTER(ORANGE, '=');
 
     // return the results
