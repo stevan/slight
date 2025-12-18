@@ -8,7 +8,9 @@ import {
 
 
 let program = compile(parse(`
-    (lambda (x) (+ x x))
+    (list
+        (+ 10 20)
+        (* 10 20))
 `));
 
 let results = run(program);

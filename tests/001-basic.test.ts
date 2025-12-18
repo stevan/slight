@@ -27,7 +27,7 @@ let results = program.map((expr) => run([expr]));
 console.group('Testing results ...');
 let tests = 0;
 results.forEach((state) => {
-    let [ stack, env, kont, stepNum, tick ] = state;
+    let [ stack, env, kont, tick ] = state;
     if (stack[0] == undefined) throw new Error('Expected Num(30), got undefined');
     if (!(stack[0] instanceof Num)) throw new Error(`Expected Num(30), got ${stack[0]}`);
     if ((stack[0] as Num).value != 30) {

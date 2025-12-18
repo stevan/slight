@@ -671,7 +671,7 @@ export const ROOT_ENV = new Environment((query : Sym) : Term => {
 // everything that is going on.
 // -----------------------------------------------------------------------------
 
-export type State = [ Term[], Environment, Kontinue[], number, number ];
+export type State = [ Term[], Environment, Kontinue[], number ];
 
 export function run (program : Term[]) : State {
 
@@ -706,10 +706,9 @@ export function run (program : Term[]) : State {
     }
 
     // the step function ... !!!
-    const step = (stepEnv : Environment, kont : Kontinue[], stepNum : number = 0) : State => {
-
-        HEADER(GREEN, `STEP[${stepNum}]`, '=');
-        LOG(GREEN, `EVAL in ${stepEnv.toNativeStr()}`);
+    const execute = (startEnv : Environment, kont : Kontinue[]) : State => {
+        HEADER(GREEN, `START`, '=');
+        LOG(GREEN, `EVAL in ${startEnv.toNativeStr()}`);
         if (kont.length == 0) {
             LOG(GREY, `KONT : ~`);
         }
@@ -723,7 +722,7 @@ export function run (program : Term[]) : State {
         while (kont.length > 0) {
             tick++;
             let k = kont.pop() as Kontinue;
-            HEADER(PURPLE, `TICK(${tick})`, '-');
+            HEADER(PURPLE, `STEP(${tick})`, '-');
             LOG(RED, `=> K : `, k.toString());
             switch (k.constructor) {
             // ---------------------------------------------------------------------
@@ -731,7 +730,7 @@ export function run (program : Term[]) : State {
             // ---------------------------------------------------------------------
             case Halt:
                 HEADER(YELLOW, `Halt`, '_');
-                return [ k.stack, (k as Kontinue).env, kont, stepNum, tick ];
+                return [ k.stack, (k as Kontinue).env, kont, tick ];
             // ---------------------------------------------------------------------
             // This is for defining things in the environment
             // ---------------------------------------------------------------------
@@ -869,7 +868,7 @@ export function run (program : Term[]) : State {
         }
 
         // should never happen
-        return [ [], stepEnv, kont, stepNum, tick ];
+        return [ [], startEnv, kont, tick ];
     }
 
     // ... program
@@ -879,19 +878,21 @@ export function run (program : Term[]) : State {
 
     // start with a fresh one!
     let env = ROOT_ENV.capture();
+    // compile all the expressions
+    // and add a Halt at the end
+    let kont = [
+        ...program.map((expr) => new EvalExpr(expr, env)),
+        new Halt(env)
+    ].reverse();
 
-    // run the program
-    // and collect the results
-    let results = step(
-        env,
-        [ ...program.map((expr) => new EvalExpr(expr, env)), new Halt(env) ].reverse()
-    );
+    // run the program and collect the results
+    let results = execute(env, kont);
 
     HEADER(ORANGE, `RESULT(s)`, '=');
     if (results != undefined) {
-        let [ stack, env, kont, stepNum, tick ] = results;
+        let [ stack, env, kont, tick ] = results;
         LOG(ORANGE, [
-            `STEP[${stepNum.toString().padStart(3, '0')}]+TICK[${tick.toString().padStart(3, '0')}] =>`,
+            `STEPS[${tick.toString().padStart(3, '0')}] =>`,
             `STACK : ${stack.map((t) => t.toNativeStr()).join(', ')};`,
             `ENV : ${env.toNativeStr()};`,
             `KONT : [${kont.map((k) => k.toString()).join(', ')}]`,
@@ -900,25 +901,6 @@ export function run (program : Term[]) : State {
         throw new Error('Expected result from step, got undefined')
     }
     FOOTER(ORANGE, '=');
-
-    //let results : State[] = [];
-    //program.forEach((expr, i) => {
-    //    let state = step( expr, env, [ new EndStatement(env) ], i );
-    //    results.push(state);
-    //    // thread environment through
-    //    env = state[1] as Environment;
-    //});
-    //HEADER(ORANGE, `RESULT(s)`, '=');
-    //LOG(ORANGE, results.map((state) => {
-    //    let [ stack, env, kont, stepNum, tick ] = state;
-    //    return [
-    //        `STEP[${stepNum.toString().padStart(3, '0')}]+TICK[${tick.toString().padStart(3, '0')}] =>`,
-    //        `STACK : ${stack.map((t) => t.toNativeStr()).join(', ')};`,
-    //        `ENV : ${env.toNativeStr()};`,
-    //        `KONT : [${kont.map((k) => k.toString()).join(', ')}]`,
-    //    ].join(' ')
-    //}).join("\n"));
-    //FOOTER(ORANGE, '=');
 
     return results;
 }

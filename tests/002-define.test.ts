@@ -18,7 +18,7 @@ let program = compile(parse(`
 let results = run(program);
 
 console.group('Testing results ...');
-let [ stack, env, kont, stepNum, tick ] = results;
+let [ stack, env, kont, tick ] = results;
 if (stack[0] == undefined) throw new Error('Expected Num(30), got undefined');
 if (!(stack[0] instanceof Num)) throw new Error(`Expected Num(30), got ${stack[0]}`);
 if ((stack[0] as Num).value != 30) {
