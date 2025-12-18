@@ -1,8 +1,59 @@
 
 import * as util from 'node:util';
+import { Console } from 'console';
 
-const OCL = console.log;
-console.log = (...as) => OCL(...as.map((a) => String(a) ? a : util.inspect(a,{depth:null,colors:true})));
+export const DEBUG      = process.env['DEBUG'] == "1" ? true : false
+export const TERM_WIDTH = process.stdout.columns;
+export const MAX_WIDTH  = TERM_WIDTH - 1
+
+const INSPECT_OPTIONS = {
+    depth       : 20,
+    sorted      : true,
+    breakLength : TERM_WIDTH,
+    colors      : true,
+}
+
+export const Logger = new Console({
+    stdout         : process.stdout,
+    stderr         : process.stderr,
+    inspectOptions : INSPECT_OPTIONS,
+})
+
+export const Dumper = new Console({
+    stdout           : process.stdout,
+    stderr           : process.stderr,
+    inspectOptions   : {
+        sorted       : true,
+        compact      : false,
+        breakLength  : TERM_WIDTH,
+        depth        : TERM_WIDTH,
+        colors       : true,
+    },
+    groupIndentation : 4,
+});
+
+export const ESC    = '\u001B[';
+export const RESET  = ESC + '0m';
+export const GREEN  = ESC + '38;2;20;200;20;m';
+export const RED    = ESC + '38;2;250;50;50;m';
+export const ORANGE = ESC + '38;2;255;150;0;m';
+export const YELLOW = ESC + '38;2;255;250;0;m';
+export const BLUE   = ESC + '38;2;70;100;255;m';
+export const PURPLE = ESC + '38;2;150;30;150;m';
+export const GREY   = ESC + '38;2;150;150;200;m';
+
+type ANSIColor = string
+
+export const HEADER = (color : ANSIColor, label : string, character : string, width : number = MAX_WIDTH) : void =>
+    Logger.log(`${color}${character.repeat(2)} ${label} ${character.repeat( width - (label.length + 4) )}${RESET}`);
+
+export const FOOTER = (color : ANSIColor, character : string, width : number = MAX_WIDTH) : void =>
+    Logger.log(color+character.repeat(width)+RESET);
+
+export function LOG (color : ANSIColor, ...args : any[]) : void {
+    if (DEBUG) return;
+    Logger.log(...(args.map((a) => typeof a === 'string' ? (color+a+RESET) : util.inspect(a,INSPECT_OPTIONS))));
+}
 
 // -----------------------------------------------------------------------------
 // Runtime
@@ -61,7 +112,7 @@ export class Sym  extends Term {
         this.ident = ident;
     }
 
-    override toNativeStr () : string { return '`'+this.ident }
+    override toNativeStr () : string { return this.ident }
 }
 
 // -----------------------------------------------------------------------------
@@ -159,14 +210,14 @@ export class Lambda extends Term {
     }
 
     override toNativeStr () : string {
-        return `(lambda ${this.params.toNativeStr()} ${this.body.toNativeStr()})`
+        return `(λ ${this.params.toNativeStr()} ${this.body.toNativeStr()})`
     }
 }
 
 // -----------------------------------------------------------------------------
 
 type NativeFunc  = (params : Term[], env : Environment) => Term;
-type NativeFExpr = (params : Term[], env : Environment) => Term;
+type NativeFExpr = (params : Term[], env : Environment) => Kontinue[];
 
 abstract class Applicative extends Term {}
 abstract class Operative   extends Term {}
@@ -182,7 +233,7 @@ export class Closure extends Applicative {
     }
 
     override toNativeStr () : string {
-        return `{ ${this.lambda.toNativeStr()} @ ${this.env.toNativeStr()} }`
+        return `<${this.lambda.toNativeStr()}>`
     }
 }
 
@@ -330,10 +381,10 @@ export class Environment extends Term {
 
     define (name : Sym, value : Term) : void {
         let upper = this.scope;
+        LOG(YELLOW, ` ~ define(${name.toNativeStr()}) => ${this.view || '~{}'}`);
         this.view += `${name.toNativeStr()} : ${value.toNativeStr()}, `;
-        console.log(` ~ define := ${this.view}`);
         this.scope = (query : Sym) : Term => {
-            console.log(` ~ lookup // ${query.toNativeStr()} in scope(${name.toNativeStr()})`);
+            LOG(YELLOW, ` ~ lookup // ${query.toNativeStr()} in scope(${name.toNativeStr()})`);
             if (query.ident == name.ident) return value;
             return upper(query);
         };
@@ -429,11 +480,31 @@ abstract class Kontinue {
 }
 
 // -----------------------------------------------------------------------------
-// Finish the Expression
+// Finish the Program
 
+// NOTE: Currently unused
 class Halt extends Kontinue {
     override toString () : string {
         return `HALT!`+super.toString()
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Finish the Expression
+
+class EndStatement extends Kontinue {
+    override toString () : string {
+        return `EndStatement`+super.toString()
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Definition
+
+class Definition extends Kontinue {
+    constructor(public name : Sym, env : Environment) { super(env) }
+    override toString () : string {
+        return `Definition[${this.name.toNativeStr()}]`+super.toString()
     }
 }
 
@@ -560,7 +631,7 @@ class ApplyApplicative extends Apply {
 // the base environment
 
 export const ROOT_ENV = new Environment((query : Sym) : Term => {
-    console.log(` ~ lookup || ${query.toNativeStr()} in scope(_) `);
+    LOG(YELLOW, ` ~ lookup || ${query.toNativeStr()} in scope(_) `);
     switch (query.ident) {
     case '+'  : return new Native('+',    liftNumBinOp((n, m) => n + m));
     case '-'  : return new Native('-',    liftNumBinOp((n, m) => n - m));
@@ -584,6 +655,16 @@ export const ROOT_ENV = new Environment((query : Sym) : Term => {
     case 'list' :
         return new Native('list', (args, env) => new Cons(args));
 
+
+    case 'define' :
+        return new FExpr('define', (args, env) => {
+            let [ name, body ] = args;
+            return [
+                new Definition( name as Sym, env ),
+                new EvalExpr( body, env ),
+            ]
+        })
+
     default:
         throw new Error(`Unable to find ${query.ident} in Scope`);
     }
@@ -594,7 +675,7 @@ export const ROOT_ENV = new Environment((query : Sym) : Term => {
 // -----------------------------------------------------------------------------
 //
 // currently it is:
-// - the stack of the Halt continuation
+// - the stack of the final continuation
 // - the current Environment
 // - the continuation stack
 // - the step number
@@ -615,9 +696,8 @@ export function run (program : Term[]) : State[] {
     // provides the starting continuation
     // for evaluating any expression
     const evaluateTerm = (expr : Term, env : Environment) : Kontinue => {
-        console.log('.'.repeat(80));
-        console.log(`>> EVAL [ ${expr.toNativeStr()} ] + ENV ${env.toNativeStr()}`);
-        console.log('.'.repeat(80));
+        HEADER(BLUE, `EVAL`, '.');
+        LOG(BLUE, `[ ${expr.toNativeStr()} ] + ENV ${env.toNativeStr()}`);
         switch (expr.constructor) {
         case Nil    :
         case Num    :
@@ -647,33 +727,37 @@ export function run (program : Term[]) : State[] {
     const step = (stepExpr : Term, stepEnv : Environment, kont : Kontinue[], stepNum : number = 0) : State => {
         kont.push( new EvalExpr( stepExpr, stepEnv ) );
 
-        console.log('='.repeat(80));
-        console.group(`STEP[${stepNum}] [ ${stepExpr.toNativeStr()} ] + ENV ${stepEnv.toNativeStr()}`);
+        HEADER(GREEN, `STEP[${stepNum}]`, '=');
+        LOG(GREEN, `EVAL : ${stepExpr.toNativeStr()} + ${stepEnv.toNativeStr()}`);
+        if (kont.length == 0) {
+            LOG(GREY, `KONT : ~`);
+        }
+        else {
+            LOG(GREY, `KONT :\n `, kont.toReversed().map((k) => k.toString()).join("\n  "));
+        }
 
         let tick = 0;
 
+        HEADER(YELLOW, `Begin Statement`, '_');
         while (kont.length > 0) {
             tick++;
             let k = kont.pop() as Kontinue;
-            console.log('-'.repeat(80));
-            console.group(`TICK(${tick})`);
-            console.log(`=> K : `, k.toString());
-            if (kont.length == 0) {
-                console.log(`KONT : ~`);
-            }
-            else {
-                console.log(`KONT :\n `, kont.toReversed().map((k) => k.toString()).join("\n  "));
-            }
+            HEADER(PURPLE, `TICK(${tick})`, '-');
+            LOG(RED, `=> K : `, k.toString());
             switch (k.constructor) {
             // ---------------------------------------------------------------------
             // This is the end of a statement, main exit point
             // ---------------------------------------------------------------------
-            case Halt:
-                console.groupEnd();
-                console.log('-'.repeat(80));
-                console.log(`Halting!`);
-                console.groupEnd();
+            case EndStatement:
+                HEADER(YELLOW, `End Statement`, '_');
                 return [ k.stack, (k as Kontinue).env, kont, stepNum, tick ];
+            // ---------------------------------------------------------------------
+            // This is for defining things in the environment
+            // ---------------------------------------------------------------------
+            case Definition:
+                let body = k.stack.pop() as Term;
+                (k as Kontinue).env.define( (k as Definition).name, body );
+                break;
             // ---------------------------------------------------------------------
             // This is a literal value to be returned to the
             // previous continuation in the stack
@@ -762,11 +846,10 @@ export function run (program : Term[]) : State[] {
             // - the arguments are not evaluated
             // ---------------------------------------------------------------------
             case ApplyOperative:
-                let opResult = ((k as ApplyOperative).call as FExpr).body(
+                kont.push(...((k as ApplyOperative).call as FExpr).body(
                     ((k as ApplyOperative).args as Cons).toNativeArray(),
                     (k as Kontinue).env
-                );
-                kont.push( new Return( opResult, (k as Kontinue).env ) );
+                ));
                 break;
             // ---------------------------------------------------------------------
             // Applicatives, or Lambdas & Native Functions
@@ -796,18 +879,23 @@ export function run (program : Term[]) : State[] {
             default:
                 throw new Error(`Unknown Continuation op ${JSON.stringify(k)}`);
             }
-            console.groupEnd();
-        }
 
-        console.groupEnd();
-        console.log('='.repeat(80));
+            if (kont.length == 0) {
+                LOG(GREY, `KONT : ~`);
+            }
+            else {
+                LOG(GREY, `KONT :\n `, kont.toReversed().map((k) => k.toString()).join("\n  "));
+            }
+        }
 
         // should never happen
         return [ [], stepEnv, kont, stepNum, tick ];
     }
 
     // ... program
-    console.log("PROGRAM:\n ", program.map((e) => e.toNativeStr()).join("\n  "));
+    HEADER(ORANGE, 'PROGRAM', ':');
+    LOG(ORANGE, program.map((e) => e.toNativeStr()).join("\n"));
+    FOOTER(ORANGE, ':');
 
     // and collect the results
     let results : State[] = [];
@@ -816,16 +904,14 @@ export function run (program : Term[]) : State[] {
 
     // run the program
     program.forEach((expr, i) => {
-        let state = step( expr, env, [ new Halt(env) ], i );
+        let state = step( expr, env, [ new EndStatement(env) ], i );
         results.push(state);
         // thread environment through
         env = state[1] as Environment;
     });
 
-    console.log('='.repeat(80));
-    console.log(`The End`);
-    console.log('='.repeat(80));
-    console.log("RESULT(s):\n ", results.map((state) => {
+    HEADER(ORANGE, `RESULT(s)`, '=');
+    LOG(ORANGE, results.map((state) => {
         let [ stack, env, kont, stepNum, tick ] = state;
         return [
             `STEP[${stepNum.toString().padStart(3, '0')}]+TICK[${tick.toString().padStart(3, '0')}] =>`,
@@ -833,7 +919,8 @@ export function run (program : Term[]) : State[] {
             `ENV : ${env.toNativeStr()};`,
             `KONT : [${kont.map((k) => k.toString()).join(', ')}]`,
         ].join(' ')
-    }).join("\n  "));
+    }).join("\n"));
+    FOOTER(ORANGE, '=');
 
     // return the results
     return results;
