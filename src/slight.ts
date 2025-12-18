@@ -673,7 +673,7 @@ export const ROOT_ENV = new Environment((query : Sym) : Term => {
 
 export type State = [ Term[], Environment, Kontinue[], number, number ];
 
-export function run (program : Term[]) : State[] {
+export function run (program : Term[]) : State {
 
     // provides the starting continuation
     // for evaluating any expression
@@ -706,7 +706,7 @@ export function run (program : Term[]) : State[] {
     }
 
     // the step function ... !!!
-    const step() = (stepEnv : Environment, kont : Kontinue[], stepNum : number = 0) : State => {
+    const step = (stepEnv : Environment, kont : Kontinue[], stepNum : number = 0) : State => {
 
         HEADER(GREEN, `STEP[${stepNum}]`, '=');
         LOG(GREEN, `EVAL in ${stepEnv.toNativeStr()}`);
@@ -729,8 +729,8 @@ export function run (program : Term[]) : State[] {
             // ---------------------------------------------------------------------
             // This is the end of a statement, main exit point
             // ---------------------------------------------------------------------
-            case EndStatement:
-                HEADER(YELLOW, `End Statement`, '_');
+            case Halt:
+                HEADER(YELLOW, `Halt`, '_');
                 return [ k.stack, (k as Kontinue).env, kont, stepNum, tick ];
             // ---------------------------------------------------------------------
             // This is for defining things in the environment
@@ -877,20 +877,19 @@ export function run (program : Term[]) : State[] {
     LOG(ORANGE, program.map((e) => e.toNativeStr()).join("\n"));
     FOOTER(ORANGE, ':');
 
-    // and collect the results
-    let results : State[] = [];
     // start with a fresh one!
     let env = ROOT_ENV.capture();
 
     // run the program
-    let result = step(
+    // and collect the results
+    let results = step(
         env,
         [ ...program.map((expr) => new EvalExpr(expr, env)), new Halt(env) ].reverse()
     );
 
     HEADER(ORANGE, `RESULT(s)`, '=');
-    if (result != undefined) {
-        let [ stack, env, kont, stepNum, tick ] = result;
+    if (results != undefined) {
+        let [ stack, env, kont, stepNum, tick ] = results;
         LOG(ORANGE, [
             `STEP[${stepNum.toString().padStart(3, '0')}]+TICK[${tick.toString().padStart(3, '0')}] =>`,
             `STACK : ${stack.map((t) => t.toNativeStr()).join(', ')};`,
@@ -900,14 +899,15 @@ export function run (program : Term[]) : State[] {
     } else {
         throw new Error('Expected result from step, got undefined')
     }
+    FOOTER(ORANGE, '=');
 
+    //let results : State[] = [];
     //program.forEach((expr, i) => {
     //    let state = step( expr, env, [ new EndStatement(env) ], i );
     //    results.push(state);
     //    // thread environment through
     //    env = state[1] as Environment;
     //});
-
     //HEADER(ORANGE, `RESULT(s)`, '=');
     //LOG(ORANGE, results.map((state) => {
     //    let [ stack, env, kont, stepNum, tick ] = state;
@@ -918,9 +918,8 @@ export function run (program : Term[]) : State[] {
     //        `KONT : [${kont.map((k) => k.toString()).join(', ')}]`,
     //    ].join(' ')
     //}).join("\n"));
-    FOOTER(ORANGE, '=');
+    //FOOTER(ORANGE, '=');
 
-    // return the results
     return results;
 }
 

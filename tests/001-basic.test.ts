@@ -21,7 +21,8 @@ let program = compile(parse(`
     (((lambda (x) (lambda (y) (+ x y))) 10) 20)
 `));
 
-let results = run(program);
+// we can do this cause these are isolated expressions
+let results = program.map((expr) => run([expr]));
 
 console.group('Testing results ...');
 let tests = 0;
