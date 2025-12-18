@@ -689,7 +689,7 @@ export const ROOT_ENV = new Environment((query : Sym) : Term => {
 // everything that is going on.
 // -----------------------------------------------------------------------------
 
-type State = [ Term[], Environment, Kontinue[], number, number ];
+export type State = [ Term[], Environment, Kontinue[], number, number ];
 
 export function run (program : Term[]) : State[] {
 
