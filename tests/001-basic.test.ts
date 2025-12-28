@@ -22,6 +22,11 @@ let program = compile(parse(`
     (?: (== 10 10) (+ 10 20) 0)
     (?: (== 10 20) 0 (+ 10 20))
     (?: false 0 (?: false 0 (+ 10 20)))
+    (&& true  30)
+    (|| false 30)
+    (|| false (and true (+ 10 20)))
+    (or (< 10 0) (&& (>= (+ 20 30) 10) (+ 10 20)))
+    (and (not (! (not false))) (or (! true) 30))
 `));
 
 // we can do this cause these are isolated expressions

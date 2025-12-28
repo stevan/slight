@@ -31,13 +31,9 @@ export const ROOT_ENV = new E.Environment((query : C.Sym) : C.Term => {
         return new C.Str( arg.constructor.name );
     });
 
-    // -------------------------------------------------------------------------
-    // predicates
-    // -------------------------------------------------------------------------
-
-    case 'null?' : return new C.Native('null?', (args, env) => {
+    case 'to-string' : return new C.Native('to-string', (args, env) => {
         let [ arg ] = args;
-        return new C.Bool( arg instanceof C.Nil );
+        return new C.Str( arg.toNativeStr() );
     });
 
     // -------------------------------------------------------------------------
@@ -88,6 +84,39 @@ export const ROOT_ENV = new E.Environment((query : C.Sym) : C.Term => {
     // -------------------------------------------------------------------------
     // Special Forms (FExprs)
     // -------------------------------------------------------------------------
+
+    case 'nil' : return new C.Native('nil', (args, env) => new C.Nil());
+
+    case 'not' :
+    case '!'   : return new C.Native('NOT', (args, env) => {
+        let [ arg ] = args;
+        if (!(arg instanceof C.Bool)) throw new Error(`Can only call ! on Bool, not ${arg.constructor.name}`);
+        return new C.Bool( !arg.value );
+    });
+
+    case 'and':
+    case '&&' : return new C.FExpr('AND', (args, env) => {
+        let [ lhs, rhs ] = args;
+        return [
+            K.IfElse( rhs, lhs, env ),
+            K.EvalExpr( lhs, env ),
+        ]
+    });
+
+    case 'or' :
+    case '||' : return new C.FExpr('OR', (args, env) => {
+        let [ lhs, rhs ] = args;
+        return [
+            K.IfElse( lhs, rhs, env ),
+            K.EvalExpr( lhs, env ),
+        ]
+    });
+
+    // TODO:
+    // - abort
+    // - assert
+    // - nil
+    // - and/or/not
 
     case '?:' : return new C.FExpr('?:', (args, env) => {
         let [ cond, ifTrue, ifFalse ] = args;
