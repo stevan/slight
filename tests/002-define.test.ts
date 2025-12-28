@@ -1,12 +1,7 @@
 
-import {
-    Dumper,
-    Num,
-    parse,
-    compile,
-    run,
-} from '../src/slight';
-
+import { Num } from '../src/Slight/Terms'
+import { Dumper } from '../src/Slight/Logger'
+import { parse, compile, run } from '../src/Slight'
 
 let program = compile(parse(`
     (def add (lambda (x y) (+ x y)))

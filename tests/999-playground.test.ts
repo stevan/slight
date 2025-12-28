@@ -1,10 +1,6 @@
 
-import {
-    Dumper,
-    parse,
-    compile,
-    run,
-} from '../src/slight';
+import { Dumper } from '../src/Slight/Logger'
+import { parse, compile, run } from '../src/Slight';
 
 
 let program = compile(parse(`

@@ -1,650 +1,66 @@
 
-import * as util from 'node:util';
-import { Console } from 'console';
+import {
+    DEBUG,
+    HEADER, FOOTER, LOG,
+    GREEN, RED, ORANGE, YELLOW, BLUE, PURPLE, GREY,
+} from './Slight/Logger'
 
-export const DEBUG      = process.env['DEBUG'] == "1" ? true : false
-export const TERM_WIDTH = process.stdout.columns;
-export const MAX_WIDTH  = TERM_WIDTH - 1
+import { Environment } from './Slight/Environment'
 
-const INSPECT_OPTIONS = {
-    depth       : 20,
-    sorted      : true,
-    breakLength : TERM_WIDTH,
-    colors      : true,
-}
+import * as Terms    from './Slight/Terms'
+import * as Kontinue from './Slight/Kontinue'
+import * as Util     from './Slight/Util'
 
-export const Logger = new Console({
-    stdout         : process.stdout,
-    stderr         : process.stderr,
-    inspectOptions : INSPECT_OPTIONS,
-})
-
-export const Dumper = new Console({
-    stdout           : process.stdout,
-    stderr           : process.stderr,
-    inspectOptions   : {
-        sorted       : true,
-        compact      : false,
-        breakLength  : TERM_WIDTH,
-        depth        : TERM_WIDTH,
-        colors       : true,
-    },
-    groupIndentation : 4,
-});
-
-export const ESC    = '\u001B[';
-export const RESET  = ESC + '0m';
-export const GREEN  = ESC + '38;2;20;200;20;m';
-export const RED    = ESC + '38;2;250;50;50;m';
-export const ORANGE = ESC + '38;2;255;150;0;m';
-export const YELLOW = ESC + '38;2;255;250;0;m';
-export const BLUE   = ESC + '38;2;70;100;255;m';
-export const PURPLE = ESC + '38;2;150;30;150;m';
-export const GREY   = ESC + '38;2;150;150;200;m';
-
-type ANSIColor = string
-
-export const HEADER = (color : ANSIColor, label : string, character : string, width : number = MAX_WIDTH) : void =>
-    Logger.log(`${color}${character.repeat(2)} ${label} ${character.repeat( width - (label.length + 4) )}${RESET}`);
-
-export const FOOTER = (color : ANSIColor, character : string, width : number = MAX_WIDTH) : void =>
-    Logger.log(color+character.repeat(width)+RESET);
-
-export function LOG (color : ANSIColor, ...args : any[]) : void {
-    if (DEBUG) return;
-    Logger.log(...(args.map((a) => typeof a === 'string' ? (color+a+RESET) : util.inspect(a,INSPECT_OPTIONS))));
-}
+export { parse   } from './Slight/Parser';
+export { compile } from './Slight/Compiler';
 
 // -----------------------------------------------------------------------------
-// Runtime
-// -----------------------------------------------------------------------------
-
-abstract class Term {
-    abstract toNativeStr () : string;
-
-    toStr () : Str { return new Str(this.toNativeStr()) }
-}
-
-// -----------------------------------------------------------------------------
-
-export class Nil extends Term {
-    override toNativeStr () : string { return '()' }
-}
-
-export class Bool extends Term {
-    public value : boolean;
-
-    constructor (value : boolean) {
-        super();
-        this.value = value;
-    }
-
-    override toNativeStr () : string { return this.value ? 'true' : 'false' }
-}
-
-export class Num  extends Term {
-    public value : number;
-
-    constructor (value : number) {
-        super();
-        this.value = value;
-    }
-
-    override toNativeStr () : string { return this.value.toString() }
-}
-
-export class Str  extends Term {
-    public value : string;
-
-    constructor (value : string) {
-        super();
-        this.value = value;
-    }
-
-    override toNativeStr () : string { return `"${this.value}"` }
-}
-
-export class Sym  extends Term {
-    public ident : string;
-
-    constructor (ident : string) {
-        super();
-        this.ident = ident;
-    }
-
-    override toNativeStr () : string { return this.ident }
-}
-
-// -----------------------------------------------------------------------------
-
-export class Pair extends Term {
-    public first  : Term;
-    public second : Term;
-
-    constructor (fst : Term, snd : Term) {
-        super();
-        this.first  = fst;
-        this.second = snd;
-    }
-
-    override toNativeStr () : string {
-        return `(${this.first.toNativeStr()} . ${this.second.toNativeStr()})`
-    }
-}
-
-// -----------------------------------------------------------------------------
-
-abstract class List<T extends Term> extends Term {
-    public items  : T[];
-    public offset : number;
-
-    constructor (items : T[], offset : number = 0) {
-        super();
-        this.items  = items;
-        this.offset = offset;
-    }
-
-    at (i : number) : T {
-        if ((this.offset + i) > this.items.length) throw new Error('OVERFLOW!');
-        return this.items[ this.offset + i ];
-    }
-
-    mapItems<U> (f : (i : T) => U) : U[] {
-        let list = [];
-        for (let i = 0; i < this.length; i++) {
-            list.push( f( this.at(i) ) );
-        }
-        return list;
-    }
-
-    get length () : number { return this.items.length - this.offset }
-    get head   () : T      { return this.items[this.offset] }
-
-    abstract get tail () : Term;
-
-    toNativeArray () : Term[] {
-        let list = [];
-        for (let i = 0; i < this.length; i++) {
-            list.push( this.at(i) );
-        }
-        return list;
-    }
-
-    override toNativeStr () : string {
-        return `(${ this.items.slice(this.offset, this.items.length).map((i) => i.toNativeStr()).join(' ') })`
-    }
-}
-
-export class Cons extends List<Term> {
-    get tail () : Cons | Nil {
-        if (this.length == 1) return new Nil();
-        return new Cons(this.items, this.offset + 1);
-    }
-
-    map (f : (i : Term) => Term) : Cons {
-        return new Cons( this.mapItems<Term>(f) );
-    }
-}
-
-export class PairList extends List<Pair> {
-    get tail () : PairList | Nil {
-        if (this.length == 1) return new Nil();
-        return new PairList(this.items, this.offset + 1);
-    }
-
-    map (f : (i : Pair) => Pair) : PairList {
-        return new PairList( this.mapItems<Pair>(f) );
-    }
-}
-
-// -----------------------------------------------------------------------------
-
-type NativeFunc  = (params : Term[], env : Environment) => Term;
-type NativeFExpr = (params : Term[], env : Environment) => Kontinue[];
-
-abstract class Applicative extends Term {}
-abstract class Operative   extends Term {}
-
-export class Lambda extends Applicative {
-    public params : Cons;
-    public body   : Term;
-    public env    : Environment;
-
-    constructor (params : Cons, body : Term, env : Environment) {
-        super();
-        this.params = params;
-        this.body   = body;
-        this.env    = env;
-    }
-
-    override toNativeStr () : string {
-        return `(λ ${this.params.toNativeStr()} ${this.body.toNativeStr()} ${this.env.toNativeStr()})`
-    }
-}
-
-export class Native extends Applicative {
-    public name : string;
-    public body : NativeFunc;
-
-    constructor (name : string, body : NativeFunc) {
-        super();
-        this.name = name;
-        this.body = body;
-    }
-
-    override toNativeStr () : string {
-        return `n:(${this.name})`
-    }
-}
-
-export class FExpr extends Operative {
-    public name : string;
-    public body : NativeFExpr;
-
-    constructor (name : string, body : NativeFExpr) {
-        super();
-        this.name = name;
-        this.body = body;
-    }
-
-    override toNativeStr () : string {
-        return `f:(${this.name})`
-    }
-}
-
-// -----------------------------------------------------------------------------
-// Parser
-// -----------------------------------------------------------------------------
-
-type ParseExpr = Term | ParseExpr[];
-
-export function parse (source : string) : Term[] {
-    const SPLITTER = /\(|\)|'|"(?:[^"\\]|\\.)*"|[^\s\(\)';]+/g;
-
-    const tokenize = (src : string) : string[] => src.match(SPLITTER) ?? [];
-
-    const parseTokens = (tokens : string[]) : [ ParseExpr, string[] ] => {
-        let token = tokens[0];
-        if (token == undefined) throw new Error('Undefined Token');
-        let rest = tokens.slice(1);
-        if (token == '(') return parseList( rest, [] );
-        switch (true) {
-        case token == 'true'        : return [ new Bool(true),         rest ];
-        case token == 'false'       : return [ new Bool(false),        rest ];
-        case !isNaN(Number(token))  : return [ new Num(Number(token)), rest ];
-        case token.charAt(0) == '"' : return [ new Str(token.slice(1, token.length - 1)), rest ];
-        default                     : return [ new Sym(token),         rest ];
-        }
-    }
-
-    const parseList = (tokens : string[], acc : ParseExpr[]) : [ ParseExpr[], string[] ] => {
-        if (tokens[0] === ')') return [ acc, tokens.slice(1) ];
-        let [ expr, remaining ] = parseTokens( tokens );
-        return parseList( remaining, [ ...acc, expr ] );
-    }
-
-    let exprs  = [];
-    let tokens = tokenize( source );
-    let rest   = tokens;
-    while (rest.length > 0) {
-        let [ expr, remaining ] = parseTokens( rest );
-        exprs.push(expr as Term);
-        rest = remaining;
-    }
-    return exprs;
-}
-
-// -----------------------------------------------------------------------------
-// Compiler
-// -----------------------------------------------------------------------------
-
-export function compile (expr : Term[]) : Term[] {
-
-    const compileExpression = (expr : ParseExpr) : Term => {
-        if (!Array.isArray(expr)) return expr;
-
-        if (expr.length == 0) return new Cons([]);
-
-        let rest = expr.map((e) => compileExpression(e));
-
-        // handle pairs and bindings
-        if (rest.length == 3) {
-            let [ fst, sym, snd ] = rest;
-            if (sym instanceof Sym) {
-                switch(sym.ident) {
-                case ':' : return new Pair( fst, snd );
-                default:
-                    // let it fall through
-                }
-            }
-        }
-
-        // handle different list types ...
-        if (rest.every((p) => p instanceof Pair)) {
-            return new PairList( rest );
-        }
-        else {
-            return new Cons( rest );
-        }
-    }
-
-    return expr.map(compileExpression);
-}
-
-// -----------------------------------------------------------------------------
-// Environment
-// -----------------------------------------------------------------------------
-
-type Scope = (n : Sym) => Term;
-
-export class Environment extends Term {
-    public scope : Scope;
-    public view  : string;
-
-    constructor (scope : Scope, view : string = '') {
-        super();
-        this.scope = scope;
-        this.view  = view;
-    }
-
-    lookup (sym : Sym) : Term {
-        return this.scope(sym);
-    }
-
-    define (name : Sym, value : Term) : void {
-        let upper = this.scope;
-        LOG(YELLOW, ` ~ define(${name.toNativeStr()}) => ${this.view || '~{}'}`);
-        this.view += `${name.toNativeStr()} : ${value.toNativeStr()}, `;
-        this.scope = (query : Sym) : Term => {
-            LOG(YELLOW, ` ~ lookup // ${query.toNativeStr()} in scope(${name.toNativeStr()})`);
-            if (query.ident == name.ident) return value;
-            return upper(query);
-        };
-    }
-
-    capture () : Environment {
-        // XXX - consider passing in the lambda
-        // and looking for free variables that
-        // need capturing, not sure if it actually
-        // matters, but we could do it.
-        return new Environment( this.scope, this.view );
-    }
-
-    derive (params : Sym[], args : Term[]) : Environment {
-        if (params.length != args.length) throw new Error(`Not Enough args!`);
-
-        // TODO - don't define() it all, but
-        // create a custom param/bind Scope
-        // function similar to how builtins
-        // are handled.
-
-        let local = new Environment( this.scope, this.view );
-        for (let i = 0; i < params.length; i++) {
-            local.define( params[i] as Sym, args[i] as Term );
-        }
-
-        return local;
-    }
-
-    override toNativeStr () : string {
-        return `~{${this.view}}`
-    }
-}
-
-// helpers for builtins
-
-const liftNumBinOp = (f : (n : number, m : number) => number) : NativeFunc => {
-    return (args : Term[], env : Environment) => {
-        let [ lhs, rhs ] = args;
-        if (!(lhs instanceof Num)) throw new Error(`LHS must be a Num, not ${lhs.constructor.name}`);
-        if (!(rhs instanceof Num)) throw new Error(`RHS must be a Num, not ${rhs.constructor.name}`);
-        return new Num( f(lhs.value, rhs.value) );
-    }
-}
-
-const liftStrBinOp = (f : (n : string, m : string) => string) : NativeFunc => {
-    return (args : Term[], env : Environment) => {
-        let [ lhs, rhs ] = args;
-        if (!(lhs instanceof Str)) throw new Error(`LHS must be a Str, not ${lhs.constructor.name}`);
-        if (!(rhs instanceof Str)) throw new Error(`RHS must be a Str, not ${rhs.constructor.name}`);
-        return new Str( f(lhs.value, rhs.value) );
-    }
-}
-
-const liftNumCompareOp = (f : (n : number, m : number) => boolean) : NativeFunc => {
-    return (args : Term[], env : Environment) => {
-        let [ lhs, rhs ] = args;
-        if (!(lhs instanceof Num)) throw new Error(`LHS must be a Num, not ${lhs.constructor.name}`);
-        if (!(rhs instanceof Num)) throw new Error(`RHS must be a Num, not ${rhs.constructor.name}`);
-        return new Bool( f(lhs.value, rhs.value) );
-    }
-}
-
-const liftStrCompareOp = (f : (n : string, m : string) => boolean) : NativeFunc => {
-    return (args : Term[], env : Environment) => {
-        let [ lhs, rhs ] = args;
-        if (!(lhs instanceof Str)) throw new Error(`LHS must be a Str, not ${lhs.constructor.name}`);
-        if (!(rhs instanceof Str)) throw new Error(`RHS must be a Str, not ${rhs.constructor.name}`);
-        return new Bool( f(lhs.value, rhs.value) );
-    }
-}
-
-// -----------------------------------------------------------------------------
-// Continuation Passing Machine
-// -----------------------------------------------------------------------------
-
-// continuation base ...
-
-abstract class Kontinue {
-    public stack : Term[];
-    public env   : Environment;
-
-    constructor(env : Environment) {
-        this.env   = env;
-        this.stack = []
-    }
-
-    toString () : string {
-        let envStr =  this.env.toNativeStr();
-        if (this.stack.length == 0) return ` ${envStr}`;
-        return ` ^(${this.stack.map((t) => t.toNativeStr()).join(';')}) ${envStr}`
-    }
-}
-
-// -----------------------------------------------------------------------------
-// Finish the Program
-
-// NOTE: Currently unused
-class Halt extends Kontinue {
-    override toString () : string {
-        return `HALT!`+super.toString()
-    }
-}
-
-// -----------------------------------------------------------------------------
-// Finish the Expression
-
-class EndStatement extends Kontinue {
-    override toString () : string {
-        return `EndStatement`+super.toString()
-    }
-}
-
-// -----------------------------------------------------------------------------
-// Definition
-
-class Definition extends Kontinue {
-    constructor(public name : Sym, env : Environment) { super(env) }
-    override toString () : string {
-        return `Definition[${this.name.toNativeStr()}]`+super.toString()
-    }
-}
-
-// -----------------------------------------------------------------------------
-// Return a Value
-
-class Return extends Kontinue {
-    constructor(public value : Term, env : Environment) { super(env) }
-    override toString () : string {
-        return `Return[${this.value.toNativeStr()}]`+super.toString()
-    }
-}
-
-// -----------------------------------------------------------------------------
-// Construction
-
-class MakePair extends Kontinue {
-    override toString () : string {
-        return `MakePair`+super.toString()
-    }
-}
-
-class MakeCons extends Kontinue {
-    override toString () : string {
-        return `MakeCons`+super.toString()
-    }
-}
-
-// -----------------------------------------------------------------------------
-// Eval:
-//     "What does this expression mean in this environment?"
-// -----------------------------------------------------------------------------
-
-abstract class Eval extends Kontinue {}
-
-// root eval
-
-class EvalExpr extends Eval {
-    constructor(public expr : Term, env : Environment) { super(env) }
-    override toString () : string {
-        return `EvalExpr[${this.expr.toNativeStr()}]`+super.toString()
-    }
-}
-
-// eval pairs
-
-class EvalPair  extends Eval {
-    constructor(public pair : Pair, env : Environment) { super(env) }
-    override toString () : string {
-        return `EvalPair[${this.pair.toNativeStr()}]`+super.toString()
-    }
-}
-
-class EvalPairSecond extends Eval {
-    constructor(public second : Term, env : Environment) { super(env) }
-    override toString () : string {
-        return `EvalPairSecond[${this.second.toNativeStr()}]`+super.toString()
-    }
-}
-
-// eval lists
-
-class EvalCons  extends Eval {
-    constructor(public cons : Cons, env : Environment) { super(env) }
-    override toString () : string {
-        return `EvalCons[${this.cons.toNativeStr()}]`+super.toString()
-    }
-}
-
-class EvalConsTail   extends Eval {
-    constructor(public tail : Term, env : Environment) { super(env) }
-    override toString () : string {
-        return `EvalConsTail[${this.tail.toNativeStr()}]`+super.toString()
-    }
-}
-
-// call procedures
-
-class ApplyExpr extends Kontinue {
-    constructor(public args  : Term, env : Environment) { super(env) }
-    override toString () : string {
-        return `ApplyExpr[${this.args.toNativeStr()}]`+super.toString()
-    }
-}
-
-// -----------------------------------------------------------------------------
-// Apply:
-//     "What happens when I invoke this procedure with these arguments?"
-// -----------------------------------------------------------------------------
-
-abstract class Apply extends Kontinue {}
-
-// FExprs
-
-class ApplyOperative extends Apply {
-    public call : Operative;
-    public args : Term;
-
-    constructor(call : Operative, args : Term, env : Environment) {
-        super(env);
-        this.call = call;
-        this.args = args;
-    }
-
-    override toString () : string {
-        return `ApplyOperative[${this.call.toNativeStr()} ${this.args.toNativeStr()}]`+super.toString()
-    }
-}
-
-// Lambda and Native
-
-class ApplyApplicative extends Apply {
-    constructor(public call : Applicative, env : Environment) { super(env) }
-
-    override toString () : string {
-        return `ApplyApplicative[${this.call.toNativeStr()}]`+super.toString()
-    }
-}
-
-// -----------------------------------------------------------------------------
-// Interpreter
-// -----------------------------------------------------------------------------
-
 // the base environment
+// -----------------------------------------------------------------------------
 
-export const ROOT_ENV = new Environment((query : Sym) : Term => {
+export const ROOT_ENV = new Environment((query : Terms.Sym) : Terms.Term => {
     LOG(YELLOW, ` ~ lookup || ${query.toNativeStr()} in scope(_) `);
     switch (query.ident) {
-    case '+'  : return new Native('+',    liftNumBinOp((n, m) => n + m));
-    case '-'  : return new Native('-',    liftNumBinOp((n, m) => n - m));
-    case '*'  : return new Native('*',    liftNumBinOp((n, m) => n * m));
-    case '/'  : return new Native('/',    liftNumBinOp((n, m) => n / m));
-    case '%'  : return new Native('%',    liftNumBinOp((n, m) => n % m));
-    case '>=' : return new Native('>=',   liftNumCompareOp((n, m) => n >= m));
-    case '>'  : return new Native('>',    liftNumCompareOp((n, m) => n >  m));
-    case '<=' : return new Native('<=',   liftNumCompareOp((n, m) => n <= m));
-    case '<'  : return new Native('<',    liftNumCompareOp((n, m) => n <  m));
-    case '==' : return new Native('==',   liftNumCompareOp((n, m) => n == m));
-    case '!=' : return new Native('!=',   liftNumCompareOp((n, m) => n != m));
-    case '~'  : return new Native('~',    liftStrBinOp((n, m) => n + m));
-    case 'ge' : return new Native('ge',   liftStrCompareOp((n, m) => n >= m));
-    case 'gt' : return new Native('gt',   liftStrCompareOp((n, m) => n >  m));
-    case 'le' : return new Native('le',   liftStrCompareOp((n, m) => n <= m));
-    case 'lt' : return new Native('lt',   liftStrCompareOp((n, m) => n <  m));
-    case 'eq' : return new Native('eq',   liftStrCompareOp((n, m) => n == m));
-    case 'ne' : return new Native('ne',   liftStrCompareOp((n, m) => n != m));
+    case '+'  : return new Terms.Native('+',  Util.liftNumBinOp((n, m) => n + m));
+    case '-'  : return new Terms.Native('-',  Util.liftNumBinOp((n, m) => n - m));
+    case '*'  : return new Terms.Native('*',  Util.liftNumBinOp((n, m) => n * m));
+    case '/'  : return new Terms.Native('/',  Util.liftNumBinOp((n, m) => n / m));
+    case '%'  : return new Terms.Native('%',  Util.liftNumBinOp((n, m) => n % m));
+    case '>=' : return new Terms.Native('>=', Util.liftNumCompareOp((n, m) => n >= m));
+    case '>'  : return new Terms.Native('>',  Util.liftNumCompareOp((n, m) => n >  m));
+    case '<=' : return new Terms.Native('<=', Util.liftNumCompareOp((n, m) => n <= m));
+    case '<'  : return new Terms.Native('<',  Util.liftNumCompareOp((n, m) => n <  m));
+    case '==' : return new Terms.Native('==', Util.liftNumCompareOp((n, m) => n == m));
+    case '!=' : return new Terms.Native('!=', Util.liftNumCompareOp((n, m) => n != m));
+    case '~'  : return new Terms.Native('~',  Util.liftStrBinOp((n, m) => n + m));
+    case 'ge' : return new Terms.Native('ge', Util.liftStrCompareOp((n, m) => n >= m));
+    case 'gt' : return new Terms.Native('gt', Util.liftStrCompareOp((n, m) => n >  m));
+    case 'le' : return new Terms.Native('le', Util.liftStrCompareOp((n, m) => n <= m));
+    case 'lt' : return new Terms.Native('lt', Util.liftStrCompareOp((n, m) => n <  m));
+    case 'eq' : return new Terms.Native('eq', Util.liftStrCompareOp((n, m) => n == m));
+    case 'ne' : return new Terms.Native('ne', Util.liftStrCompareOp((n, m) => n != m));
 
-    case 'list' : return new Native('list', (args, env) => new Cons(args));
+    case 'list' : return new Terms.Native('list', (args, env) => new Terms.Cons(args));
 
 
     // Special Forms ...
 
-    case 'lambda' : return new FExpr('lambda', (args, env) => {
+    case 'lambda' : return new Terms.FExpr('lambda', (args, env) => {
         let [ params, body ] = args;
         return [
-            new Return(
-                new Lambda( params as Cons, body, env.capture() ),
+            new Kontinue.Return(
+                new Terms.Lambda( params as Terms.Cons, body, env.capture() ),
                 env
             )
         ]
     });
 
-    case 'def' : return new FExpr('define', (args, env) => {
+    case 'def' : return new Terms.FExpr('define', (args, env) => {
         let [ name, body ] = args;
         //env.define( name as Sym, body );
         return [
-            new Definition( name as Sym, env ),
-            new EvalExpr( body, env ),
+            new Kontinue.Definition( name as Terms.Sym, env ),
+            new Kontinue.EvalExpr( body, env ),
         ]
     });
     default:
@@ -671,26 +87,30 @@ export const ROOT_ENV = new Environment((query : Sym) : Term => {
 // everything that is going on.
 // -----------------------------------------------------------------------------
 
-export type State = [ Term[], Environment, Kontinue[], number ];
+export type State = [ Terms.Term[], Environment, Kontinue.Kontinue[], number ];
 
-export function run (program : Term[]) : State {
+// -----------------------------------------------------------------------------
+// Runner
+// -----------------------------------------------------------------------------
+
+export function run (program : Terms.Term[]) : State {
 
     // provides the starting continuation
     // for evaluating any expression
-    const evaluateTerm = (expr : Term, env : Environment) : Kontinue => {
+    const evaluateTerm = (expr : Terms.Term, env : Environment) : Kontinue.Kontinue => {
         HEADER(BLUE, `EVAL`, '.');
         LOG(BLUE, `[ ${expr.toNativeStr()} ] + ENV ${env.toNativeStr()}`);
         switch (expr.constructor) {
-        case Nil    :
-        case Num    :
-        case Str    :
-        case Bool   :
-        case Native :
-        case FExpr  :
-        case Lambda : return new Return(expr, env);
-        case Sym    : return new Return(env.lookup( expr as Sym ), env);
-        case Pair   : return new EvalPair( expr as Pair, env );
-        case Cons   : return new EvalCons( expr as Cons, env );
+        case Terms.Nil    :
+        case Terms.Num    :
+        case Terms.Str    :
+        case Terms.Bool   :
+        case Terms.Native :
+        case Terms.FExpr  :
+        case Terms.Lambda : return new Kontinue.Return(expr, env);
+        case Terms.Sym    : return new Kontinue.Return(env.lookup( expr as Terms.Sym ), env);
+        case Terms.Pair   : return new Kontinue.EvalPair( expr as Terms.Pair, env );
+        case Terms.Cons   : return new Kontinue.EvalCons( expr as Terms.Cons, env );
         default:
             throw new Error(`Unrecognized Expression ${expr.constructor.name}`);
         }
@@ -698,15 +118,15 @@ export function run (program : Term[]) : State {
 
     // returns a value to the previous
     // continuation in the stack
-    const returnValues = (kont : Kontinue[], ...values : Term[]) : void => {
+    const returnValues = (kont : Kontinue.Kontinue[], ...values : Terms.Term[]) : void => {
         if (kont.length == 0)
             throw new Error(`Cannot return value ${values.map((v) => v.toNativeStr()).join(', ')} without continuation`);
-        let top = (kont.at(-1) as Kontinue);
+        let top = (kont.at(-1) as Kontinue.Kontinue);
         top.stack.push( ...values );
     }
 
     // the step function ... !!!
-    const execute = (startEnv : Environment, kont : Kontinue[]) : State => {
+    const execute = (startEnv : Environment, kont : Kontinue.Kontinue[]) : State => {
         HEADER(GREEN, `START`, '=');
         LOG(GREEN, `EVAL in ${startEnv.toNativeStr()}`);
         if (kont.length == 0) {
@@ -721,76 +141,76 @@ export function run (program : Term[]) : State {
         HEADER(YELLOW, `Begin Statement`, '_');
         while (kont.length > 0) {
             tick++;
-            let k = kont.pop() as Kontinue;
+            let k = kont.pop() as Kontinue.Kontinue;
             HEADER(PURPLE, `STEP(${tick})`, '-');
             LOG(RED, `=> K : `, k.toString());
             switch (k.constructor) {
             // ---------------------------------------------------------------------
             // This is the end of a statement, main exit point
             // ---------------------------------------------------------------------
-            case Halt:
+            case Kontinue.Halt:
                 HEADER(YELLOW, `Halt`, '_');
-                return [ k.stack, (k as Kontinue).env, kont, tick ];
+                return [ k.stack, (k as Kontinue.Kontinue).env, kont, tick ];
             // ---------------------------------------------------------------------
             // This is for defining things in the environment
             // ---------------------------------------------------------------------
-            case Definition:
-                let body = k.stack.pop() as Term;
-                (k as Kontinue).env.define( (k as Definition).name, body );
+            case Kontinue.Definition:
+                let body = k.stack.pop() as Terms.Term;
+                (k as Kontinue.Kontinue).env.define( (k as Kontinue.Definition).name, body );
                 break;
             // ---------------------------------------------------------------------
             // This is a literal value to be returned to the
             // previous continuation in the stack
             // ---------------------------------------------------------------------
-            case Return:
-                returnValues( kont, (k as Return).value );
+            case Kontinue.Return:
+                returnValues( kont, (k as Kontinue.Return).value );
                 break;
             // =====================================================================
             // Eval
             // =====================================================================
             // Main entry point
             // ---------------------------------------------------------------------
-            case EvalExpr:
-                kont.push( evaluateTerm( (k as EvalExpr).expr, (k as Kontinue).env ) );
+            case Kontinue.EvalExpr:
+                kont.push( evaluateTerm( (k as Kontinue.EvalExpr).expr, (k as Kontinue.Kontinue).env ) );
                 break;
             // ---------------------------------------------------------------------
             // Eval Pairs
             // ---------------------------------------------------------------------
-            case EvalPair:
-                let pair  = (k as EvalPair).pair;
+            case Kontinue.EvalPair:
+                let pair  = (k as Kontinue.EvalPair).pair;
                 kont.push(
-                    new EvalPairSecond( pair.second, (k as Kontinue).env ),
-                    evaluateTerm( pair.first, (k as Kontinue).env ),
+                    new Kontinue.EvalPairSecond( pair.second, (k as Kontinue.Kontinue).env ),
+                    evaluateTerm( pair.first, (k as Kontinue.Kontinue).env ),
                 );
                 break;
-            case EvalPairSecond:
-                let second = evaluateTerm( (k as EvalPairSecond).second, (k as Kontinue).env );
-                let efirst = k.stack.pop() as Term;
-                let mkPair = new MakePair( (k as Kontinue).env );
+            case Kontinue.EvalPairSecond:
+                let second = evaluateTerm( (k as Kontinue.EvalPairSecond).second, (k as Kontinue.Kontinue).env );
+                let efirst = k.stack.pop() as Terms.Term;
+                let mkPair = new Kontinue.MakePair( (k as Kontinue.Kontinue).env );
                 mkPair.stack.push(efirst);
                 kont.push( mkPair, second );
                 break;
-            case MakePair:
+            case Kontinue.MakePair:
                 let snd = k.stack.pop();
                 let fst = k.stack.pop();
                 if (fst == undefined) throw new Error('Expected fst on stack');
                 if (snd == undefined) throw new Error('Expected snd on stack');
-                kont.push( new Return( new Pair( fst as Term, snd as Term ), (k as Kontinue).env ) );
+                kont.push( new Kontinue.Return( new Terms.Pair( fst as Terms.Term, snd as Terms.Term ), (k as Kontinue.Kontinue).env ) );
                 break;
             // ---------------------------------------------------------------------
             // Eval Lists
             // ---------------------------------------------------------------------
-            case EvalCons:
-                let cons  = (k as EvalCons).cons;
-                let check = new ApplyExpr( cons.tail, (k as Kontinue).env );
-                kont.push( check, evaluateTerm( cons.head, (k as Kontinue).env ) );
+            case Kontinue.EvalCons:
+                let cons  = (k as Kontinue.EvalCons).cons;
+                let check = new Kontinue.ApplyExpr( cons.tail, (k as Kontinue.Kontinue).env );
+                kont.push( check, evaluateTerm( cons.head, (k as Kontinue.Kontinue).env ) );
                 break;
-            case EvalConsTail:
-                let tail = (k as EvalConsTail).tail;
-                if (tail instanceof Nil) throw new Error(`Tail is Nil!`);
+            case Kontinue.EvalConsTail:
+                let tail = (k as Kontinue.EvalConsTail).tail;
+                if (tail instanceof Terms.Nil) throw new Error(`Tail is Nil!`);
 
-                if (!((tail as Cons).tail instanceof Nil)) {
-                    kont.push( new EvalConsTail( (tail as Cons).tail, (k as Kontinue).env ) );
+                if (!((tail as Terms.Cons).tail instanceof Terms.Nil)) {
+                    kont.push( new Kontinue.EvalConsTail( (tail as Terms.Cons).tail, (k as Kontinue.Kontinue).env ) );
                 }
 
                 let evaled = k.stack.pop();
@@ -798,21 +218,21 @@ export function run (program : Term[]) : State {
                     returnValues( kont, evaled );
                 }
 
-                kont.push( evaluateTerm( (tail as Cons).head, (k as Kontinue).env ) );
+                kont.push( evaluateTerm( (tail as Terms.Cons).head, (k as Kontinue.Kontinue).env ) );
                 break;
             // ---------------------------------------------------------------------
             // Handle function calls
             // ---------------------------------------------------------------------
-            case ApplyExpr:
+            case Kontinue.ApplyExpr:
                 let call = k.stack.pop();
                 if (call == undefined) throw new Error('Expected call on stack');
-                if (call instanceof Operative) {
-                    kont.push(new ApplyOperative( (call as FExpr), (k as ApplyExpr).args, (k as Kontinue).env ));
+                if (call instanceof Terms.Operative) {
+                    kont.push(new Kontinue.ApplyOperative( (call as Terms.FExpr), (k as Kontinue.ApplyExpr).args, (k as Kontinue.Kontinue).env ));
                 }
-                else if (call instanceof Applicative) {
+                else if (call instanceof Terms.Applicative) {
                     kont.push(
-                        new ApplyApplicative( (call as Applicative), (k as Kontinue).env ),
-                        new EvalConsTail( (k as ApplyExpr).args, (k as Kontinue).env )
+                        new Kontinue.ApplyApplicative( (call as Terms.Applicative), (k as Kontinue.Kontinue).env ),
+                        new Kontinue.EvalConsTail( (k as Kontinue.ApplyExpr).args, (k as Kontinue.Kontinue).env )
                     );
                 }
                 else {
@@ -825,31 +245,31 @@ export function run (program : Term[]) : State {
             // Operatives, or FExprs
             // - the arguments are not evaluated
             // ---------------------------------------------------------------------
-            case ApplyOperative:
-                kont.push(...((k as ApplyOperative).call as FExpr).body(
-                    ((k as ApplyOperative).args as Cons).toNativeArray(),
-                    (k as Kontinue).env
+            case Kontinue.ApplyOperative:
+                kont.push(...((k as Kontinue.ApplyOperative).call as Terms.FExpr).body(
+                    ((k as Kontinue.ApplyOperative).args as Terms.Cons).toNativeArray(),
+                    (k as Kontinue.Kontinue).env
                 ));
                 break;
             // ---------------------------------------------------------------------
             // Applicatives, or Lambdas & Native Functions
             // - arguments are evaluated
             // ---------------------------------------------------------------------
-            case ApplyApplicative:
-                switch ((k as ApplyApplicative).call.constructor) {
-                case Native:
-                    kont.push(new Return(
-                        ((k as ApplyApplicative).call as Native).body( k.stack, (k as Kontinue).env ),
-                        (k as Kontinue).env
+            case Kontinue.ApplyApplicative:
+                switch ((k as Kontinue.ApplyApplicative).call.constructor) {
+                case Terms.Native:
+                    kont.push(new Kontinue.Return(
+                        ((k as Kontinue.ApplyApplicative).call as Terms.Native).body( k.stack, (k as Kontinue.Kontinue).env ),
+                        (k as Kontinue.Kontinue).env
                     ));
                     break;
-                case Lambda:
-                    let lambda  = (k as ApplyApplicative).call as Lambda;
+                case Terms.Lambda:
+                    let lambda  = (k as Kontinue.ApplyApplicative).call as Terms.Lambda;
                     let local   = lambda.env;
 
                     let params  = lambda.params.toNativeArray();
                     let args    = k.stack;
-                    kont.push( new EvalExpr( lambda.body, local.derive( params as Sym[], args ) ) );
+                    kont.push( new Kontinue.EvalExpr( lambda.body, local.derive( params as Terms.Sym[], args ) ) );
                 }
                 break;
             // ---------------------------------------------------------------------
@@ -881,8 +301,8 @@ export function run (program : Term[]) : State {
     // compile all the expressions
     // and add a Halt at the end
     let kont = [
-        ...program.map((expr) => new EvalExpr(expr, env)),
-        new Halt(env)
+        ...program.map((expr) => new Kontinue.EvalExpr(expr, env)),
+        new Kontinue.Halt(env)
     ].reverse();
 
     // run the program and collect the results
