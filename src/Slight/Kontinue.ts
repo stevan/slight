@@ -23,19 +23,9 @@ export abstract class Kontinue {
 // -----------------------------------------------------------------------------
 // Finish the Program
 
-// NOTE: Currently unused
 export class Halt extends Kontinue {
     override toString () : string {
         return `HALT!`+super.toString()
-    }
-}
-
-// -----------------------------------------------------------------------------
-// Finish the Expression
-
-export class EndStatement extends Kontinue {
-    override toString () : string {
-        return `EndStatement`+super.toString()
     }
 }
 
