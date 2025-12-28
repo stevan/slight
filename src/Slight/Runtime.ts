@@ -31,7 +31,7 @@ export const ROOT_ENV = new E.Environment((query : C.Sym) : C.Term => {
         return new C.Str( arg.constructor.name );
     });
 
-    case 'to-string' : return new C.Native('to-string', (args, env) => {
+    case 'to-str' : return new C.Native('to-string', (args, env) => {
         let [ arg ] = args;
         return new C.Str( arg.toNativeStr() );
     });
@@ -65,6 +65,17 @@ export const ROOT_ENV = new E.Environment((query : C.Sym) : C.Term => {
     case 'lt' : return new C.Native('lt', liftStrCompareOp((n, m) => n <  m));
 
     // -------------------------------------------------------------------------
+    // booleans
+    // -------------------------------------------------------------------------
+
+    case 'not' :
+    case '!'   : return new C.Native('NOT', (args, env) => {
+        let [ arg ] = args;
+        if (!(arg instanceof C.Bool)) throw new Error(`Can only call ! on Bool, not ${arg.constructor.name}`);
+        return new C.Bool( !arg.value );
+    });
+
+    // -------------------------------------------------------------------------
     // lists
     // -------------------------------------------------------------------------
 
@@ -81,24 +92,20 @@ export const ROOT_ENV = new E.Environment((query : C.Sym) : C.Term => {
         return arg.tail;
     });
 
+    case 'nil?' : return new C.Native('nil?', (args, env) => {
+        let [ arg ] = args;
+        return new C.Bool( arg instanceof C.Nil );
+    });
+
     // -------------------------------------------------------------------------
     // Special Forms (FExprs)
     // -------------------------------------------------------------------------
-
-    case 'nil' : return new C.Native('nil', (args, env) => new C.Nil());
-
-    case 'not' :
-    case '!'   : return new C.Native('NOT', (args, env) => {
-        let [ arg ] = args;
-        if (!(arg instanceof C.Bool)) throw new Error(`Can only call ! on Bool, not ${arg.constructor.name}`);
-        return new C.Bool( !arg.value );
-    });
-
+    // short circuit AND/OR
     case 'and':
     case '&&' : return new C.FExpr('AND', (args, env) => {
         let [ lhs, rhs ] = args;
         return [
-            K.IfElse( rhs, lhs, env ),
+            K.IfElse( lhs, rhs, lhs, env ),
             K.EvalExpr( lhs, env ),
         ]
     });
@@ -107,25 +114,21 @@ export const ROOT_ENV = new E.Environment((query : C.Sym) : C.Term => {
     case '||' : return new C.FExpr('OR', (args, env) => {
         let [ lhs, rhs ] = args;
         return [
-            K.IfElse( lhs, rhs, env ),
+            K.IfElse( lhs, lhs, rhs, env ),
             K.EvalExpr( lhs, env ),
         ]
     });
 
-    // TODO:
-    // - abort
-    // - assert
-    // - nil
-    // - and/or/not
-
+    // ternary condtional
     case '?:' : return new C.FExpr('?:', (args, env) => {
         let [ cond, ifTrue, ifFalse ] = args;
         return [
-            K.IfElse( ifTrue, ifFalse, env ),
+            K.IfElse( cond, ifTrue, ifFalse, env ),
             K.EvalExpr( cond, env ),
         ]
     });
 
+    // lambdas
     case 'lambda' : return new C.FExpr('lambda', (args, env) => {
         let [ params, body ] = args;
         return [
@@ -136,17 +139,25 @@ export const ROOT_ENV = new E.Environment((query : C.Sym) : C.Term => {
         ]
     });
 
+    // definitions
     case 'def' : return new C.FExpr('def', (args, env) => {
-        let [ name, body ] = args;
+        let [ sig, body ] = args;
+        let name   = (sig as C.Cons).head;
+        let params = (sig as C.Cons).tail;
         return [
             K.Define( name as C.Sym, env ),
-            K.EvalExpr( body, env ),
+            K.Return(
+                new C.Lambda( params as C.Cons, body, env.capture() ),
+                env
+            )
         ]
     });
 
-
     // -------------------------------------------------------------------------
-    // WTF?
+    // TODO:
+    // -------------------------------------------------------------------------
+    // - abort
+    // - assert
     // -------------------------------------------------------------------------
     default:
         throw new Error(`Unable to find ${query.ident} in Scope`);

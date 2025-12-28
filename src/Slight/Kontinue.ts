@@ -4,7 +4,7 @@ import type { Term, Sym, Pair, Cons, Operative, Applicative } from './Terms'
 
 export type Kontinue =
     | { op : 'HALT',   stack : Term[], env : Environment }
-    | { op : 'IF/ELSE', stack : Term[], env : Environment, ifTrue : Term, ifFalse : Term }
+    | { op : 'IF/ELSE', stack : Term[], env : Environment, cond : Term, ifTrue : Term, ifFalse : Term }
     | { op : 'DEFINE', stack : Term[], env : Environment, name  : Sym }
     | { op : 'RETURN', stack : Term[], env : Environment, value : Term }
     | { op : 'MAKE/PAIR', stack : Term[], env : Environment }
@@ -20,8 +20,8 @@ export type Kontinue =
 
 export function Halt (env : Environment) : Kontinue { return { op : 'HALT', stack : [], env } }
 
-export function IfElse (ifTrue : Term, ifFalse : Term, env : Environment) : Kontinue {
-    return { op : 'IF/ELSE', stack : [], env, ifTrue, ifFalse }
+export function IfElse (cond : Term, ifTrue : Term, ifFalse : Term, env : Environment) : Kontinue {
+    return { op : 'IF/ELSE', stack : [], env, cond, ifTrue, ifFalse }
 }
 
 export function Define (name  : Sym,  env : Environment) : Kontinue { return { op : 'DEFINE', stack : [], env, name } }

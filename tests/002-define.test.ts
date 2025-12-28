@@ -4,8 +4,8 @@ import { Dumper } from '../src/Slight/Logger'
 import { parse, compile, run } from '../src/Slight'
 
 let program = compile(parse(`
-    (def add (lambda (x y) (+ x y)))
-    (def adder (lambda (x) (lambda (y) (add x y))))
+    (def (add x y) (+ x y))
+    (def (adder x) (lambda (y) (add x y)))
 
     ((adder 10) (add 15 5))
 `));

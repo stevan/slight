@@ -84,6 +84,10 @@ export function run (program : C.Term[]) : State {
             // ---------------------------------------------------------------------
             case 'DEFINE':
                 let body = k.stack.pop() as C.Term;
+                if (body instanceof C.Lambda) {
+                    // letrec
+                    body.env.define( k.name, body );
+                }
                 k.env.define( k.name, body );
                 break;
             // ---------------------------------------------------------------------
@@ -101,9 +105,17 @@ export function run (program : C.Term[]) : State {
                 if (cond == undefined) throw new Error(`STACK UNDERFLOW, expected bool condition`);
                 if (!(cond instanceof C.Bool)) throw new Error(`Expected Bool at top of stack, not ${cond.toString()}`);
                 if ((cond as C.Bool).value) {
-                    kont.push( evaluateTerm( k.ifTrue, k.env ) );
+                    kont.push(
+                        (k.cond === k.ifTrue)
+                            ? K.Return( cond, k.env )
+                            : evaluateTerm( k.ifTrue, k.env )
+                    );
                 } else {
-                    kont.push( evaluateTerm( k.ifFalse, k.env ) );
+                    kont.push(
+                        (k.cond === k.ifFalse)
+                            ? K.Return( cond, k.env )
+                            : evaluateTerm( k.ifFalse, k.env )
+                    );
                 }
                 break;
             // =====================================================================
