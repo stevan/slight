@@ -15,6 +15,8 @@ let program = compile(parse(`
     ((lambda (x y) (+ x y)) 10 (* 2 10))
     ((lambda (x y) (+ x y)) (+ 5 5) (* 2 10))
     (((lambda (x) (lambda (y) (+ x y))) 10) 20)
+    (head (tail (tail (list 10 20 30))))
+    (+ (head (list 10 20)) (head (tail (list 10 20))))
 `));
 
 // we can do this cause these are isolated expressions

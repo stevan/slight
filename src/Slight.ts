@@ -5,10 +5,7 @@ import {
     GREEN, RED, ORANGE, YELLOW, BLUE, PURPLE, GREY,
 } from './Slight/Logger'
 
-import {
-    liftNumBinOp,     liftStrBinOp,
-    liftNumCompareOp, liftStrCompareOp,
-} from './Slight/Util'
+import { ROOT_ENV } from './Slight/Runtime'
 
 import * as C from './Slight/Terms'
 import * as E from './Slight/Environment'
@@ -17,59 +14,6 @@ import * as K from './Slight/Kontinue'
 export * as Util   from './Slight/Util'
 export { parse   } from './Slight/Parser';
 export { compile } from './Slight/Compiler';
-
-// -----------------------------------------------------------------------------
-// the base environment
-// -----------------------------------------------------------------------------
-
-export const ROOT_ENV = new E.Environment((query : C.Sym) : C.Term => {
-    LOG(YELLOW, ` ~ lookup || ${query.toNativeStr()} in scope(_) `);
-    switch (query.ident) {
-    case '+'  : return new C.Native('+',  liftNumBinOp((n, m) => n + m));
-    case '-'  : return new C.Native('-',  liftNumBinOp((n, m) => n - m));
-    case '*'  : return new C.Native('*',  liftNumBinOp((n, m) => n * m));
-    case '/'  : return new C.Native('/',  liftNumBinOp((n, m) => n / m));
-    case '%'  : return new C.Native('%',  liftNumBinOp((n, m) => n % m));
-    case '>=' : return new C.Native('>=', liftNumCompareOp((n, m) => n >= m));
-    case '>'  : return new C.Native('>',  liftNumCompareOp((n, m) => n >  m));
-    case '<=' : return new C.Native('<=', liftNumCompareOp((n, m) => n <= m));
-    case '<'  : return new C.Native('<',  liftNumCompareOp((n, m) => n <  m));
-    case '==' : return new C.Native('==', liftNumCompareOp((n, m) => n == m));
-    case '!=' : return new C.Native('!=', liftNumCompareOp((n, m) => n != m));
-    case '~'  : return new C.Native('~',  liftStrBinOp((n, m) => n + m));
-    case 'ge' : return new C.Native('ge', liftStrCompareOp((n, m) => n >= m));
-    case 'gt' : return new C.Native('gt', liftStrCompareOp((n, m) => n >  m));
-    case 'le' : return new C.Native('le', liftStrCompareOp((n, m) => n <= m));
-    case 'lt' : return new C.Native('lt', liftStrCompareOp((n, m) => n <  m));
-    case 'eq' : return new C.Native('eq', liftStrCompareOp((n, m) => n == m));
-    case 'ne' : return new C.Native('ne', liftStrCompareOp((n, m) => n != m));
-
-    case 'list' : return new C.Native('list', (args, env) => new C.Cons(args));
-
-
-    // Special Forms ...
-
-    case 'lambda' : return new C.FExpr('lambda', (args, env) => {
-        let [ params, body ] = args;
-        return [
-            new K.Return(
-                new C.Lambda( params as C.Cons, body, env.capture() ),
-                env
-            )
-        ]
-    });
-
-    case 'def' : return new C.FExpr('define', (args, env) => {
-        let [ name, body ] = args;
-        return [
-            new K.Definition( name as C.Sym, env ),
-            new K.EvalExpr( body, env ),
-        ]
-    });
-    default:
-        throw new Error(`Unable to find ${query.ident} in Scope`);
-    }
-});
 
 // -----------------------------------------------------------------------------
 // Runner
@@ -91,10 +35,10 @@ export function run (program : C.Term[]) : State {
         case C.Bool   :
         case C.Native :
         case C.FExpr  :
-        case C.Lambda : return new K.Return(expr, env);
-        case C.Sym    : return new K.Return(env.lookup( expr as C.Sym ), env);
-        case C.Pair   : return new K.EvalPair( expr as C.Pair, env );
-        case C.Cons   : return new K.EvalCons( expr as C.Cons, env );
+        case C.Lambda : return K.Return( expr, env );
+        case C.Sym    : return K.Return( env.lookup( expr as C.Sym ), env );
+        case C.Pair   : return K.EvalPair( expr as C.Pair, env );
+        case C.Cons   : return K.EvalCons( expr as C.Cons, env );
         default:
             throw new Error(`Unrecognized Expression ${expr.constructor.name}`);
         }
@@ -128,99 +72,95 @@ export function run (program : C.Term[]) : State {
             let k = kont.pop() as K.Kontinue;
             HEADER(PURPLE, `STEP(${tick})`, '-');
             LOG(RED, `=> K : `, k.toString());
-            switch (k.constructor) {
+            switch (k.op) {
             // ---------------------------------------------------------------------
             // This is the end of a statement, main exit point
             // ---------------------------------------------------------------------
-            case K.Halt:
+            case 'HALT':
                 HEADER(YELLOW, `Halt`, '_');
                 return [ k.stack, k.env, kont, tick ];
             // ---------------------------------------------------------------------
             // This is for defining things in the environment
             // ---------------------------------------------------------------------
-            case K.Definition:
+            case 'DEFINE':
                 let body = k.stack.pop() as C.Term;
-                k.env.define( (k as K.Definition).name, body );
+                k.env.define( k.name, body );
                 break;
             // ---------------------------------------------------------------------
             // This is a literal value to be returned to the
             // previous continuation in the stack
             // ---------------------------------------------------------------------
-            case K.Return:
-                returnValues( kont, (k as K.Return).value );
+            case 'RETURN':
+                returnValues( kont, k.value );
                 break;
             // =====================================================================
             // Eval
             // =====================================================================
             // Main entry point
             // ---------------------------------------------------------------------
-            case K.EvalExpr:
-                kont.push( evaluateTerm( (k as K.EvalExpr).expr, k.env ) );
+            case 'EVAL/EXPR':
+                kont.push( evaluateTerm( k.expr, k.env ) );
                 break;
             // ---------------------------------------------------------------------
             // Eval Pairs
             // ---------------------------------------------------------------------
-            case K.EvalPair:
-                let pair  = (k as K.EvalPair).pair;
+            case 'EVAL/PAIR':
+                let pair  = k.pair;
                 kont.push(
-                    new K.EvalPairSecond( pair.second, k.env ),
+                    K.EvalPairSecond( pair.second, k.env ),
                     evaluateTerm( pair.first, k.env ),
                 );
                 break;
-            case K.EvalPairSecond:
-                let second = evaluateTerm( (k as K.EvalPairSecond).second, k.env );
+            case 'EVAL/PAIR/SND':
+                let second = evaluateTerm( k.second, k.env );
                 let efirst = k.stack.pop() as C.Term;
-                let mkPair = new K.MakePair( k.env );
+                let mkPair = K.MakePair( k.env );
                 mkPair.stack.push(efirst);
                 kont.push( mkPair, second );
                 break;
-            case K.MakePair:
+            case 'MAKE/PAIR':
                 let snd = k.stack.pop();
                 let fst = k.stack.pop();
                 if (fst == undefined) throw new Error('Expected fst on stack');
                 if (snd == undefined) throw new Error('Expected snd on stack');
-                kont.push( new K.Return( new C.Pair( fst as C.Term, snd as C.Term ), k.env ) );
+                kont.push( K.Return( new C.Pair( fst as C.Term, snd as C.Term ), k.env ) );
                 break;
             // ---------------------------------------------------------------------
             // Eval Lists
             // ---------------------------------------------------------------------
-            case K.EvalCons:
-                let cons  = (k as K.EvalCons).cons;
-                let check = new K.ApplyExpr( cons.tail, k.env );
+            case 'EVAL/CONS':
+                let cons  = k.cons;
+                let check = K.ApplyExpr( cons.tail, k.env );
                 kont.push( check, evaluateTerm( cons.head, k.env ) );
                 break;
-            case K.EvalConsTail:
-                let tail = (k as K.EvalConsTail).tail;
+            case 'EVAL/CONS/TAIL':
+                let tail = k.tail;
                 if (tail instanceof C.Nil) throw new Error(`Tail is Nil!`);
 
                 if (!((tail as C.Cons).tail instanceof C.Nil)) {
-                    kont.push( new K.EvalConsTail( (tail as C.Cons).tail, k.env ) );
+                    kont.push( K.EvalConsTail( (tail as C.Cons).tail, k.env ) );
                 }
 
-                let evaled = k.stack.pop();
-                if (evaled != undefined) {
-                    returnValues( kont, evaled );
-                }
-
+                k.stack.splice(0).forEach((evaled) => returnValues( kont, evaled ));
                 kont.push( evaluateTerm( (tail as C.Cons).head, k.env ) );
                 break;
             // ---------------------------------------------------------------------
             // Handle function calls
             // ---------------------------------------------------------------------
-            case K.ApplyExpr:
+            case 'APPLY/EXPR':
                 let call = k.stack.pop();
                 if (call == undefined) throw new Error('Expected call on stack');
                 if (call instanceof C.Operative) {
-                    kont.push(new K.ApplyOperative( (call as C.FExpr), (k as K.ApplyExpr).args, k.env ));
+                    kont.push( K.ApplyOperative( (call as C.FExpr), k.args, k.env ));
                 }
                 else if (call instanceof C.Applicative) {
                     kont.push(
-                        new K.ApplyApplicative( (call as C.Applicative), k.env ),
-                        new K.EvalConsTail( (k as K.ApplyExpr).args, k.env )
+                        K.ApplyApplicative( (call as C.Applicative), k.env ),
+                        K.EvalConsTail( k.args, k.env )
                     );
                 }
                 else {
-                    throw new Error(`What to do with call -> ${call.constructor.name}??`);
+                    throw new Error(`What to do with call -> ${call.toString()}??`);
                 }
                 break;
             // =====================================================================
@@ -229,31 +169,25 @@ export function run (program : C.Term[]) : State {
             // Operatives, or FExprs
             // - the arguments are not evaluated
             // ---------------------------------------------------------------------
-            case K.ApplyOperative:
-                kont.push(...((k as K.ApplyOperative).call as C.FExpr).body(
-                    ((k as K.ApplyOperative).args as C.Cons).toNativeArray(),
-                    k.env
-                ));
+            case 'APPLY/OPERATIVE':
+                kont.push(...(k.call as C.FExpr).body( (k.args as C.Cons).toNativeArray(), k.env ));
                 break;
             // ---------------------------------------------------------------------
             // Applicatives, or Lambdas & Native Functions
             // - arguments are evaluated
             // ---------------------------------------------------------------------
-            case K.ApplyApplicative:
-                switch ((k as K.ApplyApplicative).call.constructor) {
+            case 'APPLY/APPLICATIVE':
+                switch (k.call.constructor) {
                 case C.Native:
-                    kont.push(new K.Return(
-                        ((k as K.ApplyApplicative).call as C.Native).body( k.stack, k.env ),
-                        k.env
-                    ));
+                    kont.push( K.Return( (k.call as C.Native).body( k.stack, k.env ), k.env ));
                     break;
                 case C.Lambda:
-                    let lambda  = (k as K.ApplyApplicative).call as C.Lambda;
+                    let lambda  = k.call as C.Lambda;
                     let local   = lambda.env;
 
                     let params  = lambda.params.toNativeArray();
                     let args    = k.stack;
-                    kont.push( new K.EvalExpr( lambda.body, local.derive( params as C.Sym[], args ) ) );
+                    kont.push( K.EvalExpr( lambda.body, local.derive( params as C.Sym[], args ) ) );
                 }
                 break;
             // ---------------------------------------------------------------------
@@ -267,7 +201,7 @@ export function run (program : C.Term[]) : State {
                 LOG(GREY, `KONT : ~`);
             }
             else {
-                LOG(GREY, `KONT :\n `, kont.toReversed().map((k) => k.toString()).join("\n  "));
+                LOG(GREY, `KONT :\n `, kont.toReversed().map((k) => K.pprint(k)).join("\n  "));
             }
         }
 
@@ -285,8 +219,8 @@ export function run (program : C.Term[]) : State {
     // compile all the expressions
     // and add a Halt at the end
     let kont = [
-        ...program.map((expr) => new K.EvalExpr(expr, env)),
-        new K.Halt(env)
+        ...program.map((expr) => K.EvalExpr(expr, env)),
+        K.Halt(env)
     ].reverse();
 
     // run the program and collect the results
@@ -299,7 +233,7 @@ export function run (program : C.Term[]) : State {
             `STEPS[${tick.toString().padStart(3, '0')}] =>`,
             `STACK : ${stack.map((t) => t.toNativeStr()).join(', ')};`,
             `ENV : ${env.toNativeStr()};`,
-            `KONT : [${kont.map((k) => k.toString()).join(', ')}]`,
+            `KONT : [${kont.map((k) => K.pprint(k)).join(', ')}]`,
         ].join(' '));
     } else {
         throw new Error('Expected result from step, got undefined')

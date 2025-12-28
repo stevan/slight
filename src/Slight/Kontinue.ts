@@ -2,155 +2,76 @@
 import type { Environment } from './Environment'
 import type { Term, Sym, Pair, Cons, Operative, Applicative } from './Terms'
 
-// continuation base ...
+export type Kontinue =
+    | { op : 'HALT',   stack : Term[], env : Environment }
+    | { op : 'DEFINE', stack : Term[], env : Environment, name  : Sym }
+    | { op : 'RETURN', stack : Term[], env : Environment, value : Term }
+    | { op : 'MAKE/PAIR', stack : Term[], env : Environment }
+    | { op : 'MAKE/CONS', stack : Term[], env : Environment }
+    | { op : 'EVAL/EXPR',      stack : Term[], env : Environment, expr : Term }
+    | { op : 'EVAL/PAIR',      stack : Term[], env : Environment, pair : Pair }
+    | { op : 'EVAL/PAIR/SND',  stack : Term[], env : Environment, second : Term }
+    | { op : 'EVAL/CONS',      stack : Term[], env : Environment, cons : Cons }
+    | { op : 'EVAL/CONS/TAIL', stack : Term[], env : Environment, tail : Term }
+    | { op : 'APPLY/EXPR',        stack : Term[], env : Environment, args : Term }
+    | { op : 'APPLY/OPERATIVE',   stack : Term[], env : Environment, call : Operative, args : Term }
+    | { op : 'APPLY/APPLICATIVE', stack : Term[], env : Environment, call : Applicative }
 
-export abstract class Kontinue {
-    public stack : Term[];
-    public env   : Environment;
+export function Halt (env : Environment) : Kontinue { return { op : 'HALT', stack : [], env } }
 
-    constructor(env : Environment) {
-        this.env   = env;
-        this.stack = []
-    }
+export function Define (name  : Sym,  env : Environment) : Kontinue { return { op : 'DEFINE', stack : [], env, name } }
+export function Return (value : Term, env : Environment) : Kontinue { return { op : 'RETURN', stack : [], env, value } }
 
-    toString () : string {
-        let envStr =  this.env.toNativeStr();
-        if (this.stack.length == 0) return ` ${envStr}`;
-        return ` ^(${this.stack.map((t) => t.toNativeStr()).join(';')}) ${envStr}`
-    }
+export function MakePair (env : Environment) : Kontinue { return { op : 'MAKE/PAIR', stack : [], env } }
+export function MakeCons (env : Environment) : Kontinue { return { op : 'MAKE/CONS', stack : [], env } }
+
+export function EvalExpr (expr : Term, env : Environment) : Kontinue {
+    return { op : 'EVAL/EXPR', stack : [], env, expr }
 }
 
-// -----------------------------------------------------------------------------
-// Finish the Program
-
-export class Halt extends Kontinue {
-    override toString () : string {
-        return `HALT!`+super.toString()
-    }
+export function EvalPair (pair : Pair, env : Environment) : Kontinue {
+    return { op : 'EVAL/PAIR', stack : [], env, pair }
 }
 
-// -----------------------------------------------------------------------------
-// Definition
-
-export class Definition extends Kontinue {
-    constructor(public name : Sym, env : Environment) { super(env) }
-    override toString () : string {
-        return `Definition[${this.name.toNativeStr()}]`+super.toString()
-    }
+export function EvalPairSecond (second : Term, env : Environment) : Kontinue {
+    return { op : 'EVAL/PAIR/SND', stack : [], env, second }
 }
 
-// -----------------------------------------------------------------------------
-// Return a Value
-
-export class Return extends Kontinue {
-    constructor(public value : Term, env : Environment) { super(env) }
-    override toString () : string {
-        return `Return[${this.value.toNativeStr()}]`+super.toString()
-    }
+export function EvalCons (cons : Cons, env : Environment) : Kontinue {
+    return { op : 'EVAL/CONS', stack : [], env, cons }
 }
 
-// -----------------------------------------------------------------------------
-// Construction
-
-export class MakePair extends Kontinue {
-    override toString () : string {
-        return `MakePair`+super.toString()
-    }
+export function EvalConsTail (tail : Term, env : Environment) : Kontinue {
+    return { op : 'EVAL/CONS/TAIL', stack : [], env, tail }
 }
 
-export class MakeCons extends Kontinue {
-    override toString () : string {
-        return `MakeCons`+super.toString()
-    }
+export function ApplyExpr (args : Term, env : Environment) : Kontinue {
+    return { op : 'APPLY/EXPR', stack : [], env, args }
 }
 
-// -----------------------------------------------------------------------------
-// Eval:
-//     "What does this expression mean in this environment?"
-// -----------------------------------------------------------------------------
-
-export abstract class Eval extends Kontinue {}
-
-// root eval
-
-export class EvalExpr extends Eval {
-    constructor(public expr : Term, env : Environment) { super(env) }
-    override toString () : string {
-        return `EvalExpr[${this.expr.toNativeStr()}]`+super.toString()
-    }
+export function ApplyOperative (call : Operative, args : Term, env : Environment) : Kontinue {
+    return { op : 'APPLY/OPERATIVE', stack : [], env, call, args }
 }
 
-// eval pairs
-
-export class EvalPair  extends Eval {
-    constructor(public pair : Pair, env : Environment) { super(env) }
-    override toString () : string {
-        return `EvalPair[${this.pair.toNativeStr()}]`+super.toString()
-    }
+export function ApplyApplicative (call : Applicative, env : Environment) : Kontinue {
+    return { op : 'APPLY/APPLICATIVE', stack : [], env, call }
 }
 
-export class EvalPairSecond extends Eval {
-    constructor(public second : Term, env : Environment) { super(env) }
-    override toString () : string {
-        return `EvalPairSecond[${this.second.toNativeStr()}]`+super.toString()
-    }
-}
-
-// eval lists
-
-export class EvalCons  extends Eval {
-    constructor(public cons : Cons, env : Environment) { super(env) }
-    override toString () : string {
-        return `EvalCons[${this.cons.toNativeStr()}]`+super.toString()
-    }
-}
-
-export class EvalConsTail   extends Eval {
-    constructor(public tail : Term, env : Environment) { super(env) }
-    override toString () : string {
-        return `EvalConsTail[${this.tail.toNativeStr()}]`+super.toString()
-    }
-}
-
-// call procedures
-
-export class ApplyExpr extends Kontinue {
-    constructor(public args  : Term, env : Environment) { super(env) }
-    override toString () : string {
-        return `ApplyExpr[${this.args.toNativeStr()}]`+super.toString()
-    }
-}
-
-// -----------------------------------------------------------------------------
-// Apply:
-//     "What happens when I invoke this procedure with these arguments?"
-// -----------------------------------------------------------------------------
-
-export abstract class Apply extends Kontinue {}
-
-// FExprs
-
-export class ApplyOperative extends Apply {
-    public call : Operative;
-    public args : Term;
-
-    constructor(call : Operative, args : Term, env : Environment) {
-        super(env);
-        this.call = call;
-        this.args = args;
-    }
-
-    override toString () : string {
-        return `ApplyOperative[${this.call.toNativeStr()} ${this.args.toNativeStr()}]`+super.toString()
-    }
-}
-
-// Lambda and Native
-
-export class ApplyApplicative extends Apply {
-    constructor(public call : Applicative, env : Environment) { super(env) }
-
-    override toString () : string {
-        return `ApplyApplicative[${this.call.toNativeStr()}]`+super.toString()
+export function pprint (k : Kontinue) : string {
+    switch (k.op) {
+    case 'HALT'              : return `${k.op}[] ^(${k.stack.map((i) => i.toString()).join(';')})`;
+    case 'DEFINE'            : return `${k.op}[${k.name.toString()}] ^(${k.stack.map((i) => i.toString()).join(';')})`;
+    case 'RETURN'            : return `${k.op}[${k.value.toString()}] ^(${k.stack.map((i) => i.toString()).join(';')})`;
+    case 'MAKE/PAIR'         : return `${k.op}[] ^(${k.stack.map((i) => i.toString()).join(';')})`;
+    case 'MAKE/CONS'         : return `${k.op}[] ^(${k.stack.map((i) => i.toString()).join(';')})`;
+    case 'EVAL/EXPR'         : return `${k.op}[${k.expr.toString()}] ^(${k.stack.map((i) => i.toString()).join(';')})`;
+    case 'EVAL/PAIR'         : return `${k.op}[${k.pair.toString()}] ^(${k.stack.map((i) => i.toString()).join(';')})`;
+    case 'EVAL/PAIR/SND'     : return `${k.op}[${k.second.toString()}] ^(${k.stack.map((i) => i.toString()).join(';')})`;
+    case 'EVAL/CONS'         : return `${k.op}[${k.cons.toString()}] ^(${k.stack.map((i) => i.toString()).join(';')})`;
+    case 'EVAL/CONS/TAIL'    : return `${k.op}[${k.tail.toString()}] ^(${k.stack.map((i) => i.toString()).join(';')})`;
+    case 'APPLY/EXPR'        : return `${k.op}[${k.args.toString()}] ^(${k.stack.map((i) => i.toString()).join(';')})`;
+    case 'APPLY/OPERATIVE'   : return `${k.op}[${k.call.toString()}](${k.args.toString()}) ^(${k.stack.map((i) => i.toString()).join(';')})`;
+    case 'APPLY/APPLICATIVE' : return `${k.op}[${k.call.toString()}] ^(${k.stack.map((i) => i.toString()).join(';')})`;
+    default: throw new Error('WTF! PPRTINT');
     }
 }
