@@ -61,7 +61,7 @@ export function run (program : C.Term[]) : State {
             LOG(GREY, `KONT : ~`);
         }
         else {
-            LOG(GREY, `KONT :\n `, kont.toReversed().map((k) => k.toString()).join("\n  "));
+            LOG(GREY, `KONT :\n `, kont.toReversed().map((k) => K.pprint(k)).join("\n  "));
         }
 
         let tick = 0;
@@ -71,7 +71,7 @@ export function run (program : C.Term[]) : State {
             tick++;
             let k = kont.pop() as K.Kontinue;
             HEADER(PURPLE, `STEP(${tick})`, '-');
-            LOG(RED, `=> K : `, k.toString());
+            LOG(RED, `=> K : `, K.pprint(k));
             switch (k.op) {
             // ---------------------------------------------------------------------
             // This is the end of a statement, main exit point
@@ -92,6 +92,19 @@ export function run (program : C.Term[]) : State {
             // ---------------------------------------------------------------------
             case 'RETURN':
                 returnValues( kont, k.value );
+                break;
+            // =====================================================================
+            // Conditonal
+            // =====================================================================
+            case 'IF/ELSE':
+                let cond = k.stack.pop();
+                if (cond == undefined) throw new Error(`STACK UNDERFLOW, expected bool condition`);
+                if (!(cond instanceof C.Bool)) throw new Error(`Expected Bool at top of stack, not ${cond.toString()}`);
+                if ((cond as C.Bool).value) {
+                    kont.push( evaluateTerm( k.ifTrue, k.env ) );
+                } else {
+                    kont.push( evaluateTerm( k.ifFalse, k.env ) );
+                }
                 break;
             // =====================================================================
             // Eval

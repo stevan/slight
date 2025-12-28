@@ -89,6 +89,14 @@ export const ROOT_ENV = new E.Environment((query : C.Sym) : C.Term => {
     // Special Forms (FExprs)
     // -------------------------------------------------------------------------
 
+    case '?:' : return new C.FExpr('?:', (args, env) => {
+        let [ cond, ifTrue, ifFalse ] = args;
+        return [
+            K.IfElse( ifTrue, ifFalse, env ),
+            K.EvalExpr( cond, env ),
+        ]
+    });
+
     case 'lambda' : return new C.FExpr('lambda', (args, env) => {
         let [ params, body ] = args;
         return [
@@ -99,7 +107,7 @@ export const ROOT_ENV = new E.Environment((query : C.Sym) : C.Term => {
         ]
     });
 
-    case 'def' : return new C.FExpr('define', (args, env) => {
+    case 'def' : return new C.FExpr('def', (args, env) => {
         let [ name, body ] = args;
         return [
             K.Define( name as C.Sym, env ),

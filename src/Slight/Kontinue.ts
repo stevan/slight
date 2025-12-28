@@ -4,6 +4,7 @@ import type { Term, Sym, Pair, Cons, Operative, Applicative } from './Terms'
 
 export type Kontinue =
     | { op : 'HALT',   stack : Term[], env : Environment }
+    | { op : 'IF/ELSE', stack : Term[], env : Environment, ifTrue : Term, ifFalse : Term }
     | { op : 'DEFINE', stack : Term[], env : Environment, name  : Sym }
     | { op : 'RETURN', stack : Term[], env : Environment, value : Term }
     | { op : 'MAKE/PAIR', stack : Term[], env : Environment }
@@ -18,6 +19,10 @@ export type Kontinue =
     | { op : 'APPLY/APPLICATIVE', stack : Term[], env : Environment, call : Applicative }
 
 export function Halt (env : Environment) : Kontinue { return { op : 'HALT', stack : [], env } }
+
+export function IfElse (ifTrue : Term, ifFalse : Term, env : Environment) : Kontinue {
+    return { op : 'IF/ELSE', stack : [], env, ifTrue, ifFalse }
+}
 
 export function Define (name  : Sym,  env : Environment) : Kontinue { return { op : 'DEFINE', stack : [], env, name } }
 export function Return (value : Term, env : Environment) : Kontinue { return { op : 'RETURN', stack : [], env, value } }
@@ -59,19 +64,20 @@ export function ApplyApplicative (call : Applicative, env : Environment) : Konti
 
 export function pprint (k : Kontinue) : string {
     switch (k.op) {
-    case 'HALT'              : return `${k.op}[] ^(${k.stack.map((i) => i.toString()).join(';')})`;
-    case 'DEFINE'            : return `${k.op}[${k.name.toString()}] ^(${k.stack.map((i) => i.toString()).join(';')})`;
-    case 'RETURN'            : return `${k.op}[${k.value.toString()}] ^(${k.stack.map((i) => i.toString()).join(';')})`;
-    case 'MAKE/PAIR'         : return `${k.op}[] ^(${k.stack.map((i) => i.toString()).join(';')})`;
-    case 'MAKE/CONS'         : return `${k.op}[] ^(${k.stack.map((i) => i.toString()).join(';')})`;
-    case 'EVAL/EXPR'         : return `${k.op}[${k.expr.toString()}] ^(${k.stack.map((i) => i.toString()).join(';')})`;
-    case 'EVAL/PAIR'         : return `${k.op}[${k.pair.toString()}] ^(${k.stack.map((i) => i.toString()).join(';')})`;
-    case 'EVAL/PAIR/SND'     : return `${k.op}[${k.second.toString()}] ^(${k.stack.map((i) => i.toString()).join(';')})`;
-    case 'EVAL/CONS'         : return `${k.op}[${k.cons.toString()}] ^(${k.stack.map((i) => i.toString()).join(';')})`;
-    case 'EVAL/CONS/TAIL'    : return `${k.op}[${k.tail.toString()}] ^(${k.stack.map((i) => i.toString()).join(';')})`;
-    case 'APPLY/EXPR'        : return `${k.op}[${k.args.toString()}] ^(${k.stack.map((i) => i.toString()).join(';')})`;
-    case 'APPLY/OPERATIVE'   : return `${k.op}[${k.call.toString()}](${k.args.toString()}) ^(${k.stack.map((i) => i.toString()).join(';')})`;
-    case 'APPLY/APPLICATIVE' : return `${k.op}[${k.call.toString()}] ^(${k.stack.map((i) => i.toString()).join(';')})`;
+    case 'HALT'              : return `${k.op}[] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
+    case 'IF/ELSE'           : return `${k.op}[] ^(${k.stack.map((i) => i.toNativeStr()).join(';')}) then: ${k.ifTrue.toNativeStr()} else: ${k.ifFalse.toNativeStr()}`;
+    case 'DEFINE'            : return `${k.op}[${k.name.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
+    case 'RETURN'            : return `${k.op}[${k.value.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
+    case 'MAKE/PAIR'         : return `${k.op}[] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
+    case 'MAKE/CONS'         : return `${k.op}[] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
+    case 'EVAL/EXPR'         : return `${k.op}[${k.expr.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
+    case 'EVAL/PAIR'         : return `${k.op}[${k.pair.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
+    case 'EVAL/PAIR/SND'     : return `${k.op}[${k.second.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
+    case 'EVAL/CONS'         : return `${k.op}[${k.cons.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
+    case 'EVAL/CONS/TAIL'    : return `${k.op}[${k.tail.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
+    case 'APPLY/EXPR'        : return `${k.op}[${k.args.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
+    case 'APPLY/OPERATIVE'   : return `${k.op}[${k.call.toNativeStr()}](${k.args.toNativeStr()}) ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
+    case 'APPLY/APPLICATIVE' : return `${k.op}[${k.call.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
     default: throw new Error('WTF! PPRTINT');
     }
 }

@@ -17,6 +17,11 @@ let program = compile(parse(`
     (((lambda (x) (lambda (y) (+ x y))) 10) 20)
     (head (tail (tail (list 10 20 30))))
     (+ (head (list 10 20)) (head (tail (list 10 20))))
+    (?: true  30 0)
+    (?: false 0 30)
+    (?: (== 10 10) (+ 10 20) 0)
+    (?: (== 10 20) 0 (+ 10 20))
+    (?: false 0 (?: false 0 (+ 10 20)))
 `));
 
 // we can do this cause these are isolated expressions
