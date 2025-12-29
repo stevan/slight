@@ -100,7 +100,7 @@ export const ROOT_ENV = new E.Environment((query : C.Sym) : C.Term => {
     // -------------------------------------------------------------------------
     // Special Forms (FExprs)
     // -------------------------------------------------------------------------
-    // short circuit AND/OR
+    // short circuit AND
     case 'and':
     case '&&' : return new C.FExpr('AND', (args, env) => {
         let [ lhs, rhs ] = args;
@@ -110,6 +110,7 @@ export const ROOT_ENV = new E.Environment((query : C.Sym) : C.Term => {
         ]
     });
 
+    // short circuit OR
     case 'or' :
     case '||' : return new C.FExpr('OR', (args, env) => {
         let [ lhs, rhs ] = args;
@@ -120,6 +121,7 @@ export const ROOT_ENV = new E.Environment((query : C.Sym) : C.Term => {
     });
 
     // ternary condtional
+    case 'if' :
     case '?:' : return new C.FExpr('?:', (args, env) => {
         let [ cond, ifTrue, ifFalse ] = args;
         return [
@@ -150,6 +152,25 @@ export const ROOT_ENV = new E.Environment((query : C.Sym) : C.Term => {
                 new C.Lambda( params as C.Cons, body, env.capture() ),
                 env
             )
+        ]
+    });
+
+    // -------------------------------------------------------------------------
+    // HOST functions
+    // -------------------------------------------------------------------------
+
+    case 'print' : return new C.FExpr('print', (args, env) => {
+        return [
+            K.Host( 'IO::print', env ),
+            K.EvalConsTail( new C.Cons(args), env )
+        ]
+    });
+
+    case 'readline' : return new C.FExpr('readline', (args, env) => {
+        let [ name ] = args;
+        return [
+            K.Define( name as C.Sym, env ),
+            K.Host( 'IO::readline', env ),
         ]
     });
 

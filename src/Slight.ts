@@ -16,12 +16,23 @@ export { parse   } from './Slight/Parser';
 export { compile } from './Slight/Compiler';
 
 // -----------------------------------------------------------------------------
+// I/O
+// -----------------------------------------------------------------------------
+
+import { createInterface } from 'node:readline/promises';
+
+const READLINE = createInterface({
+    input  : process.stdin,
+    output : process.stdout,
+});
+
+// -----------------------------------------------------------------------------
 // Runner
 // -----------------------------------------------------------------------------
 
-export type State = [ C.Term[], E.Environment, K.Kontinue[], number ];
+export type State = [ K.Kontinue, K.Kontinue[], number ];
 
-export function run (program : C.Term[]) : State {
+export async function run (program : C.Term[]) : Promise<State> {
 
     // provides the starting continuation
     // for evaluating any expression
@@ -74,11 +85,17 @@ export function run (program : C.Term[]) : State {
             LOG(RED, `=> K : `, K.pprint(k));
             switch (k.op) {
             // ---------------------------------------------------------------------
+            // This is the end of HOST operation, an async exit point
+            // ---------------------------------------------------------------------
+            case 'HOST':
+                HEADER(ORANGE, `HOST`, '^');
+                return [ k, kont, tick ];
+            // ---------------------------------------------------------------------
             // This is the end of a statement, main exit point
             // ---------------------------------------------------------------------
             case 'HALT':
                 HEADER(YELLOW, `Halt`, '_');
-                return [ k.stack, k.env, kont, tick ];
+                return [ k, kont, tick ];
             // ---------------------------------------------------------------------
             // This is for defining things in the environment
             // ---------------------------------------------------------------------
@@ -231,7 +248,7 @@ export function run (program : C.Term[]) : State {
         }
 
         // should never happen
-        return [ [], startEnv, kont, tick ];
+        throw new Error(`WTF, this should never happen, we should always return`);
     }
 
     // ... program
@@ -248,22 +265,53 @@ export function run (program : C.Term[]) : State {
         K.Halt(env)
     ].reverse();
 
-    // run the program and collect the results
-    let results = execute(env, kont);
+    let results;
+    while (true) {
+        //console.log(`Got ${kont.length} to run`);
+        // run the program and collect the results
+        results = execute(env, kont);
+        if (results == undefined)
+            throw new Error('Expected result from step, got undefined');
 
-    HEADER(ORANGE, `RESULT(s)`, '=');
-    if (results != undefined) {
-        let [ stack, env, kont, tick ] = results;
-        LOG(ORANGE, [
-            `STEPS[${tick.toString().padStart(3, '0')}] =>`,
-            `STACK : ${stack.map((t) => t.toNativeStr()).join(', ')};`,
-            `ENV : ${env.toNativeStr()};`,
-            `KONT : [${kont.map((k) => K.pprint(k)).join(', ')}]`,
-        ].join(' '));
-    } else {
-        throw new Error('Expected result from step, got undefined')
+        let [ k, rest, tick ] = results;
+        if (k.op == 'HOST') {
+            HEADER(GREEN, `PAUSE (${k.handler})`, '@');
+            switch (k.handler) {
+            case 'IO::print':
+                console.log("STDOUT: ", k.stack.map((t) => t.toNativeStr()));
+                break;
+            case 'IO::readline':
+                let input = await READLINE.question('? ');
+                returnValues(rest, new C.Str(input));
+                break;
+            default:
+                throw new Error(`The handler ${k.handler} is not supported`);
+            }
+            HEADER(GREEN, `RESUME (${k.handler})`, '@');
+        }
+
+        // if we are done then print the results and exit
+        if (rest.length == 0) {
+            HEADER(ORANGE, `RESULT(s)`, '=');
+            LOG(ORANGE, [
+                `STEPS[${tick.toString().padStart(3, '0')}] =>`,
+                `STACK : ${k.stack.map((t) => t.toNativeStr()).join(', ')};`,
+                `ENV : ${k.env.toNativeStr()};`,
+                `KONT : [${kont.map((k) => K.pprint(k)).join(', ')}]`,
+            ].join(' '));
+            FOOTER(ORANGE, '=');
+            break;
+        } else {
+            // if we have some left, then
+            // lets run it ... and pass the
+            // env along as well
+            kont = rest;
+            env  = k.env;
+        }
     }
-    FOOTER(ORANGE, '=');
+
+    // close up stuff ...
+    READLINE.close();
 
     return results;
 }

@@ -1,21 +1,22 @@
 
+import { test } from "node:test"
+import  assert  from "node:assert"
+
 import { Dumper } from '../src/Slight/Logger'
 import { parse, compile, run } from '../src/Slight';
 
 
-let program = compile(parse(`
-    (def (length list)
-        (?: (nil? list)
-            0
-            (+ 1 (length (tail list)))))
+test("... playground", async (t) => {
 
-    (length (tail (list 1 2 3 4 5 6)))
-`));
+    let program = compile(parse(`
+        (readline x)
+        (print x)
+    `));
 
-let results = run(program);
+    let results = await run(program);
 
-Dumper.log(results);
-
+    Dumper.log("RESULTS", results);
+});
 
 
 
