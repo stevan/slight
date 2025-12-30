@@ -101,10 +101,6 @@ export async function run (program : C.Term[]) : Promise<State> {
             // ---------------------------------------------------------------------
             case 'DEFINE':
                 let body = k.stack.pop() as C.Term;
-                if (body instanceof C.Lambda) {
-                    // letrec
-                    body.env.define( k.name, body );
-                }
                 k.env.define( k.name, body );
                 break;
             // ---------------------------------------------------------------------
