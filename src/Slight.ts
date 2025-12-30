@@ -239,7 +239,6 @@ export async function run (program : C.Term[]) : Promise<State> {
     let results;
     try {
         while (true) {
-            //console.log(`Got ${kont.length} to run`);
             // run the program and collect the results
             results = execute(env, kont);
             if (results == undefined)
