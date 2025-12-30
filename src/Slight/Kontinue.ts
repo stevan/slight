@@ -13,6 +13,7 @@ export type Kontinue =
     | { op : 'MAKE/PAIR', stack : Term[], env : Environment }
     | { op : 'MAKE/CONS', stack : Term[], env : Environment }
     | { op : 'EVAL/EXPR',      stack : Term[], env : Environment, expr : Term }
+    | { op : 'EVAL/TOS',       stack : Term[], env : Environment }
     | { op : 'EVAL/PAIR',      stack : Term[], env : Environment, pair : Pair }
     | { op : 'EVAL/PAIR/SND',  stack : Term[], env : Environment, second : Term }
     | { op : 'EVAL/CONS',      stack : Term[], env : Environment, cons : Cons }
@@ -40,6 +41,8 @@ export function MakeCons (env : Environment) : Kontinue { return { op : 'MAKE/CO
 export function EvalExpr (expr : Term, env : Environment) : Kontinue {
     return { op : 'EVAL/EXPR', stack : [], env, expr }
 }
+
+export function EvalTOS (env : Environment) : Kontinue { return { op : 'EVAL/TOS', stack : [], env } }
 
 export function EvalPair (pair : Pair, env : Environment) : Kontinue {
     return { op : 'EVAL/PAIR', stack : [], env, pair }
@@ -79,6 +82,7 @@ export function pprint (k : Kontinue) : string {
     case 'MAKE/PAIR'         : return `${k.op}[] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
     case 'MAKE/CONS'         : return `${k.op}[] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
     case 'EVAL/EXPR'         : return `${k.op}[${k.expr.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
+    case 'EVAL/TOS'          : return `${k.op}[] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
     case 'EVAL/PAIR'         : return `${k.op}[${k.pair.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
     case 'EVAL/PAIR/SND'     : return `${k.op}[${k.second.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
     case 'EVAL/CONS'         : return `${k.op}[${k.cons.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
@@ -86,6 +90,6 @@ export function pprint (k : Kontinue) : string {
     case 'APPLY/EXPR'        : return `${k.op}[${k.args.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
     case 'APPLY/OPERATIVE'   : return `${k.op}[${k.call.toNativeStr()}](${k.args.toNativeStr()}) ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
     case 'APPLY/APPLICATIVE' : return `${k.op}[${k.call.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
-    default: throw new Error('WTF! PPRTINT');
+    default: throw new Error(`Did not recognize Kontinue ${k} type`);
     }
 }

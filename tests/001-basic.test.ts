@@ -19,6 +19,11 @@ test("... playground", async (t) => {
                 0
                 (+ 1 (length (tail list)))))
 
+        (def (factorial n)
+            (if (== n 0)
+                1
+                (* n (factorial (- n 1)))))
+
         (list
             30
             (+ 10 20)
@@ -46,6 +51,9 @@ test("... playground", async (t) => {
             (add 10 20)
             ((adder 10) (add 15 5))
             (+ 20 (length (list 0 1 2 3 4 5 6 7 8 9)))
+            (- 750 (factorial 6))
+            (eval (quote (+ 10 20)))
+            (eval (cons (quote +) (quote (10 20))))
         )
     `));
 

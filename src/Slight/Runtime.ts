@@ -79,6 +79,13 @@ export const ROOT_ENV = new E.Environment((query : C.Sym) : C.Term => {
     // lists
     // -------------------------------------------------------------------------
 
+    case 'cons': return new C.Native('cons', (args, env) => {
+        let [ head, tail ] = args;
+        if (tail instanceof C.Nil)  return new C.Cons([ head ]);
+        if (tail instanceof C.Cons) return new C.Cons([ head, ...tail.toNativeArray() ]);
+        return new C.Pair(head, tail);  // dotted pair
+    });
+
     case 'list' : return new C.Native('list', (args, env) => new C.Cons(args));
     case 'head' : return new C.Native('head', (args, env) => {
         let [ arg ] = args;
@@ -153,6 +160,21 @@ export const ROOT_ENV = new E.Environment((query : C.Sym) : C.Term => {
                 env
             )
         ]
+    });
+
+    // quote
+    case 'quote' : return new C.FExpr('quote', (args, env) => {
+        let [expr] = args;
+        return [ K.Return( expr, env ) ];
+    });
+
+    // eval
+    case 'eval' : return new C.FExpr('eval', (args, env) => {
+        let [expr] = args;
+        return [
+            K.EvalTOS(env),
+            K.EvalExpr(expr, env),
+        ];
     });
 
     // -------------------------------------------------------------------------

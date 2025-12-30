@@ -144,6 +144,14 @@ export async function run (program : C.Term[]) : Promise<State> {
                 kont.push( evaluateTerm( k.expr, k.env ) );
                 break;
             // ---------------------------------------------------------------------
+            // Eval the Top of Stack
+            // ---------------------------------------------------------------------
+            case 'EVAL/TOS':
+                let toEval = k.stack.pop();
+                if (toEval === undefined) throw new Error('EVAL/TOS: empty stack');
+                kont.push(evaluateTerm(toEval, k.env));
+                break;
+            // ---------------------------------------------------------------------
             // Eval Pairs
             // ---------------------------------------------------------------------
             case 'EVAL/PAIR':
