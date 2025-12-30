@@ -1,10 +1,4 @@
 
-import {
-    DEBUG,
-    HEADER, FOOTER, LOG,
-    GREEN, RED, ORANGE, YELLOW, BLUE, PURPLE, GREY,
-} from './Slight/Logger'
-
 import { ROOT_ENV } from './Slight/Runtime'
 
 import * as C from './Slight/Terms'
@@ -37,8 +31,6 @@ export async function run (program : C.Term[]) : Promise<State> {
     // provides the starting continuation
     // for evaluating any expression
     const evaluateTerm = (expr : C.Term, env : E.Environment) : K.Kontinue => {
-        HEADER(BLUE, `EVAL`, '.');
-        LOG(BLUE, `[ ${expr.toNativeStr()} ] + ENV ${env.toNativeStr()}`);
         switch (expr.kind) {
         case 'Nil'    :
         case 'Num'    :
@@ -66,35 +58,21 @@ export async function run (program : C.Term[]) : Promise<State> {
 
     // the step function ... !!!
     const execute = (startEnv : E.Environment, kont : K.Kontinue[]) : State => {
-        HEADER(GREEN, `START`, '=');
-        LOG(GREEN, `EVAL in ${startEnv.toNativeStr()}`);
-        if (kont.length == 0) {
-            LOG(GREY, `KONT : ~`);
-        }
-        else {
-            LOG(GREY, `KONT :\n `, kont.toReversed().map((k) => K.pprint(k)).join("\n  "));
-        }
-
         let tick = 0;
 
-        HEADER(YELLOW, `Begin Statement`, '_');
         while (kont.length > 0) {
             tick++;
             let k = kont.pop() as K.Kontinue;
-            HEADER(PURPLE, `STEP(${tick})`, '-');
-            LOG(RED, `=> K : `, K.pprint(k));
             switch (k.op) {
             // ---------------------------------------------------------------------
             // This is the end of HOST operation, an async exit point
             // ---------------------------------------------------------------------
             case 'HOST':
-                HEADER(ORANGE, `HOST`, '^');
                 return [ k, kont, tick ];
             // ---------------------------------------------------------------------
             // This is the end of a statement, main exit point
             // ---------------------------------------------------------------------
             case 'HALT':
-                HEADER(YELLOW, `Halt`, '_');
                 return [ k, kont, tick ];
             // ---------------------------------------------------------------------
             // This is for defining things in the environment
@@ -243,23 +221,11 @@ export async function run (program : C.Term[]) : Promise<State> {
             default:
                 throw new Error(`Unknown Continuation op ${JSON.stringify(k)}`);
             }
-
-            if (kont.length == 0) {
-                LOG(GREY, `KONT : ~`);
-            }
-            else {
-                LOG(GREY, `KONT :\n `, kont.toReversed().map((k) => K.pprint(k)).join("\n  "));
-            }
         }
 
         // should never happen
         throw new Error(`WTF, this should never happen, we should always return`);
     }
-
-    // ... program
-    HEADER(ORANGE, 'PROGRAM', ':');
-    LOG(ORANGE, program.map((e) => e.toNativeStr()).join("\n"));
-    FOOTER(ORANGE, ':');
 
     // start with a fresh one!
     let env = ROOT_ENV.capture();
@@ -281,7 +247,6 @@ export async function run (program : C.Term[]) : Promise<State> {
 
             let [ k, rest, tick ] = results;
             if (k.op == 'HOST') {
-                HEADER(GREEN, `PAUSE (${k.handler})`, '@');
                 switch (k.handler) {
                 case 'IO::print':
                     console.log("STDOUT: ", k.stack.map((t) => t.toNativeStr()));
@@ -293,19 +258,10 @@ export async function run (program : C.Term[]) : Promise<State> {
                 default:
                     throw new Error(`The handler ${k.handler} is not supported`);
                 }
-                HEADER(GREEN, `RESUME (${k.handler})`, '@');
             }
 
             // if we are done then print the results and exit
             if (rest.length == 0) {
-                HEADER(ORANGE, `RESULT(s)`, '=');
-                LOG(ORANGE, [
-                    `STEPS[${tick.toString().padStart(3, '0')}] =>`,
-                    `STACK : ${k.stack.map((t) => t.toNativeStr()).join(', ')};`,
-                    `ENV : ${k.env.toNativeStr()};`,
-                    `KONT : [${kont.map((k) => K.pprint(k)).join(', ')}]`,
-                ].join(' '));
-                FOOTER(ORANGE, '=');
                 break;
             } else {
                 // if we have some left, then

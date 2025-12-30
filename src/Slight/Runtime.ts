@@ -1,11 +1,5 @@
 
 import {
-    DEBUG,
-    HEADER, FOOTER, LOG,
-    GREEN, RED, ORANGE, YELLOW, BLUE, PURPLE, GREY,
-} from './Logger'
-
-import {
     liftNumBinOp,     liftStrBinOp,
     liftNumCompareOp, liftStrCompareOp,
 } from './Util'
@@ -149,7 +143,7 @@ export const constructRootEnvironment = () : E.Environment => {
         let [ params, body ] = args;
         return [
             K.Return(
-                new C.Lambda( params as C.Cons, body, env.capture() ),
+                new C.Lambda( params as C.Cons, body, env ),
                 env
             )
         ]
@@ -163,7 +157,7 @@ export const constructRootEnvironment = () : E.Environment => {
         return [
             K.Define( name as C.Sym, env ),
             K.Return(
-                new C.Lambda( params as C.Cons, body, env.capture() ),
+                new C.Lambda( params as C.Cons, body, env ),
                 env
             )
         ]

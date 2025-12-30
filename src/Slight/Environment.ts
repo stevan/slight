@@ -1,6 +1,4 @@
 
-import { LOG, YELLOW } from './Logger'
-
 import { AbstractTerm, Term, Pair, PairList, Sym } from './Terms'
 
 export type MaybeEnvironment = Environment | undefined
@@ -36,7 +34,7 @@ export class Environment extends AbstractTerm {
     derive (params : Sym[], args : Term[]) : Environment {
         if (params.length != args.length) throw new Error(`Not Enough args!`);
 
-        let local = new Environment( new Map<string, Term>(), this );
+        let local = this.capture();
         for (let i = 0; i < params.length; i++) {
             local.define( params[i] as Sym, args[i] as Term );
         }
