@@ -13,6 +13,10 @@ export function parse (source : string) : Term[] {
         if (token == undefined) throw new Error('Undefined Token');
         let rest = tokens.slice(1);
         if (token == '(') return parseList( rest, [] );
+        if (token == "'") {
+            let [ quoted, remaining ] = parseTokens(rest);
+            return [ [ new Sym("quote"), quoted ], remaining ];
+        }
         switch (true) {
         case token == 'true'        : return [ new Bool(true),         rest ];
         case token == 'false'       : return [ new Bool(false),        rest ];

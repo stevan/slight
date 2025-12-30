@@ -10,7 +10,7 @@ test("... playground", async (t) => {
 
     let program = compile(parse(`
 
-        (eval (cons (quote +) (quote (10 20))))
+        (cons '+ '(10 20))
 
     `));
 
