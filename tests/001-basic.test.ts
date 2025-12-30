@@ -24,6 +24,16 @@ test("... playground", async (t) => {
                 1
                 (* n (factorial (- n 1)))))
 
+        (def (even? n)
+            (if (== n 0)
+                true
+                (odd? (- n 1))))
+
+        (def (odd? n)
+            (if (== n 0)
+                false
+                (even? (- n 1))))
+
         (list
             30
             (+ 10 20)
@@ -44,10 +54,10 @@ test("... playground", async (t) => {
             (?: (== 10 20) 0 (+ 10 20))
             (?: false 0 (?: false 0 (+ 10 20)))
             (&& true  30)
-            (|| false 30)
-            (|| false (and true (+ 10 20)))
+            (|| (odd? 10) 30)
+            (|| false (and (even? 10) (+ 10 20)))
             (or (< 10 0) (&& (>= (+ 20 30) 10) (+ 10 20)))
-            (and (not (! (not false))) (or (! true) 30))
+            (and (not (! (even? 16))) (or (! true) 30))
             (add 10 20)
             ((adder 10) (add 15 5))
             (+ 20 (length (list 0 1 2 3 4 5 6 7 8 9)))

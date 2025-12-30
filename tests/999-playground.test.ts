@@ -10,19 +10,6 @@ test("... playground", async (t) => {
 
     let program = compile(parse(`
 
-        (cons '+ '(10 20))
-
-    `));
-
-    let results = await run(program);
-
-    Dumper.log("RESULTS", results);
-});
-
-
-
-/*
-
     (def (even? n)
         (if (== n 0)
             true
@@ -33,4 +20,15 @@ test("... playground", async (t) => {
             false
             (even? (- n 1))))
 
-*/
+    (list
+        (even? 10)
+        (odd? 10))
+
+    `));
+
+    let results = await run(program);
+
+    Dumper.log("RESULTS", results[0].stack!);
+});
+
+

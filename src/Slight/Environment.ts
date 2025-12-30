@@ -1,52 +1,40 @@
 
 import { LOG, YELLOW } from './Logger'
 
-import { Term, Sym } from './Terms'
+import { Term, Pair, PairList, Sym } from './Terms'
 
-type Scope = (n : Sym) => Term;
+export type MaybeEnvironment = Environment | undefined
 
 export class Environment extends Term {
-    public scope : Scope;
-    public view  : string;
+    public bindings : Map<string, Term>;
+    public parent   : MaybeEnvironment;
 
-    constructor (scope : Scope, view : string = '') {
+    constructor (bindings : Map<string, Term>, parent? : MaybeEnvironment) {
         super();
-        this.scope = scope;
-        this.view  = view;
+        this.bindings = bindings;
+        this.parent   = parent;
     }
 
-    lookup (sym : Sym) : Term {
-        return this.scope(sym);
+    lookup(sym: Sym): Term {
+        if (this.bindings.has(sym.ident))
+            return this.bindings.get(sym.ident)!;
+        if (this.parent)
+            return this.parent.lookup(sym);
+        throw new Error(`Undefined: ${sym.ident}`);
     }
 
-    define (name : Sym, value : Term) : void {
-        let upper = this.scope;
-        LOG(YELLOW, ` ~ define(${name.toNativeStr()}) => ${this.view || '~{}'}`);
-        this.view += `${name.toNativeStr()} : ${value.toNativeStr()}, `;
-        this.scope = (query : Sym) : Term => {
-            LOG(YELLOW, ` ~ lookup // ${query.toNativeStr()} in scope(${name.toNativeStr()})`);
-            if (query.ident == name.ident) return value;
-            return upper(query);
-        };
+    define(name: Sym, value: Term): void {
+        this.bindings.set(name.ident, value);
     }
 
     capture () : Environment {
-        // XXX - consider passing in the lambda
-        // and looking for free variables that
-        // need capturing, not sure if it actually
-        // matters, but we could do it.
-        return new Environment( this.scope, this.view );
+        return new Environment( new Map<string, Term>(), this );
     }
 
     derive (params : Sym[], args : Term[]) : Environment {
         if (params.length != args.length) throw new Error(`Not Enough args!`);
 
-        // TODO - don't define() it all, but
-        // create a custom param/bind Scope
-        // function similar to how builtins
-        // are handled.
-
-        let local = new Environment( this.scope, this.view );
+        let local = new Environment( new Map<string, Term>(), this );
         for (let i = 0; i < params.length; i++) {
             local.define( params[i] as Sym, args[i] as Term );
         }
@@ -54,7 +42,14 @@ export class Environment extends Term {
         return local;
     }
 
-    override toNativeStr () : string {
-        return `~{${this.view}}`
+    // Reification
+    toPairList(): PairList {
+        let pairs = [...this.bindings.entries()]
+              .map(([k, v]) => new Pair(new Sym(k), v));
+        return new PairList(pairs);
+    }
+
+    override toNativeStr(): string {
+        return `Env(${[...this.bindings.keys()].join(', ')})`;
     }
 }
