@@ -39,17 +39,17 @@ export async function run (program : C.Term[]) : Promise<State> {
     const evaluateTerm = (expr : C.Term, env : E.Environment) : K.Kontinue => {
         HEADER(BLUE, `EVAL`, '.');
         LOG(BLUE, `[ ${expr.toNativeStr()} ] + ENV ${env.toNativeStr()}`);
-        switch (expr.constructor) {
-        case C.Nil    :
-        case C.Num    :
-        case C.Str    :
-        case C.Bool   :
-        case C.Native :
-        case C.FExpr  :
-        case C.Lambda : return K.Return( expr, env );
-        case C.Sym    : return K.Return( env.lookup( expr as C.Sym ), env );
-        case C.Pair   : return K.EvalPair( expr as C.Pair, env );
-        case C.Cons   : return K.EvalCons( expr as C.Cons, env );
+        switch (expr.kind) {
+        case 'Nil'    :
+        case 'Num'    :
+        case 'Str'    :
+        case 'Bool'   :
+        case 'Native' :
+        case 'FExpr'  :
+        case 'Lambda' : return K.Return( expr, env );
+        case 'Sym'    : return K.Return( env.lookup( expr ), env );
+        case 'Pair'   : return K.EvalPair( expr, env );
+        case 'Cons'   : return K.EvalCons( expr, env );
         default:
             throw new Error(`Unrecognized Expression ${expr.constructor.name}`);
         }
@@ -100,7 +100,8 @@ export async function run (program : C.Term[]) : Promise<State> {
             // This is for defining things in the environment
             // ---------------------------------------------------------------------
             case 'DEFINE':
-                let body = k.stack.pop() as C.Term;
+                let body = k.stack.pop();
+                if (body == undefined) throw new Error(`Expected body for DEFINE`);
                 k.env.define( k.name, body );
                 break;
             // ---------------------------------------------------------------------
@@ -270,52 +271,57 @@ export async function run (program : C.Term[]) : Promise<State> {
     ].reverse();
 
     let results;
-    while (true) {
-        //console.log(`Got ${kont.length} to run`);
-        // run the program and collect the results
-        results = execute(env, kont);
-        if (results == undefined)
-            throw new Error('Expected result from step, got undefined');
+    try {
+        while (true) {
+            //console.log(`Got ${kont.length} to run`);
+            // run the program and collect the results
+            results = execute(env, kont);
+            if (results == undefined)
+                throw new Error('Expected result from step, got undefined');
 
-        let [ k, rest, tick ] = results;
-        if (k.op == 'HOST') {
-            HEADER(GREEN, `PAUSE (${k.handler})`, '@');
-            switch (k.handler) {
-            case 'IO::print':
-                console.log("STDOUT: ", k.stack.map((t) => t.toNativeStr()));
-                break;
-            case 'IO::readline':
-                let input = await READLINE.question('? ');
-                returnValues(rest, new C.Str(input));
-                break;
-            default:
-                throw new Error(`The handler ${k.handler} is not supported`);
+            let [ k, rest, tick ] = results;
+            if (k.op == 'HOST') {
+                HEADER(GREEN, `PAUSE (${k.handler})`, '@');
+                switch (k.handler) {
+                case 'IO::print':
+                    console.log("STDOUT: ", k.stack.map((t) => t.toNativeStr()));
+                    break;
+                case 'IO::readline':
+                    let input = await READLINE.question('? ');
+                    returnValues(rest, new C.Str(input));
+                    break;
+                default:
+                    throw new Error(`The handler ${k.handler} is not supported`);
+                }
+                HEADER(GREEN, `RESUME (${k.handler})`, '@');
             }
-            HEADER(GREEN, `RESUME (${k.handler})`, '@');
-        }
 
-        // if we are done then print the results and exit
-        if (rest.length == 0) {
-            HEADER(ORANGE, `RESULT(s)`, '=');
-            LOG(ORANGE, [
-                `STEPS[${tick.toString().padStart(3, '0')}] =>`,
-                `STACK : ${k.stack.map((t) => t.toNativeStr()).join(', ')};`,
-                `ENV : ${k.env.toNativeStr()};`,
-                `KONT : [${kont.map((k) => K.pprint(k)).join(', ')}]`,
-            ].join(' '));
-            FOOTER(ORANGE, '=');
-            break;
-        } else {
-            // if we have some left, then
-            // lets run it ... and pass the
-            // env along as well
-            kont = rest;
-            env  = k.env;
+            // if we are done then print the results and exit
+            if (rest.length == 0) {
+                HEADER(ORANGE, `RESULT(s)`, '=');
+                LOG(ORANGE, [
+                    `STEPS[${tick.toString().padStart(3, '0')}] =>`,
+                    `STACK : ${k.stack.map((t) => t.toNativeStr()).join(', ')};`,
+                    `ENV : ${k.env.toNativeStr()};`,
+                    `KONT : [${kont.map((k) => K.pprint(k)).join(', ')}]`,
+                ].join(' '));
+                FOOTER(ORANGE, '=');
+                break;
+            } else {
+                // if we have some left, then
+                // lets run it ... and pass the
+                // env along as well
+                kont = rest;
+                env  = k.env;
+            }
         }
+    } catch (e) {
+        console.log("WHOOPS!!!!!");
+        throw e;
+    } finally {
+        // close up stuff ...
+        READLINE.close();
     }
-
-    // close up stuff ...
-    READLINE.close();
 
     return results;
 }

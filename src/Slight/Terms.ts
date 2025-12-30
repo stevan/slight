@@ -2,7 +2,22 @@
 import type { Environment } from './Environment'
 import type { Kontinue    } from './Kontinue'
 
-export abstract class Term {
+export type Term =
+    | Nil
+    | Bool
+    | Num
+    | Str
+    | Sym
+    | Pair
+    | Cons
+    | PairList
+    | Lambda
+    | Native
+    | FExpr
+
+export abstract class AbstractTerm {
+    abstract readonly kind: string;
+
     abstract toNativeStr () : string;
 
     toStr () : Str { return new Str(this.toNativeStr()) }
@@ -10,11 +25,15 @@ export abstract class Term {
 
 // -----------------------------------------------------------------------------
 
-export class Nil extends Term {
+export class Nil extends AbstractTerm {
+    readonly kind = 'Nil' as const;
+
     override toNativeStr () : string { return '()' }
 }
 
-export class Bool extends Term {
+export class Bool extends AbstractTerm {
+    readonly kind = 'Bool' as const;
+
     public value : boolean;
 
     constructor (value : boolean) {
@@ -25,7 +44,9 @@ export class Bool extends Term {
     override toNativeStr () : string { return this.value ? 'true' : 'false' }
 }
 
-export class Num  extends Term {
+export class Num extends AbstractTerm {
+    readonly kind = 'Num' as const;
+
     public value : number;
 
     constructor (value : number) {
@@ -36,7 +57,9 @@ export class Num  extends Term {
     override toNativeStr () : string { return this.value.toString() }
 }
 
-export class Str  extends Term {
+export class Str extends AbstractTerm {
+    readonly kind = 'Str' as const;
+
     public value : string;
 
     constructor (value : string) {
@@ -47,7 +70,9 @@ export class Str  extends Term {
     override toNativeStr () : string { return `"${this.value}"` }
 }
 
-export class Sym  extends Term {
+export class Sym extends AbstractTerm {
+    readonly kind = 'Sym' as const;
+
     public ident : string;
 
     constructor (ident : string) {
@@ -60,7 +85,9 @@ export class Sym  extends Term {
 
 // -----------------------------------------------------------------------------
 
-export class Pair extends Term {
+export class Pair extends AbstractTerm {
+    readonly kind = 'Pair' as const;
+
     public first  : Term;
     public second : Term;
 
@@ -77,7 +104,7 @@ export class Pair extends Term {
 
 // -----------------------------------------------------------------------------
 
-abstract class List<T extends Term> extends Term {
+abstract class List<T extends Term> extends AbstractTerm {
     public items  : T[];
     public offset : number;
 
@@ -119,6 +146,8 @@ abstract class List<T extends Term> extends Term {
 }
 
 export class Cons extends List<Term> {
+    readonly kind = 'Cons' as const;
+
     get tail () : Cons | Nil {
         if (this.length == 1) return new Nil();
         return new Cons(this.items, this.offset + 1);
@@ -130,6 +159,8 @@ export class Cons extends List<Term> {
 }
 
 export class PairList extends List<Pair> {
+    readonly kind = 'PairList' as const;
+
     get tail () : PairList | Nil {
         if (this.length == 1) return new Nil();
         return new PairList(this.items, this.offset + 1);
@@ -145,10 +176,12 @@ export class PairList extends List<Pair> {
 export type NativeFunc  = (params : Term[], env : Environment) => Term;
 export type NativeFExpr = (params : Term[], env : Environment) => Kontinue[];
 
-export abstract class Applicative extends Term {}
-export abstract class Operative   extends Term {}
+export abstract class Applicative extends AbstractTerm {}
+export abstract class Operative   extends AbstractTerm {}
 
 export class Lambda extends Applicative {
+    readonly kind = 'Lambda' as const;
+
     public params : Cons;
     public body   : Term;
     public env    : Environment;
@@ -166,6 +199,8 @@ export class Lambda extends Applicative {
 }
 
 export class Native extends Applicative {
+    readonly kind = 'Native' as const;
+
     public name : string;
     public body : NativeFunc;
 
@@ -181,6 +216,8 @@ export class Native extends Applicative {
 }
 
 export class FExpr extends Operative {
+    readonly kind = 'FExpr' as const;
+
     public name : string;
     public body : NativeFExpr;
 

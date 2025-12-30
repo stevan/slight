@@ -1,11 +1,13 @@
 
 import { LOG, YELLOW } from './Logger'
 
-import { Term, Pair, PairList, Sym } from './Terms'
+import { AbstractTerm, Term, Pair, PairList, Sym } from './Terms'
 
 export type MaybeEnvironment = Environment | undefined
 
-export class Environment extends Term {
+export class Environment extends AbstractTerm {
+    readonly kind = 'Environment' as const;
+
     public bindings : Map<string, Term>;
     public parent   : MaybeEnvironment;
 
