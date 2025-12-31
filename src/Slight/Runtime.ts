@@ -150,7 +150,7 @@ export const constructRootEnvironment = () : E.Environment => {
     }));
 
     // definitions
-    builtins.set('def', new C.FExpr('def', (args, env) => {
+    builtins.set('defun', new C.FExpr('defun', (args, env) => {
         let [ sig, body ] = args;
         let name   = (sig as C.Cons).head;
         let params = (sig as C.Cons).tail;

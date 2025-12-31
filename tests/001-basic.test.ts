@@ -9,27 +9,27 @@ import { parse, compile, Machine, State } from '../src/Slight'
 
 test("... playground", async (t) => {
     let program = compile(parse(`
-        (def (add x y) (+ x y))
+        (defun (add x y) (+ x y))
 
-        (def (adder x)
+        (defun (adder x)
             (lambda (y) (add x y)))
 
-        (def (length list)
+        (defun (length list)
             (if (nil? list)
                 0
                 (+ 1 (length (tail list)))))
 
-        (def (factorial n)
+        (defun (factorial n)
             (if (== n 0)
                 1
                 (* n (factorial (- n 1)))))
 
-        (def (even? n)
+        (defun (even? n)
             (if (== n 0)
                 true
                 (odd? (- n 1))))
 
-        (def (odd? n)
+        (defun (odd? n)
             (if (== n 0)
                 false
                 (even? (- n 1))))
