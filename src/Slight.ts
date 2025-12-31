@@ -52,31 +52,16 @@ export class Machine {
         this.queue.push(...compiled);
     }
 
-    async handleHostAction (k : K.HostKontinue) : Promise<void> {
-        switch (k.action) {
-        case 'IO::print':
-            console.log("STDOUT: ", k.stack.map((t) => t.toNativeStr()));
-            this.returnValues( new C.Nil() ); // return unit
-            break;
-        case 'IO::readline':
-            let input = await READLINE.question('? ');
-            this.returnValues( new C.Str(input) );
-            break;
-        default:
-            throw new Error(`The Host ${k.action} is not supported`);
-        }
-    }
-
     async run () : Promise<K.HostKontinue> {
         let results : K.HostKontinue | undefined = undefined;
-
         try {
             while (this.queue.length > 0) {
                 results = this.runUntilHost();
                 if (results.action == 'SYS::exit') break;
-                // if not an exit, ... handle the host
-                // action and continue ...
-                await this.handleHostAction(results);
+                // if not an exit, ... handle the host action
+                let resume = await this.handleHostAction(results);
+                // and then resume processing
+                this.queue.push(...resume);
             }
         } catch (e) {
             console.log("WHOOPS!!!!!");
@@ -85,10 +70,21 @@ export class Machine {
             // close up stuff ...
             READLINE.close();
         }
-
         if (results == undefined) throw new Error(`Results are undefined!`);
-
         return results;
+    }
+
+    async handleHostAction (k : K.HostKontinue) : Promise<K.Kontinue[]> {
+        switch (k.action) {
+        case 'IO::print':
+            console.log("STDOUT: ", k.stack.map((t) => t.toNativeStr()));
+            return [ K.Return( new C.Nil(), k.env ) ]; // return unit
+        case 'IO::readline':
+            let input = await READLINE.question('? ');
+            return [ K.Return( new C.Str(input), k.env ) ];
+        default:
+            throw new Error(`The Host ${k.action} is not supported`);
+        }
     }
 
     // provides the starting continuation

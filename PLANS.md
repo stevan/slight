@@ -20,10 +20,19 @@
     - and macro support as well
     
 
+## Slight
+
+- move the load() code into the Compiler
+    - have it handle building the initial continuation queue
+    - then it can be called inside a FExpr and the resulting queue returned
+    
+- the handleHostAction() method needs a lot of work. 
+    - it should be a Map lookup, not a switch statement
+        - these are pluggable handlers
 
 
-
-
+- READLINE needs to be handled better
+    - do this when I clean up the Host action handlers. 
 
 
 
