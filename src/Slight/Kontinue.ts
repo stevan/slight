@@ -5,7 +5,6 @@ import type { Term, Sym, Pair, Cons, Operative, Applicative } from './Terms'
 export type HostHandler = string
 
 export type Kontinue =
-    | { op : 'HALT',   stack : Term[], env : Environment }
     | { op : 'HOST',   stack : Term[], env : Environment, handler : HostHandler }
     | { op : 'IF/ELSE', stack : Term[], env : Environment, cond : Term, ifTrue : Term, ifFalse : Term }
     | { op : 'DEFINE', stack : Term[], env : Environment, name  : Sym }
@@ -21,8 +20,6 @@ export type Kontinue =
     | { op : 'APPLY/EXPR',        stack : Term[], env : Environment, args : Term }
     | { op : 'APPLY/OPERATIVE',   stack : Term[], env : Environment, call : Operative, args : Term }
     | { op : 'APPLY/APPLICATIVE', stack : Term[], env : Environment, call : Applicative }
-
-export function Halt (env : Environment) : Kontinue { return { op : 'HALT', stack : [], env } }
 
 export function Host (handler : HostHandler, env : Environment) : Kontinue {
     return { op : 'HOST', stack : [], env, handler }
@@ -74,7 +71,6 @@ export function ApplyApplicative (call : Applicative, env : Environment) : Konti
 
 export function pprint (k : Kontinue) : string {
     switch (k.op) {
-    case 'HALT'              : return `${k.op}[] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
     case 'HOST'              : return `${k.op}[] ^(${k.stack.map((i) => i.toNativeStr()).join(';')}) handler: ${k.handler}`;
     case 'IF/ELSE'           : return `${k.op}[] ^(${k.stack.map((i) => i.toNativeStr()).join(';')}) then: ${k.ifTrue.toNativeStr()} else: ${k.ifFalse.toNativeStr()}`;
     case 'DEFINE'            : return `${k.op}[${k.name.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;

@@ -9,11 +9,11 @@ export * as Util   from './Slight/Util'
 export { parse   } from './Slight/Parser';
 export { compile } from './Slight/Compiler';
 
+import { createInterface } from 'node:readline/promises';
+
 // -----------------------------------------------------------------------------
 // I/O
 // -----------------------------------------------------------------------------
-
-import { createInterface } from 'node:readline/promises';
 
 const READLINE = createInterface({
     input  : process.stdin,
@@ -24,13 +24,92 @@ const READLINE = createInterface({
 // Runner
 // -----------------------------------------------------------------------------
 
-export type State = [ K.Kontinue, K.Kontinue[], number ];
+export type State = [
+    K.Kontinue,    // last continuation processed
+    K.Kontinue[],  // rest of the program queue
+    number         // tick counter
+];
 
-export async function run (program : C.Term[]) : Promise<State> {
+export class Machine {
+    public rootEnv : E.Environment;
+    public queue   : K.Kontinue[];
+    public running : boolean;
+    public ticks   : number;
+
+    constructor () {
+        // start with a fresh one!
+        this.rootEnv = ROOT_ENV.capture();
+        this.queue   = [];
+        this.ticks   = 0;
+        this.running = false;
+    }
+
+    load (program : C.Term[]) : void {
+        // compile all the expressions
+        // and add a Halt at the end
+        let compiled = [
+            ...program.map((expr) => K.EvalExpr(expr, this.rootEnv)),
+            K.Host('SYS::exit', this.rootEnv)
+        ].reverse();
+        // and then load it into the queue
+        this.queue.push(...compiled);
+    }
+
+    async run () : Promise<State> {
+        let results : State | undefined = undefined;
+
+        try {
+            let kont = [ ...this.queue ];
+            this.running = true;
+            while (this.running) {
+                // run the program and collect the results
+                results = this.runUntilHost(kont)!;
+
+                let [ k, rest, tick ] = results;
+                if (k.op == 'HOST') {
+                    switch (k.handler) {
+                    case 'SYS::exit':
+                        this.running = false;
+                        break;
+                    case 'IO::print':
+                        console.log("STDOUT: ", k.stack.map((t) => t.toNativeStr()));
+                        this.returnValues(rest, new C.Nil()); // return unit
+                        break;
+                    case 'IO::readline':
+                        let input = await READLINE.question('? ');
+                        this.returnValues(rest, new C.Str(input));
+                        break;
+                    default:
+                        throw new Error(`The handler ${k.handler} is not supported`);
+                    }
+                }
+
+                // if we are done then print the results and exit
+                if (rest.length == 0) {
+                    break;
+                } else {
+                    // if we have some left, then
+                    // lets run it ...
+                    kont = rest;
+                }
+            }
+        } catch (e) {
+            console.log("WHOOPS!!!!!");
+            throw e;
+        } finally {
+            this.running = false;
+            // close up stuff ...
+            READLINE.close();
+        }
+
+        if (results == undefined) throw new Error(`Results are undefined!`);
+
+        return results;
+    }
 
     // provides the starting continuation
     // for evaluating any expression
-    const evaluateTerm = (expr : C.Term, env : E.Environment) : K.Kontinue => {
+    evaluateTerm (expr : C.Term, env : E.Environment) : K.Kontinue {
         switch (expr.kind) {
         case 'Nil'    :
         case 'Num'    :
@@ -49,7 +128,7 @@ export async function run (program : C.Term[]) : Promise<State> {
 
     // returns a value to the previous
     // continuation in the stack
-    const returnValues = (kont : K.Kontinue[], ...values : C.Term[]) : void => {
+    returnValues (kont : K.Kontinue[], ...values : C.Term[]) : void {
         if (kont.length == 0)
             throw new Error(`Cannot return value ${values.map((v) => v.toNativeStr()).join(', ')} without continuation`);
         let top = kont.at(-1) as K.Kontinue;
@@ -57,23 +136,16 @@ export async function run (program : C.Term[]) : Promise<State> {
     }
 
     // the step function ... !!!
-    const execute = (startEnv : E.Environment, kont : K.Kontinue[]) : State => {
-        let tick = 0;
-
+    runUntilHost (kont : K.Kontinue[]) : State {
         while (kont.length > 0) {
-            tick++;
+            this.ticks++;
             let k = kont.pop() as K.Kontinue;
             switch (k.op) {
             // ---------------------------------------------------------------------
             // This is the end of HOST operation, an async exit point
             // ---------------------------------------------------------------------
             case 'HOST':
-                return [ k, kont, tick ];
-            // ---------------------------------------------------------------------
-            // This is the end of a statement, main exit point
-            // ---------------------------------------------------------------------
-            case 'HALT':
-                return [ k, kont, tick ];
+                return [ k, kont, this.ticks ];
             // ---------------------------------------------------------------------
             // This is for defining things in the environment
             // ---------------------------------------------------------------------
@@ -87,7 +159,7 @@ export async function run (program : C.Term[]) : Promise<State> {
             // previous continuation in the stack
             // ---------------------------------------------------------------------
             case 'RETURN':
-                returnValues( kont, k.value );
+                this.returnValues( kont, k.value );
                 break;
             // =====================================================================
             // Conditonal
@@ -100,13 +172,13 @@ export async function run (program : C.Term[]) : Promise<State> {
                     kont.push(
                         (k.cond === k.ifTrue)
                             ? K.Return( cond, k.env )
-                            : evaluateTerm( k.ifTrue, k.env )
+                            : this.evaluateTerm( k.ifTrue, k.env )
                     );
                 } else {
                     kont.push(
                         (k.cond === k.ifFalse)
                             ? K.Return( cond, k.env )
-                            : evaluateTerm( k.ifFalse, k.env )
+                            : this.evaluateTerm( k.ifFalse, k.env )
                     );
                 }
                 break;
@@ -116,7 +188,7 @@ export async function run (program : C.Term[]) : Promise<State> {
             // Main entry point
             // ---------------------------------------------------------------------
             case 'EVAL/EXPR':
-                kont.push( evaluateTerm( k.expr, k.env ) );
+                kont.push( this.evaluateTerm( k.expr, k.env ) );
                 break;
             // ---------------------------------------------------------------------
             // Eval the Top of Stack
@@ -124,7 +196,7 @@ export async function run (program : C.Term[]) : Promise<State> {
             case 'EVAL/TOS':
                 let toEval = k.stack.pop();
                 if (toEval === undefined) throw new Error('EVAL/TOS: empty stack');
-                kont.push(evaluateTerm(toEval, k.env));
+                kont.push( this.evaluateTerm(toEval, k.env) );
                 break;
             // ---------------------------------------------------------------------
             // Eval Pairs
@@ -133,11 +205,11 @@ export async function run (program : C.Term[]) : Promise<State> {
                 let pair  = k.pair;
                 kont.push(
                     K.EvalPairSecond( pair.second, k.env ),
-                    evaluateTerm( pair.first, k.env ),
+                    this.evaluateTerm( pair.first, k.env ),
                 );
                 break;
             case 'EVAL/PAIR/SND':
-                let second = evaluateTerm( k.second, k.env );
+                let second = this.evaluateTerm( k.second, k.env );
                 let efirst = k.stack.pop() as C.Term;
                 let mkPair = K.MakePair( k.env );
                 mkPair.stack.push(efirst);
@@ -156,7 +228,7 @@ export async function run (program : C.Term[]) : Promise<State> {
             case 'EVAL/CONS':
                 let cons  = k.cons;
                 let check = K.ApplyExpr( cons.tail, k.env );
-                kont.push( check, evaluateTerm( cons.head, k.env ) );
+                kont.push( check, this.evaluateTerm( cons.head, k.env ) );
                 break;
             case 'EVAL/CONS/TAIL':
                 let tail = k.tail;
@@ -166,8 +238,8 @@ export async function run (program : C.Term[]) : Promise<State> {
                     kont.push( K.EvalConsTail( (tail as C.Cons).tail, k.env ) );
                 }
 
-                k.stack.splice(0).forEach((evaled) => returnValues( kont, evaled ));
-                kont.push( evaluateTerm( (tail as C.Cons).head, k.env ) );
+                k.stack.splice(0).forEach((evaled) => this.returnValues( kont, evaled ));
+                kont.push( this.evaluateTerm( (tail as C.Cons).head, k.env ) );
                 break;
             // ---------------------------------------------------------------------
             // Handle function calls
@@ -226,61 +298,4 @@ export async function run (program : C.Term[]) : Promise<State> {
         // should never happen
         throw new Error(`WTF, this should never happen, we should always return`);
     }
-
-    // start with a fresh one!
-    let env = ROOT_ENV.capture();
-    // compile all the expressions
-    // and add a Halt at the end
-    let kont = [
-        ...program.map((expr) => K.EvalExpr(expr, env)),
-        K.Halt(env)
-    ].reverse();
-
-    let results;
-    try {
-        while (true) {
-            // run the program and collect the results
-            results = execute(env, kont);
-            if (results == undefined)
-                throw new Error('Expected result from step, got undefined');
-
-            let [ k, rest, tick ] = results;
-            if (k.op == 'HOST') {
-                switch (k.handler) {
-                case 'IO::print':
-                    console.log("STDOUT: ", k.stack.map((t) => t.toNativeStr()));
-                    break;
-                case 'IO::readline':
-                    let input = await READLINE.question('? ');
-                    returnValues(rest, new C.Str(input));
-                    break;
-                default:
-                    throw new Error(`The handler ${k.handler} is not supported`);
-                }
-            }
-
-            // if we are done then print the results and exit
-            if (rest.length == 0) {
-                break;
-            } else {
-                // if we have some left, then
-                // lets run it ... and pass the
-                // env along as well
-                kont = rest;
-                env  = k.env;
-            }
-        }
-    } catch (e) {
-        console.log("WHOOPS!!!!!");
-        throw e;
-    } finally {
-        // close up stuff ...
-        READLINE.close();
-    }
-
-    return results;
 }
-
-// -----------------------------------------------------------------------------
-
-

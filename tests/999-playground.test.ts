@@ -3,32 +3,22 @@ import { test } from "node:test"
 import  assert  from "node:assert"
 
 import { Dumper } from '../src/Slight/Logger'
-import { parse, compile, run } from '../src/Slight';
+import { parse, compile, Machine } from '../src/Slight';
 
 
 test("... playground", async (t) => {
 
     let program = compile(parse(`
 
-    (def (even? n)
-        (if (== n 0)
-            true
-            (odd? (- n 1))))
-
-    (def (odd? n)
-        (if (== n 0)
-            false
-            (even? (- n 1))))
-
-    (list
-        (even? 10)
-        (odd? 10))
+        (readline x)
+        (print x)
 
     `));
 
-    let results = await run(program);
+    let machine = new Machine();
+    machine.load(program);
+
+    let results = await machine.run();
 
     Dumper.log("RESULTS", results[0].stack!);
 });
-
-
