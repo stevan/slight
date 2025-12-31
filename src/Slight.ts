@@ -9,6 +9,9 @@ export * as Util   from './Slight/Util'
 export { parse   } from './Slight/Parser';
 export { compile } from './Slight/Compiler';
 
+import { parse   } from './Slight/Parser';
+import { compile } from './Slight/Compiler';
+
 // -----------------------------------------------------------------------------
 // I/O
 // -----------------------------------------------------------------------------
@@ -24,11 +27,6 @@ const READLINE = createInterface({
 // Runner
 // -----------------------------------------------------------------------------
 
-export type State = [
-    K.Kontinue,    // last continuation processed
-    K.Kontinue[],  // rest of the program queue
-];
-
 export class Machine {
     public env   : E.Environment;
     public queue : K.Kontinue[];
@@ -41,11 +39,15 @@ export class Machine {
         this.ticks = 0;
     }
 
+    prepareProgram (program : C.Term[], env : E.Environment) : K.Kontinue[] {
+        return program.map((expr) => K.EvalExpr(expr, env)).reverse()
+    }
+
     async run (program : C.Term[]) : Promise<K.HostKontinue> {
         let result : K.HostKontinue = this.queue[0] as K.HostKontinue;
         try {
             // compile the program terms
-            let compiled = program.map((expr) => K.EvalExpr(expr, this.env)).reverse();
+            let compiled = this.prepareProgram( program, this.env );
             // load the program
             this.queue.push(...compiled);
             // process the queue
@@ -76,6 +78,14 @@ export class Machine {
         case 'IO::readline':
             let input = await READLINE.question('? ');
             return [ K.Return( new C.Str(input), k.env ) ];
+        case 'IO::repl':
+            k.stack.splice(0).forEach((value) => console.log('REPL!', value.toNativeStr()));
+            let source = await READLINE.question('? ');
+            if (source == ':q') return [ K.Return( new C.Nil(), k.env ) ];
+            return [
+                K.Host( 'IO::repl', k.env ),
+                ...this.prepareProgram( compile(parse(source)), k.env ),
+            ];
         default:
             throw new Error(`The Host ${k.action} is not supported`);
         }

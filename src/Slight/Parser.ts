@@ -1,9 +1,7 @@
 
-import { Term, Bool, Num, Str, Sym } from './Terms'
+export type ParseExpr = string | ParseExpr[];
 
-export type ParseExpr = Term | ParseExpr[];
-
-export function parse (source : string) : Term[] {
+export function parse (source : string) : ParseExpr[] {
     const SPLITTER = /\(|\)|'|"(?:[^"\\]|\\.)*"|[^\s\(\)';]+/g;
 
     const tokenize = (src : string) : string[] => src.match(SPLITTER) ?? [];
@@ -15,15 +13,9 @@ export function parse (source : string) : Term[] {
         if (token == '(') return parseList( rest, [] );
         if (token == "'") {
             let [ quoted, remaining ] = parseTokens(rest);
-            return [ [ new Sym("quote"), quoted ], remaining ];
+            return [ [ "quote", quoted ], remaining ];
         }
-        switch (true) {
-        case token == 'true'        : return [ new Bool(true),         rest ];
-        case token == 'false'       : return [ new Bool(false),        rest ];
-        case !isNaN(Number(token))  : return [ new Num(Number(token)), rest ];
-        case token.charAt(0) == '"' : return [ new Str(token.slice(1, token.length - 1)), rest ];
-        default                     : return [ new Sym(token),         rest ];
-        }
+        return [ token, rest ];
     }
 
     const parseList = (tokens : string[], acc : ParseExpr[]) : [ ParseExpr[], string[] ] => {
@@ -37,7 +29,7 @@ export function parse (source : string) : Term[] {
     let rest   = tokens;
     while (rest.length > 0) {
         let [ expr, remaining ] = parseTokens( rest );
-        exprs.push(expr as Term);
+        exprs.push(expr);
         rest = remaining;
     }
     return exprs;

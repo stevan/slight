@@ -197,6 +197,10 @@ export const constructRootEnvironment = () : E.Environment => {
         ]
     }));
 
+    builtins.set('repl', new C.FExpr('repl', (args, env) => {
+        return [ K.Host( 'IO::repl', env ) ]
+    }));
+
     // -------------------------------------------------------------------------
     // TODO:
     // -------------------------------------------------------------------------
