@@ -9,11 +9,11 @@ export * as Util   from './Slight/Util'
 export { parse   } from './Slight/Parser';
 export { compile } from './Slight/Compiler';
 
-import { createInterface } from 'node:readline/promises';
-
 // -----------------------------------------------------------------------------
 // I/O
 // -----------------------------------------------------------------------------
+
+import { createInterface } from 'node:readline/promises';
 
 const READLINE = createInterface({
     input  : process.stdin,
@@ -30,35 +30,31 @@ export type State = [
 ];
 
 export class Machine {
-    public rootEnv : E.Environment;
-    public queue   : K.Kontinue[];
-    public ticks   : number;
+    public env   : E.Environment;
+    public queue : K.Kontinue[];
+    public ticks : number;
 
     constructor () {
         // start with a fresh one!
-        this.rootEnv = ROOT_ENV.capture();
-        this.queue   = [ K.Host('SYS::exit', this.rootEnv) ];
-        this.ticks   = 0;
+        this.env   = ROOT_ENV.capture();
+        this.queue = [ K.Host('SYS::exit', this.env) ];
+        this.ticks = 0;
     }
 
-    load (program : C.Term[]) : void {
-        // compile all the expressions
-        // and add a Halt at the end
-        let compiled = [
-            ...program.map((expr) => K.EvalExpr(expr, this.rootEnv)),
-        ].reverse();
-        // and then load it into the queue
-        this.queue.push(...compiled);
-    }
-
-    async run () : Promise<K.HostKontinue> {
-        let results : K.HostKontinue = this.queue[0] as K.HostKontinue;
+    async run (program : C.Term[]) : Promise<K.HostKontinue> {
+        let result : K.HostKontinue = this.queue[0] as K.HostKontinue;
         try {
+            // compile the program terms
+            let compiled = program.map((expr) => K.EvalExpr(expr, this.env)).reverse();
+            // load the program
+            this.queue.push(...compiled);
+            // process the queue
             while (this.queue.length > 0) {
-                results = this.runUntilHost();
-                if (results.action == 'SYS::exit') break;
+                // until you hit HOST
+                result = this.runUntilHost();
+                if (result.action == 'SYS::exit') break;
                 // if not an exit, ... handle the host action
-                let resume = await this.handleHostAction(results);
+                let resume = await this.handleHostAction(result);
                 // and then resume processing
                 this.queue.push(...resume);
             }
@@ -69,7 +65,7 @@ export class Machine {
             // close up stuff ...
             READLINE.close();
         }
-        return results;
+        return result;
     }
 
     async handleHostAction (k : K.HostKontinue) : Promise<K.Kontinue[]> {

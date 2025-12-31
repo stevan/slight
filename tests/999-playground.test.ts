@@ -16,9 +16,8 @@ test("... playground", async (t) => {
     `));
 
     let machine = new Machine();
-    machine.load(program);
 
-    let k = await machine.run();
+    let k = await machine.run(program);
 
     Dumper.log("RESULTS", k.stack!);
 });
