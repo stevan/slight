@@ -190,11 +190,7 @@ export const constructRootEnvironment = () : E.Environment => {
     }));
 
     builtins.set('readline', new C.FExpr('readline', (args, env) => {
-        let [ name ] = args;
-        return [
-            K.Define( name as C.Sym, env ),
-            K.Host( 'IO::readline', env ),
-        ]
+        return [ K.Host( 'IO::readline', env ) ]
     }));
 
     builtins.set('repl', new C.FExpr('repl', (args, env) => {

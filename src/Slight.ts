@@ -216,6 +216,11 @@ export class Machine {
                 break;
             case 'EVAL/CONS/TAIL':
                 let tail = k.tail;
+                // FIXME - this error should not happen because
+                // it is prevented by the conditional below,
+                // and by the conditionals in APPLY/EXPR, there
+                // has to be a cleaner way to do this, but it
+                // works for now.
                 if (tail instanceof C.Nil) throw new Error(`Tail is Nil!`);
 
                 if (!((tail as C.Cons).tail instanceof C.Nil)) {
@@ -232,13 +237,20 @@ export class Machine {
                 let call = k.stack.pop();
                 if (call == undefined) throw new Error('Expected call on stack');
                 if (call instanceof C.Operative) {
-                    this.queue.push( K.ApplyOperative( (call as C.FExpr), k.args, k.env ));
+                    // FIXME - this is gross
+                    let args = k.args;
+                    if (args instanceof C.Nil) {
+                        args = new C.Cons([]);
+                    }
+                    this.queue.push( K.ApplyOperative( (call as C.FExpr), args, k.env ));
                 }
                 else if (call instanceof C.Applicative) {
-                    this.queue.push(
-                        K.ApplyApplicative( (call as C.Applicative), k.env ),
-                        K.EvalConsTail( k.args, k.env )
-                    );
+                    this.queue.push( K.ApplyApplicative( (call as C.Applicative), k.env ) );
+                    // FIXME - I think this is right place for this
+                    // but see comment above in EVAL/CONS/TAIL
+                    if (!(k.args instanceof C.Nil)) {
+                        this.queue.push( K.EvalConsTail( k.args, k.env ) );
+                    }
                 }
                 else {
                     throw new Error(`What to do with call -> ${call.toString()}??`);

@@ -10,9 +10,11 @@ test("... playground", async (t) => {
 
     let program = compile(parse(`
 
-        (repl "hello")
+        (readline)
 
     `));
+
+    Dumper.log("PROGRAM", program);
 
     let machine = new Machine();
 
