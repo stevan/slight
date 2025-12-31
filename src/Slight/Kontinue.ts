@@ -2,10 +2,10 @@
 import type { Environment } from './Environment'
 import type { Term, Sym, Pair, Cons, Operative, Applicative } from './Terms'
 
-export type HostHandler = string
+export type HostKontinue = { op : 'HOST',   stack : Term[], env : Environment, action : string };
 
 export type Kontinue =
-    | { op : 'HOST',   stack : Term[], env : Environment, handler : HostHandler }
+    | HostKontinue
     | { op : 'IF/ELSE', stack : Term[], env : Environment, cond : Term, ifTrue : Term, ifFalse : Term }
     | { op : 'DEFINE', stack : Term[], env : Environment, name  : Sym }
     | { op : 'RETURN', stack : Term[], env : Environment, value : Term }
@@ -21,8 +21,8 @@ export type Kontinue =
     | { op : 'APPLY/OPERATIVE',   stack : Term[], env : Environment, call : Operative, args : Term }
     | { op : 'APPLY/APPLICATIVE', stack : Term[], env : Environment, call : Applicative }
 
-export function Host (handler : HostHandler, env : Environment) : Kontinue {
-    return { op : 'HOST', stack : [], env, handler }
+export function Host (action : string, env : Environment) : Kontinue {
+    return { op : 'HOST', stack : [], env, action }
 }
 
 export function IfElse (cond : Term, ifTrue : Term, ifFalse : Term, env : Environment) : Kontinue {
@@ -71,7 +71,7 @@ export function ApplyApplicative (call : Applicative, env : Environment) : Konti
 
 export function pprint (k : Kontinue) : string {
     switch (k.op) {
-    case 'HOST'              : return `${k.op}[] ^(${k.stack.map((i) => i.toNativeStr()).join(';')}) handler: ${k.handler}`;
+    case 'HOST'              : return `${k.op}[] ^(${k.stack.map((i) => i.toNativeStr()).join(';')}) action: ${k.action}`;
     case 'IF/ELSE'           : return `${k.op}[] ^(${k.stack.map((i) => i.toNativeStr()).join(';')}) then: ${k.ifTrue.toNativeStr()} else: ${k.ifFalse.toNativeStr()}`;
     case 'DEFINE'            : return `${k.op}[${k.name.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
     case 'RETURN'            : return `${k.op}[${k.value.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;

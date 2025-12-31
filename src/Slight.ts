@@ -27,13 +27,11 @@ const READLINE = createInterface({
 export type State = [
     K.Kontinue,    // last continuation processed
     K.Kontinue[],  // rest of the program queue
-    number         // tick counter
 ];
 
 export class Machine {
     public rootEnv : E.Environment;
     public queue   : K.Kontinue[];
-    public running : boolean;
     public ticks   : number;
 
     constructor () {
@@ -41,7 +39,6 @@ export class Machine {
         this.rootEnv = ROOT_ENV.capture();
         this.queue   = [];
         this.ticks   = 0;
-        this.running = false;
     }
 
     load (program : C.Term[]) : void {
@@ -55,49 +52,36 @@ export class Machine {
         this.queue.push(...compiled);
     }
 
-    async run () : Promise<State> {
-        let results : State | undefined = undefined;
+    async handleHostAction (k : K.HostKontinue) : Promise<void> {
+        switch (k.action) {
+        case 'IO::print':
+            console.log("STDOUT: ", k.stack.map((t) => t.toNativeStr()));
+            this.returnValues( new C.Nil() ); // return unit
+            break;
+        case 'IO::readline':
+            let input = await READLINE.question('? ');
+            this.returnValues( new C.Str(input) );
+            break;
+        default:
+            throw new Error(`The Host ${k.action} is not supported`);
+        }
+    }
+
+    async run () : Promise<K.HostKontinue> {
+        let results : K.HostKontinue | undefined = undefined;
 
         try {
-            let kont = [ ...this.queue ];
-            this.running = true;
-            while (this.running) {
-                // run the program and collect the results
-                results = this.runUntilHost(kont)!;
-
-                let [ k, rest, tick ] = results;
-                if (k.op == 'HOST') {
-                    switch (k.handler) {
-                    case 'SYS::exit':
-                        this.running = false;
-                        break;
-                    case 'IO::print':
-                        console.log("STDOUT: ", k.stack.map((t) => t.toNativeStr()));
-                        this.returnValues(rest, new C.Nil()); // return unit
-                        break;
-                    case 'IO::readline':
-                        let input = await READLINE.question('? ');
-                        this.returnValues(rest, new C.Str(input));
-                        break;
-                    default:
-                        throw new Error(`The handler ${k.handler} is not supported`);
-                    }
-                }
-
-                // if we are done then print the results and exit
-                if (rest.length == 0) {
-                    break;
-                } else {
-                    // if we have some left, then
-                    // lets run it ...
-                    kont = rest;
-                }
+            while (this.queue.length > 0) {
+                results = this.runUntilHost();
+                if (results.action == 'SYS::exit') break;
+                // if not an exit, ... handle the host
+                // action and continue ...
+                await this.handleHostAction(results);
             }
         } catch (e) {
             console.log("WHOOPS!!!!!");
             throw e;
         } finally {
-            this.running = false;
             // close up stuff ...
             READLINE.close();
         }
@@ -128,24 +112,24 @@ export class Machine {
 
     // returns a value to the previous
     // continuation in the stack
-    returnValues (kont : K.Kontinue[], ...values : C.Term[]) : void {
-        if (kont.length == 0)
+    returnValues (...values : C.Term[]) : void {
+        if (this.queue.length == 0)
             throw new Error(`Cannot return value ${values.map((v) => v.toNativeStr()).join(', ')} without continuation`);
-        let top = kont.at(-1) as K.Kontinue;
+        let top = this.queue.at(-1) as K.Kontinue;
         top.stack.push( ...values );
     }
 
     // the step function ... !!!
-    runUntilHost (kont : K.Kontinue[]) : State {
-        while (kont.length > 0) {
+    runUntilHost () : K.HostKontinue {
+        while (this.queue.length > 0) {
             this.ticks++;
-            let k = kont.pop() as K.Kontinue;
+            let k = this.queue.pop() as K.Kontinue;
             switch (k.op) {
             // ---------------------------------------------------------------------
             // This is the end of HOST operation, an async exit point
             // ---------------------------------------------------------------------
             case 'HOST':
-                return [ k, kont, this.ticks ];
+                return k;
             // ---------------------------------------------------------------------
             // This is for defining things in the environment
             // ---------------------------------------------------------------------
@@ -159,7 +143,7 @@ export class Machine {
             // previous continuation in the stack
             // ---------------------------------------------------------------------
             case 'RETURN':
-                this.returnValues( kont, k.value );
+                this.returnValues( k.value );
                 break;
             // =====================================================================
             // Conditonal
@@ -169,13 +153,13 @@ export class Machine {
                 if (cond == undefined) throw new Error(`STACK UNDERFLOW, expected bool condition`);
                 if (!(cond instanceof C.Bool)) throw new Error(`Expected Bool at top of stack, not ${cond.toString()}`);
                 if ((cond as C.Bool).value) {
-                    kont.push(
+                    this.queue.push(
                         (k.cond === k.ifTrue)
                             ? K.Return( cond, k.env )
                             : this.evaluateTerm( k.ifTrue, k.env )
                     );
                 } else {
-                    kont.push(
+                    this.queue.push(
                         (k.cond === k.ifFalse)
                             ? K.Return( cond, k.env )
                             : this.evaluateTerm( k.ifFalse, k.env )
@@ -188,7 +172,7 @@ export class Machine {
             // Main entry point
             // ---------------------------------------------------------------------
             case 'EVAL/EXPR':
-                kont.push( this.evaluateTerm( k.expr, k.env ) );
+                this.queue.push( this.evaluateTerm( k.expr, k.env ) );
                 break;
             // ---------------------------------------------------------------------
             // Eval the Top of Stack
@@ -196,14 +180,14 @@ export class Machine {
             case 'EVAL/TOS':
                 let toEval = k.stack.pop();
                 if (toEval === undefined) throw new Error('EVAL/TOS: empty stack');
-                kont.push( this.evaluateTerm(toEval, k.env) );
+                this.queue.push( this.evaluateTerm(toEval, k.env) );
                 break;
             // ---------------------------------------------------------------------
             // Eval Pairs
             // ---------------------------------------------------------------------
             case 'EVAL/PAIR':
                 let pair  = k.pair;
-                kont.push(
+                this.queue.push(
                     K.EvalPairSecond( pair.second, k.env ),
                     this.evaluateTerm( pair.first, k.env ),
                 );
@@ -213,14 +197,14 @@ export class Machine {
                 let efirst = k.stack.pop() as C.Term;
                 let mkPair = K.MakePair( k.env );
                 mkPair.stack.push(efirst);
-                kont.push( mkPair, second );
+                this.queue.push( mkPair, second );
                 break;
             case 'MAKE/PAIR':
                 let snd = k.stack.pop();
                 let fst = k.stack.pop();
                 if (fst == undefined) throw new Error('Expected fst on stack');
                 if (snd == undefined) throw new Error('Expected snd on stack');
-                kont.push( K.Return( new C.Pair( fst as C.Term, snd as C.Term ), k.env ) );
+                this.queue.push( K.Return( new C.Pair( fst as C.Term, snd as C.Term ), k.env ) );
                 break;
             // ---------------------------------------------------------------------
             // Eval Lists
@@ -228,18 +212,18 @@ export class Machine {
             case 'EVAL/CONS':
                 let cons  = k.cons;
                 let check = K.ApplyExpr( cons.tail, k.env );
-                kont.push( check, this.evaluateTerm( cons.head, k.env ) );
+                this.queue.push( check, this.evaluateTerm( cons.head, k.env ) );
                 break;
             case 'EVAL/CONS/TAIL':
                 let tail = k.tail;
                 if (tail instanceof C.Nil) throw new Error(`Tail is Nil!`);
 
                 if (!((tail as C.Cons).tail instanceof C.Nil)) {
-                    kont.push( K.EvalConsTail( (tail as C.Cons).tail, k.env ) );
+                    this.queue.push( K.EvalConsTail( (tail as C.Cons).tail, k.env ) );
                 }
 
-                k.stack.splice(0).forEach((evaled) => this.returnValues( kont, evaled ));
-                kont.push( this.evaluateTerm( (tail as C.Cons).head, k.env ) );
+                k.stack.splice(0).forEach((evaled) => this.returnValues( evaled ));
+                this.queue.push( this.evaluateTerm( (tail as C.Cons).head, k.env ) );
                 break;
             // ---------------------------------------------------------------------
             // Handle function calls
@@ -248,10 +232,10 @@ export class Machine {
                 let call = k.stack.pop();
                 if (call == undefined) throw new Error('Expected call on stack');
                 if (call instanceof C.Operative) {
-                    kont.push( K.ApplyOperative( (call as C.FExpr), k.args, k.env ));
+                    this.queue.push( K.ApplyOperative( (call as C.FExpr), k.args, k.env ));
                 }
                 else if (call instanceof C.Applicative) {
-                    kont.push(
+                    this.queue.push(
                         K.ApplyApplicative( (call as C.Applicative), k.env ),
                         K.EvalConsTail( k.args, k.env )
                     );
@@ -267,7 +251,7 @@ export class Machine {
             // - the arguments are not evaluated
             // ---------------------------------------------------------------------
             case 'APPLY/OPERATIVE':
-                kont.push(...(k.call as C.FExpr).body( (k.args as C.Cons).toNativeArray(), k.env ));
+                this.queue.push(...(k.call as C.FExpr).body( (k.args as C.Cons).toNativeArray(), k.env ));
                 break;
             // ---------------------------------------------------------------------
             // Applicatives, or Lambdas & Native Functions
@@ -276,7 +260,7 @@ export class Machine {
             case 'APPLY/APPLICATIVE':
                 switch (k.call.constructor) {
                 case C.Native:
-                    kont.push( K.Return( (k.call as C.Native).body( k.stack, k.env ), k.env ));
+                    this.queue.push( K.Return( (k.call as C.Native).body( k.stack, k.env ), k.env ));
                     break;
                 case C.Lambda:
                     let lambda  = k.call as C.Lambda;
@@ -284,7 +268,7 @@ export class Machine {
 
                     let params  = lambda.params.toNativeArray();
                     let args    = k.stack;
-                    kont.push( K.EvalExpr( lambda.body, local.derive( params as C.Sym[], args ) ) );
+                    this.queue.push( K.EvalExpr( lambda.body, local.derive( params as C.Sym[], args ) ) );
                 }
                 break;
             // ---------------------------------------------------------------------

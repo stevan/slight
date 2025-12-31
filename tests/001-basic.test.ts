@@ -75,7 +75,7 @@ test("... playground", async (t) => {
     let results = await machine.run();
 
     console.group('Testing results ...');
-    let [ k, kont, tick ] = results;
+    let k = results;
 
     let list = k.stack.pop() as Cons;
 
