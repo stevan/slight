@@ -37,7 +37,7 @@ export class Machine {
     constructor () {
         // start with a fresh one!
         this.rootEnv = ROOT_ENV.capture();
-        this.queue   = [];
+        this.queue   = [ K.Host('SYS::exit', this.rootEnv) ];
         this.ticks   = 0;
     }
 
@@ -46,14 +46,13 @@ export class Machine {
         // and add a Halt at the end
         let compiled = [
             ...program.map((expr) => K.EvalExpr(expr, this.rootEnv)),
-            K.Host('SYS::exit', this.rootEnv)
         ].reverse();
         // and then load it into the queue
         this.queue.push(...compiled);
     }
 
     async run () : Promise<K.HostKontinue> {
-        let results : K.HostKontinue | undefined = undefined;
+        let results : K.HostKontinue = this.queue[0] as K.HostKontinue;
         try {
             while (this.queue.length > 0) {
                 results = this.runUntilHost();
@@ -70,7 +69,6 @@ export class Machine {
             // close up stuff ...
             READLINE.close();
         }
-        if (results == undefined) throw new Error(`Results are undefined!`);
         return results;
     }
 
