@@ -1,9 +1,48 @@
 
+// -----------------------------------------------------------------------------
+// Debugging/Logging
+// -----------------------------------------------------------------------------
+
+import * as util from 'node:util';
+import { Console } from 'console';
+
+export const DEBUG      = process.env['DEBUG'] == "1" ? true : false
+export const TERM_WIDTH = process.stdout.columns;
+export const MAX_WIDTH  = TERM_WIDTH - 1
+
+const INSPECT_OPTIONS = {
+    depth       : 20,
+    sorted      : true,
+    breakLength : TERM_WIDTH,
+    colors      : true,
+}
+
+export const Logger = new Console({
+    stdout         : process.stdout,
+    stderr         : process.stderr,
+    inspectOptions : INSPECT_OPTIONS,
+})
+
+export const Dumper = new Console({
+    stdout           : process.stdout,
+    stderr           : process.stderr,
+    inspectOptions   : {
+        sorted       : true,
+        compact      : false,
+        breakLength  : TERM_WIDTH,
+        depth        : TERM_WIDTH,
+        colors       : true,
+    },
+    groupIndentation : 4,
+});
+
+// -----------------------------------------------------------------------------
+// helpers for builtins
+// -----------------------------------------------------------------------------
+
 import type { Environment } from './Environment'
 import type { Term, NativeFunc } from './Terms'
 import { Num, Str, Bool } from './Terms'
-
-// helpers for builtins
 
 export const liftNumBinOp = (f : (n : number, m : number) => number) : NativeFunc => {
     return (args : Term[], env : Environment) => {

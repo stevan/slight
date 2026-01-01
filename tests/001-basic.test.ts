@@ -3,7 +3,7 @@ import { test } from "node:test"
 import  assert  from "node:assert"
 
 import { Num, Cons } from '../src/Slight/Terms'
-import { Dumper } from '../src/Slight/Logger'
+import { Dumper } from '../src/Slight/Util'
 import { parse, compile, Machine } from '../src/Slight'
 
 

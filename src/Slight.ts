@@ -80,6 +80,7 @@ export class Machine {
         case 'IO::readline':
             return new Promise<K.Kontinue[]>((resolve) => {
                 READLINE.question('? ', (input : string) => {
+                    // XXX - should I add SIGINT handling here?
                     resolve([ K.Return( new C.Str(input), k.env ) ]);
                 });
             });
@@ -91,6 +92,8 @@ export class Machine {
                 } else {
                     console.log(` >> : ${result.toNativeStr()}`);
                 }
+                // XXX - probably should remove this handler
+                // after I get the response from the REPL
                 READLINE.on('SIGINT', () => { resolve([ K.Return( result, k.env ) ]) });
                 READLINE.question('repl? ', (source : string) => {
                     resolve([
