@@ -108,14 +108,17 @@ export class Machine {
             return new Promise<K.Kontinue[]>((resolve) => {
 
                 if (k.stack.length > 0) {
-                    let prev   = k.stack.pop()!;
                     let result = k.stack.pop()!;
+                    let prev   = k.stack.pop()!;
+                    console.group('');
                     console.log('?? PREV', prev.toNativeStr());
                     console.log('?? RESULT', result.toNativeStr());
+                    console.groupEnd();
                     k.args.push(prev, result);
                 }
 
                 let [ query, ...results ] = k.args;
+                console.group(`--- AI::REPL turn(${results.length / 2}) ---\n`)
                 console.log("QUERY: ", query.toNativeStr());
                 console.log("ARGS:", results.map((r) => r.toNativeStr()))
 
@@ -123,12 +126,10 @@ export class Machine {
                 for (let i = 0; i < results.length; i += 2) {
                     let prev = results[i + 0];
                     let resp = results[i + 1];
-                    let result = `${prev.toNativeStr()} => ${resp.toNativeStr()}`;
-                    prev_results += `  - ${result}\n`;
+                    prev_results += `  ? ${prev.toNativeStr()}\n  > ${resp.toNativeStr()}\n`;
                 }
 
-                let repl_env = k.env.capture();
-                repl_env.define(
+                k.env.define(
                     new C.Sym('resume'),
                     new C.Native('resume', (args, env) => args[0]!)
                 );
@@ -144,7 +145,7 @@ AVAILABLE OPERATIONS:
 (/ n m) - divide two numbers
 (% n m) - modulo two numbers
 (lambda (x y) (...)) - create lambda functions
-(defun (name x y) (...)) - create named functions
+(defun (name x y) (...)) - define named functions
 
 Generate the next REPL expression. You can:
 - Call any available operation to explore or act
@@ -152,38 +153,31 @@ Generate the next REPL expression. You can:
 
 Respond with ONLY a single S-expression, nothing else.
 
-The result of any previous expression and results are listed below.
-
-EXPRESSION-RESULTS:
+HISTORY:
 ${prev_results}
 
 QUERY:
 ${query.toNativeStr()}
 
->`;
-
+?`;
                 console.log("PROMPT: ", prompt);
+                console.groupEnd();
 
                 const claude = spawn("claude", ["-p", prompt]);
                 claude.stdin.end();
 
                 let output = "";
-                claude.stdout.on("data", (data) => {
-                    console.log("... data: ", String(data));
-                    output += data;
-                });
+                claude.stdout.on("data", (data) => output += data);
 
                 claude.on("close", () => {
                     let source   = output.trim();
-                    console.log('>> GOT SOURCE', source);
+                    console.log('>>>>> GOT SOURCE :', source);
                     let compiled = compile(parse(source));
-                    let prepared = this.prepareProgram( compiled, repl_env )
+                    let prepared = this.prepareProgram( compiled, k.env )
                     if (!source.startsWith('(resume')) {
-                        console.log('... is not a resume');
                         k.stack.push(compiled[0]!);
                         prepared.unshift(k);
                     }
-
                     resolve(prepared);
                 });
             });
@@ -238,6 +232,8 @@ ${query.toNativeStr()}
                 let body = k.stack.pop();
                 if (body == undefined) throw new Error(`Expected body for DEFINE`);
                 k.env.define( k.name, body );
+                // FIXME - this should return SOMETHING?!
+                //this.returnValues( k.env.toPairList() );
                 break;
             // ---------------------------------------------------------------------
             // This is a literal value to be returned to the

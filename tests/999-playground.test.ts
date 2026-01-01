@@ -10,9 +10,12 @@ test("... playground", async (t) => {
 
     let program = compile(parse(`
 
-        (if (== 30 (ai-repl "generate a complex expression that evaluates to 30, try up to 3 options before deciding"))
-            (print "Got 30")
-            (print "Not 30"))
+        (defun (is-thirty x)
+            (if (== x 30)
+                (print "Got 30")
+                (print "Not 30")))
+
+        (is-thirty (ai-repl "give me an expression that always evaluates to 30, use lambda expressions and named functions. be creative, try 3 different options and choose one, make sure it works correctly before resuming"))
 
     `));
 

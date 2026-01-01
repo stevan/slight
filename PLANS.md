@@ -20,8 +20,10 @@
     - it's only because i don't handle nullary functions
         - so fix that
 
+## Terms
 
-
+- instead of a name with a FExpr or Native, make it a signature
+    - so `+` becomes `+:(n m)` or something similar
 
 
 
