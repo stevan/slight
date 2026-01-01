@@ -2,7 +2,13 @@
 import type { Environment } from './Environment'
 import type { Term, Sym, Pair, Cons, Operative, Applicative } from './Terms'
 
-export type HostKontinue = { op : 'HOST',   stack : Term[], env : Environment, action : string };
+export type HostKontinue = {
+    op     : 'HOST',
+    stack  : Term[],
+    env    : Environment,
+    action : string,
+    args   : Term[],
+};
 
 export type Kontinue =
     | HostKontinue
@@ -20,8 +26,8 @@ export type Kontinue =
     | { op : 'APPLY/OPERATIVE',   stack : Term[], env : Environment, call : Operative, args : Term }
     | { op : 'APPLY/APPLICATIVE', stack : Term[], env : Environment, call : Applicative }
 
-export function Host (action : string, env : Environment) : Kontinue {
-    return { op : 'HOST', stack : [], env, action }
+export function Host (action : string, env : Environment, ...args : Term[]) : Kontinue {
+    return { op : 'HOST', stack : [], env, action, args }
 }
 
 export function IfElse (cond : Term, ifTrue : Term, ifFalse : Term, env : Environment) : Kontinue {

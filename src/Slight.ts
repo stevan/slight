@@ -16,6 +16,8 @@ import { compile } from './Slight/Compiler';
 // I/O
 // -----------------------------------------------------------------------------
 
+import { spawn } from "child_process";
+
 import * as readline from 'node:readline';
 
 const READLINE : readline.ReadLine = readline.createInterface({
@@ -100,6 +102,89 @@ export class Machine {
                         K.Host( 'IO::repl', k.env ),
                         ...this.prepareProgram( compile(parse(source)), k.env ),
                     ]);
+                });
+            });
+        case 'AI::repl':
+            return new Promise<K.Kontinue[]>((resolve) => {
+
+                if (k.stack.length > 0) {
+                    let prev   = k.stack.pop()!;
+                    let result = k.stack.pop()!;
+                    console.log('?? PREV', prev.toNativeStr());
+                    console.log('?? RESULT', result.toNativeStr());
+                    k.args.push(prev, result);
+                }
+
+                let [ query, ...results ] = k.args;
+                console.log("QUERY: ", query.toNativeStr());
+                console.log("ARGS:", results.map((r) => r.toNativeStr()))
+
+                let prev_results = '';
+                for (let i = 0; i < results.length; i += 2) {
+                    let prev = results[i + 0];
+                    let resp = results[i + 1];
+                    let result = `${prev.toNativeStr()} => ${resp.toNativeStr()}`;
+                    prev_results += `  - ${result}\n`;
+                }
+
+                let repl_env = k.env.capture();
+                repl_env.define(
+                    new C.Sym('resume'),
+                    new C.Native('resume', (args, env) => args[0]!)
+                );
+
+                let prompt = `
+You are an agent working in a Lisp REPL to answer a query.
+Do not use any context outside of this REPL.
+
+AVAILABLE OPERATIONS:
+(+ n m) - add two numbers
+(- n m) - subtract two numbers
+(* n m) - mulitply two numbers
+(/ n m) - divide two numbers
+(% n m) - modulo two numbers
+(lambda (x y) (...)) - create lambda functions
+(defun (name x y) (...)) - create named functions
+
+Generate the next REPL expression. You can:
+- Call any available operation to explore or act
+- Use (resume <value>) when the problem is solved
+
+Respond with ONLY a single S-expression, nothing else.
+
+The result of any previous expression and results are listed below.
+
+EXPRESSION-RESULTS:
+${prev_results}
+
+QUERY:
+${query.toNativeStr()}
+
+>`;
+
+                console.log("PROMPT: ", prompt);
+
+                const claude = spawn("claude", ["-p", prompt]);
+                claude.stdin.end();
+
+                let output = "";
+                claude.stdout.on("data", (data) => {
+                    console.log("... data: ", String(data));
+                    output += data;
+                });
+
+                claude.on("close", () => {
+                    let source   = output.trim();
+                    console.log('>> GOT SOURCE', source);
+                    let compiled = compile(parse(source));
+                    let prepared = this.prepareProgram( compiled, repl_env )
+                    if (!source.startsWith('(resume')) {
+                        console.log('... is not a resume');
+                        k.stack.push(compiled[0]!);
+                        prepared.unshift(k);
+                    }
+
+                    resolve(prepared);
                 });
             });
         default:

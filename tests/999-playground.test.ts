@@ -10,11 +10,13 @@ test("... playground", async (t) => {
 
     let program = compile(parse(`
 
-        (~ "Hello " (repl))
+        (if (== 30 (ai-repl "generate a complex expression that evaluates to 30, try up to 3 options before deciding"))
+            (print "Got 30")
+            (print "Not 30"))
 
     `));
 
-    Dumper.log("PROGRAM", program);
+    Dumper.log("PROGRAM:\n", program.map((expr) => expr.toNativeStr()).join("\n"));
 
     let machine = new Machine();
 

@@ -184,17 +184,21 @@ export const constructRootEnvironment = () : E.Environment => {
 
     builtins.set('print', new C.FExpr('print', (args, env) => {
         return [
-            K.Host( 'IO::print', env ),
+            K.Host( 'IO::print', env, ...args ),
             K.EvalConsTail( new C.Cons(args), env )
         ]
     }));
 
     builtins.set('readline', new C.FExpr('readline', (args, env) => {
-        return [ K.Host( 'IO::readline', env ) ]
+        return [ K.Host( 'IO::readline', env, ...args ) ]
     }));
 
     builtins.set('repl', new C.FExpr('repl', (args, env) => {
-        return [ K.Host( 'IO::repl', env ) ]
+        return [ K.Host( 'IO::repl', env, ...args ) ]
+    }));
+
+    builtins.set('ai-repl', new C.FExpr('ai-repl', (args, env) => {
+        return [ K.Host( 'AI::repl', env, ...args ) ]
     }));
 
     // -------------------------------------------------------------------------
