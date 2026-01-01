@@ -16,9 +16,9 @@ import { compile } from './Slight/Compiler';
 // I/O
 // -----------------------------------------------------------------------------
 
-import { createInterface } from 'node:readline/promises';
+import * as readline from 'node:readline';
 
-const READLINE = createInterface({
+const READLINE : readline.ReadLine = readline.createInterface({
     input  : process.stdin,
     output : process.stdout,
 });
@@ -70,22 +70,35 @@ export class Machine {
         return result;
     }
 
-    async handleHostAction (k : K.HostKontinue) : Promise<K.Kontinue[]> {
+    handleHostAction (k : K.HostKontinue) : Promise<K.Kontinue[]> {
         switch (k.action) {
         case 'IO::print':
-            console.log("STDOUT: ", k.stack.map((t) => t.toNativeStr()));
-            return [ K.Return( new C.Nil(), k.env ) ]; // return unit
+            return new Promise<K.Kontinue[]>((resolve) => {
+                console.log("STDOUT: ", k.stack.map((t) => t.toNativeStr()));
+                resolve([ K.Return( new C.Nil(), k.env ) ]);
+            });
         case 'IO::readline':
-            let input = await READLINE.question('? ');
-            return [ K.Return( new C.Str(input), k.env ) ];
+            return new Promise<K.Kontinue[]>((resolve) => {
+                READLINE.question('? ', (input : string) => {
+                    resolve([ K.Return( new C.Str(input), k.env ) ]);
+                });
+            });
         case 'IO::repl':
-            k.stack.splice(0).forEach((value) => console.log('REPL!', value.toNativeStr()));
-            let source = await READLINE.question('? ');
-            if (source == ':q') return [ K.Return( new C.Nil(), k.env ) ];
-            return [
-                K.Host( 'IO::repl', k.env ),
-                ...this.prepareProgram( compile(parse(source)), k.env ),
-            ];
+            return new Promise<K.Kontinue[]>((resolve) => {
+                let result = k.stack.pop();
+                if (result == undefined) {
+                    result = new C.Nil();
+                } else {
+                    console.log(` >> : ${result.toNativeStr()}`);
+                }
+                READLINE.on('SIGINT', () => { resolve([ K.Return( result, k.env ) ]) });
+                READLINE.question('repl? ', (source : string) => {
+                    resolve([
+                        K.Host( 'IO::repl', k.env ),
+                        ...this.prepareProgram( compile(parse(source)), k.env ),
+                    ]);
+                });
+            });
         default:
             throw new Error(`The Host ${k.action} is not supported`);
         }
