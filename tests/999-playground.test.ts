@@ -10,7 +10,7 @@ test("... playground", async (t) => {
 
     let program = compile(parse(`
 
-        (list :hello :world)
+        (ai-repl "create an expression that evaluates to 30, test it before resuming")
 
     `));
 
