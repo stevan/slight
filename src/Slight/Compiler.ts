@@ -20,26 +20,7 @@ export function compile (expr : ParseNode[]) : C.Term[] {
 
         if (node.length == 0) return new C.Cons([]);
         let rest = node.map((e) => compileExpression(e));
-
-        // handle pairs and bindings
-        if (rest.length == 3) {
-            let [ fst, sym, snd ] = rest;
-            if (sym instanceof C.Sym) {
-                switch(sym.ident) {
-                case ':' : return new C.Pair( fst, snd );
-                default:
-                    // let it fall through
-                }
-            }
-        }
-
-        // handle different list types ...
-        if (rest.every((p) => p instanceof C.Pair)) {
-            return new C.PairList( rest );
-        }
-        else {
-            return new C.Cons( rest );
-        }
+        return new C.Cons( rest );
     }
 
     return expr.map(compileExpression);

@@ -199,15 +199,12 @@ ${query.toNativeStr()}
         case 'FExpr'     :
         case 'Lambda'    :
         case 'Tag'       : return K.Return( expr, env );
-        case 'Pair'      : return K.EvalPair( expr, env );
         case 'Cons'      : return K.EvalCons( expr, env );
         case 'Sym'       :
             let value = env.lookup( expr );
             if (value instanceof C.Exception) return K.Throw( value, env );
             return K.Return( env.lookup( expr ), env );
         case 'Exception' : return K.Throw( expr, env );
-        default:
-            return K.Throw( new C.Exception(`Unrecognized Expression type ${expr.constructor.name}`), env );
         }
     }
 
@@ -296,45 +293,6 @@ ${query.toNativeStr()}
                     break;
                 }
                 this.queue.push( this.evaluateTerm(toEval, k.env) );
-                break;
-            // ---------------------------------------------------------------------
-            // Eval Pairs
-            // ---------------------------------------------------------------------
-            case 'EVAL/PAIR':
-                let pair = k.pair;
-                this.queue.push(
-                    K.EvalPairSecond( pair.second, k.env ),
-                    this.evaluateTerm( pair.first, k.env ),
-                );
-                break;
-            case 'EVAL/PAIR/SND':
-                let efirst = k.stack.pop();
-
-                if (efirst == undefined) {
-                    this.queue.push( K.Throw( new C.Exception('Expected Evalued Pair first at TOS, got nothing '), k.env) );
-                    break;
-                }
-
-                let second = this.evaluateTerm( k.second, k.env );
-                let mkPair = K.MakePair( k.env );
-                mkPair.stack.push(efirst);
-                this.queue.push( mkPair, second );
-                break;
-            case 'MAKE/PAIR':
-                let snd = k.stack.pop();
-                let fst = k.stack.pop();
-
-                if (snd == undefined) {
-                    this.queue.push( K.Throw( new C.Exception('Expected Evalued Pair second at TOS, got nothing '), k.env) );
-                    break;
-                }
-
-                if (fst == undefined) {
-                    this.queue.push( K.Throw( new C.Exception('Expected Evalued Pair first at TOS, got nothing '), k.env) );
-                    break;
-                }
-
-                this.queue.push( K.Return( new C.Pair( fst as C.Term, snd as C.Term ), k.env ) );
                 break;
             // ---------------------------------------------------------------------
             // Eval Lists

@@ -8,9 +8,7 @@ export type Term =
     | Num
     | Str
     | Sym
-    | Pair
     | Cons
-    | PairList
     | Lambda
     | Native
     | FExpr
@@ -115,25 +113,6 @@ export class Sym extends AbstractTerm {
 
 // -----------------------------------------------------------------------------
 
-export class Pair extends AbstractTerm {
-    readonly kind = 'Pair' as const;
-
-    public first  : Term;
-    public second : Term;
-
-    constructor (fst : Term, snd : Term) {
-        super();
-        this.first  = fst;
-        this.second = snd;
-    }
-
-    override toNativeStr () : string {
-        return `(${this.first.toNativeStr()} . ${this.second.toNativeStr()})`
-    }
-}
-
-// -----------------------------------------------------------------------------
-
 abstract class List<T extends Term> extends AbstractTerm {
     public items  : T[];
     public offset : number;
@@ -185,19 +164,6 @@ export class Cons extends List<Term> {
 
     map (f : (i : Term) => Term) : Cons {
         return new Cons( this.mapItems<Term>(f) );
-    }
-}
-
-export class PairList extends List<Pair> {
-    readonly kind = 'PairList' as const;
-
-    get tail () : PairList | Nil {
-        if (this.length == 1) return new Nil();
-        return new PairList(this.items, this.offset + 1);
-    }
-
-    map (f : (i : Pair) => Pair) : PairList {
-        return new PairList( this.mapItems<Pair>(f) );
     }
 }
 

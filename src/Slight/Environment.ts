@@ -1,5 +1,5 @@
 
-import { AbstractTerm, Term, Pair, PairList, Sym, Exception } from './Terms'
+import { AbstractTerm, Term, Sym, Exception } from './Terms'
 
 export type MaybeEnvironment = Environment | undefined
 
@@ -38,13 +38,6 @@ export class Environment extends AbstractTerm {
         }
 
         return local;
-    }
-
-    // Reification
-    toPairList(): PairList {
-        let pairs = [...this.bindings.entries()]
-              .map(([k, v]) => new Pair(new Sym(k), v));
-        return new PairList(pairs);
     }
 
     override toNativeStr(): string {

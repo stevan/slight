@@ -77,7 +77,7 @@ export const constructRootEnvironment = () : E.Environment => {
         let [ head, tail ] = args;
         if (tail instanceof C.Nil)  return new C.Cons([ head ]);
         if (tail instanceof C.Cons) return new C.Cons([ head, ...tail.toNativeArray() ]);
-        return new C.Pair(head, tail);  // dotted pair
+        return new C.Cons([ head, tail ]);
     }));
 
     builtins.set('list' , new C.Native('list', (args, env) => new C.Cons(args)));
