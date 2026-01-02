@@ -2,7 +2,7 @@
 import * as readline from 'node:readline';
 import { spawn } from "child_process";
 
-import type { Machine } from '../Slight'
+import type { Machine } from './Machine'
 
 import * as C from './Terms'
 import * as E from './Environment'
@@ -20,11 +20,13 @@ export interface HostActionHandler {
     shutdown () : void;
 }
 
-export class AgentHandler implements HostActionHandler {
-    public machine : Machine;
+type PrepareProgram = (program : C.Term[], env : E.Environment) => K.Kontinue[];
 
-    constructor (machine : Machine) {
-        this.machine = machine;
+export class AgentHandler implements HostActionHandler {
+    public prepareProgram : PrepareProgram;
+
+    constructor (prepareProgram : PrepareProgram) {
+        this.prepareProgram = prepareProgram;
     }
 
     constructPrompt (query : C.Term, results : C.Term[]) : string {
@@ -98,7 +100,7 @@ ${query.toNativeStr()}
                     let source   = output.trim();
                     console.log('>>>>> GOT SOURCE :', source);
                     let compiled = compile(parse(source));
-                    let prepared = this.machine.prepareProgram( compiled, k.env )
+                    let prepared = this.prepareProgram( compiled, k.env )
                     if (!source.startsWith('(resume')) {
                         k.stack.push(compiled[0]!);
                         prepared.unshift(k);
@@ -116,12 +118,12 @@ ${query.toNativeStr()}
 }
 
 export class IOHandler implements HostActionHandler {
-    public rl      : readline.ReadLine;
-    public machine : Machine;
+    public rl             : readline.ReadLine;
+    public prepareProgram : PrepareProgram;
 
-    constructor (machine : Machine) {
-        this.machine = machine;
-        this.rl      = readline.createInterface({
+    constructor (prepareProgram : PrepareProgram) {
+        this.prepareProgram = prepareProgram;
+        this.rl = readline.createInterface({
             input  : process.stdin,
             output : process.stdout,
         });
@@ -155,7 +157,7 @@ export class IOHandler implements HostActionHandler {
                 this.rl.question('repl? ', (source : string) => {
                     resolve([
                         K.Host( 'IO::repl', k.env ),
-                        ...this.machine.prepareProgram( compile(parse(source)), k.env ),
+                        ...this.prepareProgram( compile(parse(source)), k.env ),
                     ]);
                 });
             });

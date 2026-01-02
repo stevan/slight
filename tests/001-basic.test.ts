@@ -4,7 +4,7 @@ import  assert  from "node:assert"
 
 import { Num, Cons } from '../src/Slight/Terms'
 import { Dumper } from '../src/Slight/Util'
-import { parse, compile, Machine } from '../src/Slight'
+import { parse, compile, Slight } from '../src/Slight'
 
 
 test("... playground", async (t) => {
@@ -69,7 +69,7 @@ test("... playground", async (t) => {
         )
     `));
 
-    let machine = new Machine();
+    let machine = new Slight();
 
     let results = await machine.run(program);
 

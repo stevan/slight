@@ -3,22 +3,22 @@ import { test } from "node:test"
 import  assert  from "node:assert"
 
 import { Dumper } from '../src/Slight/Util'
-import { parse, compile, Machine } from '../src/Slight';
+import { parse, compile, Slight } from '../src/Slight';
 
 
 test("... playground", async (t) => {
 
     let program = compile(parse(`
 
-        (ai-repl "create an expression that evaluates to 30, test it before resuming")
+        (print (+ 100 (repl)))
 
     `));
 
     Dumper.log("PROGRAM:\n", program.map((expr) => expr.toNativeStr()).join("\n"));
 
-    let machine = new Machine();
+    let slight = new Slight();
 
-    let k = await machine.run(program);
+    let k = await slight.run(program);
 
     Dumper.log("RESULTS", {
         action : k.action,
