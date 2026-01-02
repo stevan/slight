@@ -235,8 +235,8 @@ ${query.toNativeStr()}
             // Exception handling
             // ---------------------------------------------------------------------
             case 'THROW':
-                console.log('ERROR', k.exception.toNativeStr());
-                //return K.Host( 'SYS::error', k.env, k.exception );
+                console.log('GOT ERROR', k.exception.toNativeStr());
+                return K.Host( 'SYS::error', k.env, k.exception );
                 break;
             // ---------------------------------------------------------------------
             // This is for defining things in the environment
@@ -312,10 +312,12 @@ ${query.toNativeStr()}
                 break;
             case 'EVAL/PAIR/SND':
                 let efirst = k.stack.pop();
+
                 if (efirst == undefined) {
                     this.queue.push( K.Throw( new C.Exception('Expected Evalued Pair first at TOS, got nothing '), k.env) );
                     break;
                 }
+
                 let second = this.evaluateTerm( k.second, k.env );
                 let mkPair = K.MakePair( k.env );
                 mkPair.stack.push(efirst);
