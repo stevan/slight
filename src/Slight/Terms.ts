@@ -15,6 +15,7 @@ export type Term =
     | Native
     | FExpr
     | Exception
+    | Tag
 
 export abstract class AbstractTerm {
     abstract readonly kind: string;
@@ -37,6 +38,19 @@ export class Exception extends AbstractTerm {
     }
 
     override toNativeStr () : string { return `Exception ${this.msg}` }
+}
+
+export class Tag extends AbstractTerm {
+    readonly kind = 'Tag' as const;
+
+    public ident : string;
+
+    constructor (ident : string) {
+        super();
+        this.ident = ident;
+    }
+
+    override toNativeStr () : string { return this.ident }
 }
 
 // -----------------------------------------------------------------------------

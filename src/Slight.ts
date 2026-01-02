@@ -197,19 +197,17 @@ ${query.toNativeStr()}
         case 'Bool'      :
         case 'Native'    :
         case 'FExpr'     :
-        case 'Lambda'    : return K.Return( expr, env );
+        case 'Lambda'    :
+        case 'Tag'       : return K.Return( expr, env );
         case 'Pair'      : return K.EvalPair( expr, env );
         case 'Cons'      : return K.EvalCons( expr, env );
         case 'Sym'       :
             let value = env.lookup( expr );
-            if (value instanceof C.Exception) {
-                return K.Throw( value, env );
-            } else {
-                return K.Return( env.lookup( expr ), env );
-            }
+            if (value instanceof C.Exception) return K.Throw( value, env );
+            return K.Return( env.lookup( expr ), env );
         case 'Exception' : return K.Throw( expr, env );
         default:
-            return K.Throw( new C.Exception(`Unrecognized Expression ${expr.constructor.name}`), env );
+            return K.Throw( new C.Exception(`Unrecognized Expression type ${expr.constructor.name}`), env );
         }
     }
 
@@ -237,7 +235,6 @@ ${query.toNativeStr()}
             case 'THROW':
                 console.log('GOT ERROR', k.exception.toNativeStr());
                 return K.Host( 'SYS::error', k.env, k.exception );
-                break;
             // ---------------------------------------------------------------------
             // This is for defining things in the environment
             // ---------------------------------------------------------------------
