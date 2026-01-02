@@ -20,12 +20,12 @@ export const constructRootEnvironment = () : E.Environment => {
     // everythings
     // -------------------------------------------------------------------------
 
-    builtins.set('type-of', new C.Native('type-of', (args, env) => {
+    builtins.set('type-of', new C.Native('type-of [any]:str', (args, env) => {
         let [ arg ] = args;
         return new C.Str( arg.constructor.name );
     }));
 
-    builtins.set('to-str', new C.Native('to-string', (args, env) => {
+    builtins.set('pprint', new C.Native('pprint [any]:str', (args, env) => {
         let [ arg ] = args;
         return new C.Str( arg.toNativeStr() );
     }));
@@ -34,66 +34,67 @@ export const constructRootEnvironment = () : E.Environment => {
     // numbers
     // -------------------------------------------------------------------------
 
-    builtins.set('+',  new C.Native('+',  liftNumBinOp((n, m) => n + m)));
-    builtins.set('-',  new C.Native('-',  liftNumBinOp((n, m) => n - m)));
-    builtins.set('*',  new C.Native('*',  liftNumBinOp((n, m) => n * m)));
-    builtins.set('/',  new C.Native('/',  liftNumBinOp((n, m) => n / m)));
-    builtins.set('%',  new C.Native('%',  liftNumBinOp((n, m) => n % m)));
-    builtins.set('==', new C.Native('==', liftNumCompareOp((n, m) => n == m)));
-    builtins.set('!=', new C.Native('!=', liftNumCompareOp((n, m) => n != m)));
-    builtins.set('>=', new C.Native('>=', liftNumCompareOp((n, m) => n >= m)));
-    builtins.set('>',  new C.Native('>',  liftNumCompareOp((n, m) => n >  m)));
-    builtins.set('<=', new C.Native('<=', liftNumCompareOp((n, m) => n <= m)));
-    builtins.set('<',  new C.Native('<',  liftNumCompareOp((n, m) => n <  m)));
+    builtins.set('+',  new C.Native('+ [num;num]:num',  liftNumBinOp((n, m) => n + m)));
+    builtins.set('-',  new C.Native('- [num;num]:num',  liftNumBinOp((n, m) => n - m)));
+    builtins.set('*',  new C.Native('* [num;num]:num',  liftNumBinOp((n, m) => n * m)));
+    builtins.set('/',  new C.Native('/ [num;num]:num',  liftNumBinOp((n, m) => n / m)));
+    builtins.set('%',  new C.Native('% [num;num]:num',  liftNumBinOp((n, m) => n % m)));
+
+    builtins.set('==', new C.Native('== [num;num]:bool', liftNumCompareOp((n, m) => n == m)));
+    builtins.set('!=', new C.Native('!= [num;num]:bool', liftNumCompareOp((n, m) => n != m)));
+    builtins.set('>=', new C.Native('>= [num;num]:bool', liftNumCompareOp((n, m) => n >= m)));
+    builtins.set('>',  new C.Native( '> [num;num]:bool', liftNumCompareOp((n, m) => n >  m)));
+    builtins.set('<=', new C.Native('<= [num;num]:bool', liftNumCompareOp((n, m) => n <= m)));
+    builtins.set('<',  new C.Native( '< [num;num]:bool', liftNumCompareOp((n, m) => n <  m)));
 
     // -------------------------------------------------------------------------
     // strings
     // -------------------------------------------------------------------------
 
-    builtins.set('~' , new C.Native('~',  liftStrBinOp((n, m) => n + m)));
-    builtins.set('eq', new C.Native('eq', liftStrCompareOp((n, m) => n == m)));
-    builtins.set('ne', new C.Native('ne', liftStrCompareOp((n, m) => n != m)));
-    builtins.set('ge', new C.Native('ge', liftStrCompareOp((n, m) => n >= m)));
-    builtins.set('gt', new C.Native('gt', liftStrCompareOp((n, m) => n >  m)));
-    builtins.set('le', new C.Native('le', liftStrCompareOp((n, m) => n <= m)));
-    builtins.set('lt', new C.Native('lt', liftStrCompareOp((n, m) => n <  m)));
+    builtins.set('~' , new C.Native('~ [str;str]:str',  liftStrBinOp((n, m) => n + m)));
+
+    builtins.set('eq', new C.Native('eq [str;str]:bool', liftStrCompareOp((n, m) => n == m)));
+    builtins.set('ne', new C.Native('ne [str;str]:bool', liftStrCompareOp((n, m) => n != m)));
+    builtins.set('ge', new C.Native('ge [str;str]:bool', liftStrCompareOp((n, m) => n >= m)));
+    builtins.set('gt', new C.Native('gt [str;str]:bool', liftStrCompareOp((n, m) => n >  m)));
+    builtins.set('le', new C.Native('le [str;str]:bool', liftStrCompareOp((n, m) => n <= m)));
+    builtins.set('lt', new C.Native('lt [str;str]:bool', liftStrCompareOp((n, m) => n <  m)));
 
     // -------------------------------------------------------------------------
     // booleans
     // -------------------------------------------------------------------------
 
-    builtins.set('!', new C.Native('NOT', (args, env) => {
+    builtins.set('!', new C.Native('! [bool]:bool', (args, env) => {
         let [ arg ] = args;
         if (!(arg instanceof C.Bool)) throw new Error(`Can only call ! on Bool, not ${arg.constructor.name}`);
         return new C.Bool( !arg.value );
     }));
 
-
     // -------------------------------------------------------------------------
     // lists
     // -------------------------------------------------------------------------
 
-    builtins.set('cons', new C.Native('cons', (args, env) => {
+    builtins.set('cons', new C.Native('cons [x;xs]:list', (args, env) => {
         let [ head, tail ] = args;
         if (tail instanceof C.Nil)  return new C.Cons([ head ]);
         if (tail instanceof C.Cons) return new C.Cons([ head, ...tail.toNativeArray() ]);
         return new C.Cons([ head, tail ]);
     }));
 
-    builtins.set('list' , new C.Native('list', (args, env) => new C.Cons(args)));
-    builtins.set('head' , new C.Native('head', (args, env) => {
+    builtins.set('list' , new C.Native('list [...]:list', (args, env) => new C.Cons(args)));
+    builtins.set('head' , new C.Native('head [list]:any', (args, env) => {
         let [ arg ] = args;
         if (!(arg instanceof C.Cons)) throw new Error(`Can only call head() on Cons, not ${arg.constructor.name}`);
         return arg.head;
     }));
 
-    builtins.set('tail' , new C.Native('tail', (args, env) => {
+    builtins.set('tail' , new C.Native('tail [list]:list', (args, env) => {
         let [ arg ] = args;
         if (!(arg instanceof C.Cons)) throw new Error(`Can only call tail() on Cons, not ${arg.constructor.name}`);
         return arg.tail;
     }));
 
-    builtins.set('nil?' , new C.Native('nil?', (args, env) => {
+    builtins.set('nil?' , new C.Native('nil? [any]:bool', (args, env) => {
         let [ arg ] = args;
         return new C.Bool( arg instanceof C.Nil );
     }));
@@ -103,7 +104,7 @@ export const constructRootEnvironment = () : E.Environment => {
     // -------------------------------------------------------------------------
     // short circuit AND
 
-    builtins.set('&&', new C.FExpr('AND', (args, env) => {
+    builtins.set('&&', new C.FExpr('&& [any;any]:any', (args, env) => {
         let [ lhs, rhs ] = args;
         return [
             K.IfElse( lhs, rhs, lhs, env ),
@@ -114,7 +115,7 @@ export const constructRootEnvironment = () : E.Environment => {
 
     // short circuit OR
 
-    builtins.set('||', new C.FExpr('OR', (args, env) => {
+    builtins.set('||', new C.FExpr('|| [any;any]:any', (args, env) => {
         let [ lhs, rhs ] = args;
         return [
             K.IfElse( lhs, lhs, rhs, env ),
@@ -124,7 +125,7 @@ export const constructRootEnvironment = () : E.Environment => {
 
     // ternary condtional
 
-    builtins.set('?:', new C.FExpr('?:', (args, env) => {
+    builtins.set('?:', new C.FExpr('?: [cond;any;any]:any', (args, env) => {
         let [ cond, ifTrue, ifFalse ] = args;
         return [
             K.IfElse( cond, ifTrue, ifFalse, env ),
@@ -139,7 +140,7 @@ export const constructRootEnvironment = () : E.Environment => {
     builtins.set('if',  builtins.get('?:')!);
 
     // lambdas
-    builtins.set('lambda', new C.FExpr('lambda', (args, env) => {
+    builtins.set('lambda', new C.FExpr('lambda [[params];body]:(λ + E)', (args, env) => {
         let [ params, body ] = args;
         return [
             K.Return(
@@ -150,7 +151,7 @@ export const constructRootEnvironment = () : E.Environment => {
     }));
 
     // definitions
-    builtins.set('defun', new C.FExpr('defun', (args, env) => {
+    builtins.set('defun', new C.FExpr('defun [[name;params...];body]:(unit)', (args, env) => {
         let [ sig, body ] = args;
         let name   = (sig as C.Cons).head;
         let params = (sig as C.Cons).tail;
@@ -164,13 +165,13 @@ export const constructRootEnvironment = () : E.Environment => {
     }));
 
     // quote
-    builtins.set('quote', new C.FExpr('quote', (args, env) => {
+    builtins.set('quote', new C.FExpr('quote [any]:any', (args, env) => {
         let [expr] = args;
         return [ K.Return( expr, env ) ];
     }));
 
     // eval
-    builtins.set('eval', new C.FExpr('eval', (args, env) => {
+    builtins.set('eval', new C.FExpr('eval [any]:any', (args, env) => {
         let [expr] = args;
         return [
             K.EvalTOS(env),
@@ -182,22 +183,22 @@ export const constructRootEnvironment = () : E.Environment => {
     // HOST functions
     // -------------------------------------------------------------------------
 
-    builtins.set('print', new C.FExpr('print', (args, env) => {
+    builtins.set('print', new C.FExpr('print [any]:(unit)', (args, env) => {
         return [
             K.Host( 'IO::print', env, ...args ),
             K.EvalConsTail( new C.Cons(args), env )
         ]
     }));
 
-    builtins.set('readline', new C.FExpr('readline', (args, env) => {
+    builtins.set('readline', new C.FExpr('readline []:string', (args, env) => {
         return [ K.Host( 'IO::readline', env, ...args ) ]
     }));
 
-    builtins.set('repl', new C.FExpr('repl', (args, env) => {
+    builtins.set('repl', new C.FExpr('repl []:any', (args, env) => {
         return [ K.Host( 'IO::repl', env.capture(), ...args ) ]
     }));
 
-    builtins.set('ai-repl', new C.FExpr('ai-repl', (args, env) => {
+    builtins.set('ai-repl', new C.FExpr('ai-repl [str]:any', (args, env) => {
         return [ K.Host( 'AI::repl', env.capture(), ...args ) ]
     }));
 

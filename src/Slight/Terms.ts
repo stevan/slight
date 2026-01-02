@@ -207,7 +207,7 @@ export class Native extends Applicative {
     }
 
     override toNativeStr () : string {
-        return `n:(${this.name})`
+        return `Native(${this.name})`
     }
 }
 
@@ -224,6 +224,6 @@ export class FExpr extends Operative {
     }
 
     override toNativeStr () : string {
-        return `f:(${this.name})`
+        return `FExpr[ ${this.name} ]`
     }
 }

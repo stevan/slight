@@ -10,7 +10,7 @@ test("... playground", async (t) => {
 
     let program = compile(parse(`
 
-        (print (+ 100 (repl)))
+        ((repl) 10 20)
 
     `));
 
