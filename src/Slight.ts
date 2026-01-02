@@ -236,7 +236,8 @@ ${query.toNativeStr()}
             // ---------------------------------------------------------------------
             case 'THROW':
                 console.log('ERROR', k.exception.toNativeStr());
-                return K.Host( 'SYS::error', k.env, k.exception );
+                //return K.Host( 'SYS::error', k.env, k.exception );
+                break;
             // ---------------------------------------------------------------------
             // This is for defining things in the environment
             // ---------------------------------------------------------------------
