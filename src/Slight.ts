@@ -56,7 +56,8 @@ export class Machine {
             while (this.queue.length > 0) {
                 // until you hit HOST
                 result = this.runUntilHost();
-                if (result.action == 'SYS::exit') break;
+                if (result.action == 'SYS::exit' ) break;
+                if (result.action == 'SYS::error') break;
                 // if not an exit, ... handle the host action
                 let resume = await this.handleHostAction(result);
                 // and then resume processing
@@ -190,27 +191,32 @@ ${query.toNativeStr()}
     // for evaluating any expression
     evaluateTerm (expr : C.Term, env : E.Environment) : K.Kontinue {
         switch (expr.kind) {
-        case 'Nil'    :
-        case 'Num'    :
-        case 'Str'    :
-        case 'Bool'   :
-        case 'Native' :
-        case 'FExpr'  :
-        case 'Lambda' : return K.Return( expr, env );
-        case 'Sym'    : return K.Return( env.lookup( expr ), env );
-        case 'Pair'   : return K.EvalPair( expr, env );
-        case 'Cons'   : return K.EvalCons( expr, env );
+        case 'Nil'       :
+        case 'Num'       :
+        case 'Str'       :
+        case 'Bool'      :
+        case 'Native'    :
+        case 'FExpr'     :
+        case 'Lambda'    : return K.Return( expr, env );
+        case 'Pair'      : return K.EvalPair( expr, env );
+        case 'Cons'      : return K.EvalCons( expr, env );
+        case 'Sym'       :
+            let value = env.lookup( expr );
+            if (value instanceof C.Exception) {
+                return K.Throw( value, env );
+            } else {
+                return K.Return( env.lookup( expr ), env );
+            }
+        case 'Exception' : return K.Throw( expr, env );
         default:
-            throw new Error(`Unrecognized Expression ${expr.constructor.name}`);
+            return K.Throw( new C.Exception(`Unrecognized Expression ${expr.constructor.name}`), env );
         }
     }
 
     // returns a value to the previous
     // continuation in the stack
     returnValues (...values : C.Term[]) : void {
-        if (this.queue.length == 0)
-            throw new Error(`Cannot return value ${values.map((v) => v.toNativeStr()).join(', ')} without continuation`);
-        let top = this.queue.at(-1) as K.Kontinue;
+        let top = this.queue.at(-1)!;
         top.stack.push( ...values );
     }
 
@@ -226,11 +232,16 @@ ${query.toNativeStr()}
             case 'HOST':
                 return k;
             // ---------------------------------------------------------------------
+            // Exception handling
+            // ---------------------------------------------------------------------
+            case 'THROW':
+                console.log('ERROR', k.exception.toNativeStr());
+                return K.Host( 'SYS::error', k.env, k.exception );
+            // ---------------------------------------------------------------------
             // This is for defining things in the environment
             // ---------------------------------------------------------------------
             case 'DEFINE':
-                let body = k.stack.pop();
-                if (body == undefined) throw new Error(`Expected body for DEFINE`);
+                let body = k.stack.pop()!;
                 k.env.define( k.name, body );
                 // FIXME - this should return SOMETHING?!
                 //this.returnValues( k.env.toPairList() );
@@ -246,16 +257,22 @@ ${query.toNativeStr()}
             // Conditonal
             // =====================================================================
             case 'IF/ELSE':
-                let cond = k.stack.pop();
-                if (cond == undefined) throw new Error(`STACK UNDERFLOW, expected bool condition`);
-                if (!(cond instanceof C.Bool)) throw new Error(`Expected Bool at top of stack, not ${cond.toString()}`);
+                let cond = k.stack.pop()!;
+                if (!(cond instanceof C.Bool)) {
+                    this.queue.push(
+                        K.Throw( new C.Exception(`Expected Bool at top of stack, not ${cond.kind} ${cond.toNativeStr()}`), k.env )
+                    );
+                    break;
+                }
+
                 if ((cond as C.Bool).value) {
                     this.queue.push(
                         (k.cond === k.ifTrue)
                             ? K.Return( cond, k.env )
                             : this.evaluateTerm( k.ifTrue, k.env )
                     );
-                } else {
+                }
+                else {
                     this.queue.push(
                         (k.cond === k.ifFalse)
                             ? K.Return( cond, k.env )
@@ -276,22 +293,29 @@ ${query.toNativeStr()}
             // ---------------------------------------------------------------------
             case 'EVAL/TOS':
                 let toEval = k.stack.pop();
-                if (toEval === undefined) throw new Error('EVAL/TOS: empty stack');
+                if (toEval == undefined) {
+                    this.queue.push( K.Throw( new C.Exception('Expected Term at TOS, got nothing'), k.env) );
+                    break;
+                }
                 this.queue.push( this.evaluateTerm(toEval, k.env) );
                 break;
             // ---------------------------------------------------------------------
             // Eval Pairs
             // ---------------------------------------------------------------------
             case 'EVAL/PAIR':
-                let pair  = k.pair;
+                let pair = k.pair;
                 this.queue.push(
                     K.EvalPairSecond( pair.second, k.env ),
                     this.evaluateTerm( pair.first, k.env ),
                 );
                 break;
             case 'EVAL/PAIR/SND':
+                let efirst = k.stack.pop();
+                if (efirst == undefined) {
+                    this.queue.push( K.Throw( new C.Exception('Expected Evalued Pair first at TOS, got nothing '), k.env) );
+                    break;
+                }
                 let second = this.evaluateTerm( k.second, k.env );
-                let efirst = k.stack.pop() as C.Term;
                 let mkPair = K.MakePair( k.env );
                 mkPair.stack.push(efirst);
                 this.queue.push( mkPair, second );
@@ -299,8 +323,17 @@ ${query.toNativeStr()}
             case 'MAKE/PAIR':
                 let snd = k.stack.pop();
                 let fst = k.stack.pop();
-                if (fst == undefined) throw new Error('Expected fst on stack');
-                if (snd == undefined) throw new Error('Expected snd on stack');
+
+                if (snd == undefined) {
+                    this.queue.push( K.Throw( new C.Exception('Expected Evalued Pair second at TOS, got nothing '), k.env) );
+                    break;
+                }
+
+                if (fst == undefined) {
+                    this.queue.push( K.Throw( new C.Exception('Expected Evalued Pair first at TOS, got nothing '), k.env) );
+                    break;
+                }
+
                 this.queue.push( K.Return( new C.Pair( fst as C.Term, snd as C.Term ), k.env ) );
                 break;
             // ---------------------------------------------------------------------
@@ -318,7 +351,10 @@ ${query.toNativeStr()}
                 // and by the conditionals in APPLY/EXPR, there
                 // has to be a cleaner way to do this, but it
                 // works for now.
-                if (tail instanceof C.Nil) throw new Error(`Tail is Nil!`);
+                if (tail instanceof C.Nil) {
+                    this.queue.push( K.Throw( new C.Exception('Got Nil in EVAL/CONS/TAIL, should never happen!'), k.env) );
+                    break;
+                }
 
                 if (!((tail as C.Cons).tail instanceof C.Nil)) {
                     this.queue.push( K.EvalConsTail( (tail as C.Cons).tail, k.env ) );
@@ -332,7 +368,11 @@ ${query.toNativeStr()}
             // ---------------------------------------------------------------------
             case 'APPLY/EXPR':
                 let call = k.stack.pop();
-                if (call == undefined) throw new Error('Expected call on stack');
+                if (call == undefined) {
+                    this.queue.push( K.Throw( new C.Exception('Expected callable at TOS, got nothing'), k.env) );
+                    break;
+                }
+
                 if (call instanceof C.Operative) {
                     // FIXME - this is gross
                     let args = k.args;
@@ -350,7 +390,10 @@ ${query.toNativeStr()}
                     }
                 }
                 else {
-                    throw new Error(`What to do with call -> ${call.toString()}??`);
+                    this.queue.push(K.Throw(
+                        new C.Exception(`Cannot APPLY/EXPR to non-Callable ${call.toNativeStr()}`),
+                        k.env
+                    ));
                 }
                 break;
             // =====================================================================

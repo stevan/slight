@@ -14,6 +14,7 @@ export type Term =
     | Lambda
     | Native
     | FExpr
+    | Exception
 
 export abstract class AbstractTerm {
     abstract readonly kind: string;
@@ -21,6 +22,21 @@ export abstract class AbstractTerm {
     abstract toNativeStr () : string;
 
     toStr () : Str { return new Str(this.toNativeStr()) }
+}
+
+// -----------------------------------------------------------------------------
+
+export class Exception extends AbstractTerm {
+    readonly kind = 'Exception' as const;
+
+    public msg : string;
+
+    constructor (msg : string) {
+        super();
+        this.msg = msg;
+    }
+
+    override toNativeStr () : string { return `Exception ${this.msg}` }
 }
 
 // -----------------------------------------------------------------------------

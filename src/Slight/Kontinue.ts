@@ -1,6 +1,6 @@
 
 import type { Environment } from './Environment'
-import type { Term, Sym, Pair, Cons, Operative, Applicative } from './Terms'
+import type { Term, Sym, Pair, Cons, Operative, Applicative, Exception } from './Terms'
 
 export type HostKontinue = {
     op     : 'HOST',
@@ -10,8 +10,16 @@ export type HostKontinue = {
     args   : Term[],
 };
 
+export type ThrowKontinue = {
+    op        : 'THROW',
+    stack     : Term[],
+    env       : Environment,
+    exception : Exception
+};
+
 export type Kontinue =
     | HostKontinue
+    | ThrowKontinue
     | { op : 'IF/ELSE', stack : Term[], env : Environment, cond : Term, ifTrue : Term, ifFalse : Term }
     | { op : 'DEFINE', stack : Term[], env : Environment, name  : Sym }
     | { op : 'RETURN', stack : Term[], env : Environment, value : Term }
@@ -26,8 +34,12 @@ export type Kontinue =
     | { op : 'APPLY/OPERATIVE',   stack : Term[], env : Environment, call : Operative, args : Term }
     | { op : 'APPLY/APPLICATIVE', stack : Term[], env : Environment, call : Applicative }
 
-export function Host (action : string, env : Environment, ...args : Term[]) : Kontinue {
+export function Host (action : string, env : Environment, ...args : Term[]) : HostKontinue {
     return { op : 'HOST', stack : [], env, action, args }
+}
+
+export function Throw (exception : Exception, env : Environment) : ThrowKontinue {
+    return { op : 'THROW', stack : [], env, exception }
 }
 
 export function IfElse (cond : Term, ifTrue : Term, ifFalse : Term, env : Environment) : Kontinue {

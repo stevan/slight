@@ -10,12 +10,8 @@ test("... playground", async (t) => {
 
     let program = compile(parse(`
 
-        (defun (is-thirty x)
-            (if (== x 30)
-                (print "Got 30")
-                (print "Not 30")))
+        (repl)
 
-        (is-thirty (ai-repl "give me an expression that always evaluates to 30, use lambda expressions and named functions. be creative, try 3 different options and choose one, make sure it works correctly before resuming"))
 
     `));
 
@@ -25,5 +21,10 @@ test("... playground", async (t) => {
 
     let k = await machine.run(program);
 
-    Dumper.log("RESULTS", k.stack!);
+    Dumper.log("RESULTS", {
+        action : k.action,
+        args   : k.args,
+        stack  : k.stack,
+        env    : k.env.bindings,
+    });
 });

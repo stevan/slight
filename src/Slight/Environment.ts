@@ -1,5 +1,5 @@
 
-import { AbstractTerm, Term, Pair, PairList, Sym } from './Terms'
+import { AbstractTerm, Term, Pair, PairList, Sym, Exception } from './Terms'
 
 export type MaybeEnvironment = Environment | undefined
 
@@ -15,12 +15,12 @@ export class Environment extends AbstractTerm {
         this.parent   = parent;
     }
 
-    lookup(sym: Sym): Term {
+    lookup(sym: Sym) : Term {
         if (this.bindings.has(sym.ident))
             return this.bindings.get(sym.ident)!;
         if (this.parent)
             return this.parent.lookup(sym);
-        throw new Error(`Undefined: ${sym.ident}`);
+        return new Exception(`Cannot find ${sym.toNativeStr()} in Environment`);
     }
 
     define(name: Sym, value: Term): void {
@@ -32,8 +32,6 @@ export class Environment extends AbstractTerm {
     }
 
     derive (params : Sym[], args : Term[]) : Environment {
-        if (params.length != args.length) throw new Error(`Not Enough args!`);
-
         let local = this.capture();
         for (let i = 0; i < params.length; i++) {
             local.define( params[i] as Sym, args[i] as Term );
