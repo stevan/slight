@@ -64,8 +64,25 @@ export class Machine {
             // ---------------------------------------------------------------------
             // Exception handling
             // ---------------------------------------------------------------------
+            // THE PLAN:
+            //
+            // (try (<body>) (catch (e) <handler>))
+            //
+            // K.Catch((lambda (e) <handler>))
+            // K.EvalExpr(<body>)
+            //
+            // K.Catch
+            //     - looks at result on stack
+            //         - if Exception, handles it
+            //         - if not, ... returns it
+            //
+            // K.Throw
+            //     - rewinds the queue to the last K.Catch
+            //
+            case 'CATCH':
+                throw new Error('TODO - CATCH continuation!')
             case 'THROW':
-                console.log('GOT ERROR', k.exception.pprint());
+                console.log('TODO - THROW continuation correctly ... ', k.exception.pprint());
                 return K.Host( 'SYS::error', k.env, k.exception );
             // ---------------------------------------------------------------------
             // This is for defining things in the environment

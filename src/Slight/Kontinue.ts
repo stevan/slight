@@ -1,6 +1,6 @@
 
 import type { Environment } from './Environment'
-import type { Term, Sym, Cons, Operative, Applicative, Exception } from './Terms'
+import type { Term, Sym, Cons, Operative, Applicative, Exception, Lambda } from './Terms'
 
 export type HostKontinue = {
     op     : 'HOST',
@@ -17,9 +17,17 @@ export type ThrowKontinue = {
     exception : Exception
 };
 
+export type CatchKontinue = {
+    op        : 'CATCH',
+    stack     : Term[],
+    env       : Environment,
+    handler   : Lambda
+};
+
 export type Kontinue =
     | HostKontinue
     | ThrowKontinue
+    | CatchKontinue
     | { op : 'IF/ELSE', stack : Term[], env : Environment, cond : Term, ifTrue : Term, ifFalse : Term }
     | { op : 'DEFINE', stack : Term[], env : Environment, name  : Sym }
     | { op : 'RETURN', stack : Term[], env : Environment, value : Term }
@@ -37,6 +45,10 @@ export function Host (action : string, env : Environment, ...args : Term[]) : Ho
 
 export function Throw (exception : Exception, env : Environment) : ThrowKontinue {
     return { op : 'THROW', stack : [], env, exception }
+}
+
+export function Catch (handler : Lambda, env : Environment) : CatchKontinue {
+    return { op : 'CATCH', stack : [], env, handler }
 }
 
 export function IfElse (cond : Term, ifTrue : Term, ifFalse : Term, env : Environment) : Kontinue {
