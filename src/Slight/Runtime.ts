@@ -309,6 +309,18 @@ export const constructRootEnvironment = () : E.Environment => {
         return new C.Unit();
     }));
 
+    builtins.set('keys', new C.Native('keys [table]:list',  (args, env) => {
+        let [ table, tag ] = args;
+        if (!(table instanceof C.Table)) throw new Error(`Expected table as first arg to keys, not ${table.constructor.name}`);
+        return new C.Cons(table.keys());
+    }));
+
+    builtins.set('values', new C.Native('values [table]:list',  (args, env) => {
+        let [ table, tag ] = args;
+        if (!(table instanceof C.Table)) throw new Error(`Expected table as first arg to values, not ${table.constructor.name}`);
+        return new C.Cons(table.values());
+    }));
+
     // -------------------------------------------------------------------------
     // Functions
     // -------------------------------------------------------------------------
