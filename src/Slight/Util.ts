@@ -44,6 +44,8 @@ import type { Environment } from './Environment'
 import type { Term, NativeFunc } from './Terms'
 import { Num, Str, Bool } from './Terms'
 
+// ...
+
 export const liftNumBinOp = (f : (n : number, m : number) => number) : NativeFunc => {
     return (args : Term[], env : Environment) => {
         let [ lhs, rhs ] = args;
@@ -53,6 +55,16 @@ export const liftNumBinOp = (f : (n : number, m : number) => number) : NativeFun
     }
 }
 
+export const liftNumUnOp = (f : (t : number) => number) : NativeFunc => {
+    return (args : Term[], env : Environment) => {
+        let [ num ] = args;
+        if (!(num instanceof Num)) throw new Error(`Expected instance of Num`);
+        return new Num( f( num.value ) );
+    }
+}
+
+// ...
+
 export const liftStrBinOp = (f : (n : string, m : string) => string) : NativeFunc => {
     return (args : Term[], env : Environment) => {
         let [ lhs, rhs ] = args;
@@ -61,6 +73,16 @@ export const liftStrBinOp = (f : (n : string, m : string) => string) : NativeFun
         return new Str( f(lhs.value, rhs.value) );
     }
 }
+
+export const liftStrUnOp = (f : (t : string) => string) : NativeFunc => {
+    return (args : Term[], env : Environment) => {
+        let [ str ] = args;
+        if (!(str instanceof Str)) throw new Error(`Expected instance of Str`);
+        return new Str( f( str.value ) );
+    }
+}
+
+// ...
 
 export const liftNumCompareOp = (f : (n : number, m : number) => boolean) : NativeFunc => {
     return (args : Term[], env : Environment) => {

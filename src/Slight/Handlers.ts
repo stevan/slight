@@ -34,7 +34,7 @@ export class AgentHandler implements HostActionHandler {
         for (let i = 0; i < results.length; i += 2) {
             let prev = results[i + 0];
             let resp = results[i + 1];
-            prev_results += `  ? ${prev.toNativeStr()}\n  > ${resp.toNativeStr()}\n`;
+            prev_results += `  ? ${prev.pprint()}\n  > ${resp.pprint()}\n`;
         }
         return `
 You are an agent working in a Lisp REPL to answer a query.
@@ -58,7 +58,7 @@ HISTORY:
 ${prev_results}
 
 QUERY:
-${query.toNativeStr()}
+${query.pprint()}
 
 ?`
     }
@@ -71,16 +71,16 @@ ${query.toNativeStr()}
                     let result = k.stack.pop()!;
                     let prev   = k.stack.pop()!;
                     console.group('');
-                    console.log('?? PREV', prev.toNativeStr());
-                    console.log('?? RESULT', result.toNativeStr());
+                    console.log('?? PREV', prev.pprint());
+                    console.log('?? RESULT', result.pprint());
                     console.groupEnd();
                     k.args.push(prev, result);
                 }
 
                 let [ query, ...results ] = k.args;
                 console.group(`--- AI::REPL turn(${results.length / 2}) ---\n`)
-                console.log("QUERY: ", query.toNativeStr());
-                console.log("ARGS:", results.map((r) => r.toNativeStr()))
+                console.log("QUERY: ", query.pprint());
+                console.log("ARGS:", results.map((r) => r.pprint()))
 
                 k.env.define(
                     new C.Sym('resume'),
@@ -133,7 +133,7 @@ export class IOHandler implements HostActionHandler {
         switch (k.action) {
         case 'IO::print':
             return new Promise<K.Kontinue[]>((resolve) => {
-                console.log("STDOUT: ", k.stack.map((t) => t.toNativeStr()));
+                console.log("STDOUT: ", k.stack.map((t) => t.pprint()));
                 resolve([ K.Return( new C.Nil(), k.env ) ]);
             });
         case 'IO::readline':
@@ -149,7 +149,7 @@ export class IOHandler implements HostActionHandler {
                 if (result == undefined) {
                     result = new C.Nil();
                 } else {
-                    console.log(` >> : ${result.toNativeStr()}`);
+                    console.log(` >> : ${result.pprint()}`);
                 }
                 // XXX - probably should remove this handler
                 // after I get the response from the REPL

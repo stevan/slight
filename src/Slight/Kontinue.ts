@@ -74,17 +74,17 @@ export function ApplyApplicative (call : Applicative, env : Environment) : Konti
 
 export function pprint (k : Kontinue) : string {
     switch (k.op) {
-    case 'HOST'              : return `${k.op}[] ^(${k.stack.map((i) => i.toNativeStr()).join(';')}) action: ${k.action}`;
-    case 'IF/ELSE'           : return `${k.op}[] ^(${k.stack.map((i) => i.toNativeStr()).join(';')}) then: ${k.ifTrue.toNativeStr()} else: ${k.ifFalse.toNativeStr()}`;
-    case 'DEFINE'            : return `${k.op}[${k.name.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
-    case 'RETURN'            : return `${k.op}[${k.value.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
-    case 'EVAL/EXPR'         : return `${k.op}[${k.expr.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
-    case 'EVAL/TOS'          : return `${k.op}[] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
-    case 'EVAL/CONS'         : return `${k.op}[${k.cons.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
-    case 'EVAL/CONS/REST'    : return `${k.op}[${k.rest.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
-    case 'APPLY/EXPR'        : return `${k.op}[${k.args.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
-    case 'APPLY/OPERATIVE'   : return `${k.op}[${k.call.toNativeStr()}](${k.args.toNativeStr()}) ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
-    case 'APPLY/APPLICATIVE' : return `${k.op}[${k.call.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
+    case 'HOST'              : return `${k.op}[] ^(${k.stack.map((i) => i.pprint()).join(';')}) action: ${k.action}`;
+    case 'IF/ELSE'           : return `${k.op}[] ^(${k.stack.map((i) => i.pprint()).join(';')}) then: ${k.ifTrue.pprint()} else: ${k.ifFalse.pprint()}`;
+    case 'DEFINE'            : return `${k.op}[${k.name.pprint()}] ^(${k.stack.map((i) => i.pprint()).join(';')})`;
+    case 'RETURN'            : return `${k.op}[${k.value.pprint()}] ^(${k.stack.map((i) => i.pprint()).join(';')})`;
+    case 'EVAL/EXPR'         : return `${k.op}[${k.expr.pprint()}] ^(${k.stack.map((i) => i.pprint()).join(';')})`;
+    case 'EVAL/TOS'          : return `${k.op}[] ^(${k.stack.map((i) => i.pprint()).join(';')})`;
+    case 'EVAL/CONS'         : return `${k.op}[${k.cons.pprint()}] ^(${k.stack.map((i) => i.pprint()).join(';')})`;
+    case 'EVAL/CONS/REST'    : return `${k.op}[${k.rest.pprint()}] ^(${k.stack.map((i) => i.pprint()).join(';')})`;
+    case 'APPLY/EXPR'        : return `${k.op}[${k.args.pprint()}] ^(${k.stack.map((i) => i.pprint()).join(';')})`;
+    case 'APPLY/OPERATIVE'   : return `${k.op}[${k.call.pprint()}](${k.args.pprint()}) ^(${k.stack.map((i) => i.pprint()).join(';')})`;
+    case 'APPLY/APPLICATIVE' : return `${k.op}[${k.call.pprint()}] ^(${k.stack.map((i) => i.pprint()).join(';')})`;
     default: throw new Error(`Did not recognize Kontinue ${k} type`);
     }
 }

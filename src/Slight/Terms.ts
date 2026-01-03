@@ -17,9 +17,14 @@ export type Term =
 export abstract class AbstractTerm {
     abstract readonly kind: string;
 
-    abstract toNativeStr () : string;
+    abstract toNativeStr  () : string;
 
-    toStr () : Str { return new Str(this.toNativeStr()) }
+    toNativeBool () : boolean { return true }
+
+    toStr  () : Str  { return new Str(this.toNativeStr()) }
+    toBool () : Bool { return new Bool(this.toNativeBool()) }
+
+    pprint () : string { return this.toNativeStr() }
 }
 
 // -----------------------------------------------------------------------------
@@ -34,7 +39,7 @@ export class Exception extends AbstractTerm {
         this.msg = msg;
     }
 
-    override toNativeStr () : string { return `Exception ${this.msg}` }
+    override toNativeStr  () : string { return `Exception ${this.msg}` }
 }
 
 // -----------------------------------------------------------------------------
@@ -67,6 +72,7 @@ export class Bool extends Literal {
     }
 
     override toNativeStr () : string { return this.value ? 'true' : 'false' }
+    override toNativeBool () : boolean { return this.value }
 }
 
 export class Num extends Literal {
@@ -80,6 +86,7 @@ export class Num extends Literal {
     }
 
     override toNativeStr () : string { return this.value.toString() }
+    override toNativeBool () : boolean { return this.value == 0 ? false : true }
 }
 
 export class Str extends Literal {
@@ -92,7 +99,10 @@ export class Str extends Literal {
         this.value = value;
     }
 
-    override toNativeStr () : string { return `"${this.value}"` }
+    override pprint () : string { return `"${this.value}"` }
+
+    override toNativeStr () : string { return this.value }
+    override toNativeBool () : boolean { return this.value.length == 0 ? false : true }
 }
 
 // -----------------------------------------------------------------------------
@@ -103,6 +113,7 @@ export class Nil extends List {
     readonly kind = 'Nil' as const;
 
     override toNativeStr () : string { return '()' }
+    override toNativeBool () : boolean { return false }
 }
 
 export class Cons extends List {
@@ -139,8 +150,10 @@ export class Cons extends List {
     }
 
     override toNativeStr () : string {
-        return `(${ this.items.slice(this.offset, this.items.length).map((i) => i.toNativeStr()).join(' ') })`
+        return `(${ this.items.slice(this.offset, this.items.length).map((i) => i.pprint()).join(' ') })`
     }
+
+    override toNativeBool () : boolean { return this.length == 0 ? false : true }
 }
 
 // -----------------------------------------------------------------------------

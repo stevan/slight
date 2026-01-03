@@ -61,7 +61,7 @@ export class Machine {
             // Exception handling
             // ---------------------------------------------------------------------
             case 'THROW':
-                console.log('GOT ERROR', k.exception.toNativeStr());
+                console.log('GOT ERROR', k.exception.pprint());
                 return K.Host( 'SYS::error', k.env, k.exception );
             // ---------------------------------------------------------------------
             // This is for defining things in the environment
@@ -85,7 +85,7 @@ export class Machine {
                 let cond = k.stack.pop()!;
                 if (!(cond instanceof C.Bool)) {
                     this.queue.push(
-                        K.Throw( new C.Exception(`Expected Bool at top of stack, not ${cond.kind} ${cond.toNativeStr()}`), k.env )
+                        K.Throw( new C.Exception(`Expected Bool at top of stack, not ${cond.kind} ${cond.pprint()}`), k.env )
                     );
                     break;
                 }
@@ -179,7 +179,7 @@ export class Machine {
                 }
                 else {
                     this.queue.push(K.Throw(
-                        new C.Exception(`Cannot APPLY/EXPR to non-Callable ${call.toNativeStr()}`),
+                        new C.Exception(`Cannot APPLY/EXPR to non-Callable ${call.pprint()}`),
                         k.env
                     ));
                 }

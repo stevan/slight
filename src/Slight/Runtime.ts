@@ -1,5 +1,6 @@
 
 import {
+    liftNumUnOp,      liftStrUnOp,
     liftNumBinOp,     liftStrBinOp,
     liftNumCompareOp, liftStrCompareOp,
 } from './Util'
@@ -17,13 +18,41 @@ export const constructRootEnvironment = () : E.Environment => {
     let builtins = new Map<string, C.Term>();
 
     // -------------------------------------------------------------------------
+    // HOST functions
+    // -------------------------------------------------------------------------
+
+    builtins.set('print', new C.FExpr('print [any]:(unit)', (args, env) => {
+        return [
+            K.Host( 'IO::print', env, ...args ),
+            K.EvalConsRest( new C.Cons(args), env )
+        ]
+    }));
+
+    builtins.set('readline', new C.FExpr('readline []:string', (args, env) => {
+        return [ K.Host( 'IO::readline', env, ...args ) ]
+    }));
+
+    builtins.set('repl', new C.FExpr('repl []:any', (args, env) => {
+        return [ K.Host( 'IO::repl', env.capture(), ...args ) ]
+    }));
+
+    builtins.set('ai-repl', new C.FExpr('ai-repl [str]:any', (args, env) => {
+        return [ K.Host( 'AI::repl', env.capture(), ...args ) ]
+    }));
+
+    // TODO
+    // - say/warn
+    // - sleep
+    // - slurp/spew
+
+    // -------------------------------------------------------------------------
     // Utils
     // -------------------------------------------------------------------------
 
     // pretty print any value
     builtins.set('pprint', new C.Native('pprint [any]:str', (args, env) => {
         let [ arg ] = args;
-        return new C.Str( arg.toNativeStr() );
+        return new C.Str( arg.pprint() );
     }));
 
     // quote
@@ -40,6 +69,13 @@ export const constructRootEnvironment = () : E.Environment => {
             K.EvalExpr(expr, env),
         ];
     }));
+
+    // TODO
+    // - do/begin/progn
+    // - abort
+    // - assert
+    // - time
+    // - apply
 
     // -------------------------------------------------------------------------
     // types & predicates
@@ -67,8 +103,29 @@ export const constructRootEnvironment = () : E.Environment => {
     builtins.set('exception?', new C.Native('exception? [any]:bool', (args, env) => new C.Bool( args[0]!.constructor == C.Exception )));
 
     // -------------------------------------------------------------------------
+    // conversions
+    // -------------------------------------------------------------------------
+
+    builtins.set('to-str',  new C.Native('to-str [any]:str',   (args, env) => args[0]!.toStr()));
+    builtins.set('to-bool', new C.Native('to-bool [any]:bool', (args, env) => args[0]!.toBool()));
+
+    builtins.set('str->int', new C.Native('str->int [str]:num', (args, env) => {
+        let [ str ] = args;
+        if (!(str instanceof C.Str)) throw new Error(`Can only call str->int on Str, not ${str.constructor.name}`);
+        return new C.Num( Number.parseInt( str.value ) );
+    }));
+
+    builtins.set('str->float', new C.Native('str->float [str]:num', (args, env) => {
+        let [ str ] = args;
+        if (!(str instanceof C.Str)) throw new Error(`Can only call str->float on Str, not ${str.constructor.name}`);
+        return new C.Num( Number.parseFloat( str.value ) );
+    }));
+
+    // -------------------------------------------------------------------------
     // numbers
     // -------------------------------------------------------------------------
+
+    builtins.set('PI', new C.Num(Math.PI));
 
     // operators
     builtins.set('+',  new C.Native('+ [num;num]:num',  liftNumBinOp((n, m) => n + m)));
@@ -85,9 +142,23 @@ export const constructRootEnvironment = () : E.Environment => {
     builtins.set('<=', new C.Native('<= [num;num]:bool', liftNumCompareOp((n, m) => n <= m)));
     builtins.set('<',  new C.Native( '< [num;num]:bool', liftNumCompareOp((n, m) => n <  m)));
 
-    // TODO
-    // - sin, cos, atan, etc.
-    // - trunc, round, etc.
+    // numeric unary ops
+    builtins.set('log',   new C.Native('log [num]:num',   liftNumUnOp(Math.log)));
+    builtins.set('exp',   new C.Native('exp [num]:num',   liftNumUnOp(Math.exp)));
+    builtins.set('abs',   new C.Native('abs [num]:num',   liftNumUnOp(Math.abs)));
+    builtins.set('sin',   new C.Native('sin [num]:num',   liftNumUnOp(Math.sin)));
+    builtins.set('cos',   new C.Native('cos [num]:num',   liftNumUnOp(Math.cos)));
+    builtins.set('sqrt',  new C.Native('sqrt [num]:num',  liftNumUnOp(Math.sqrt)));
+    builtins.set('atan',  new C.Native('atan [num]:num',  liftNumUnOp(Math.atan)));
+
+    // numeric conversions
+    builtins.set('ceil',  new C.Native('ceil [num]:num',  liftNumUnOp(Math.ceil)));
+    builtins.set('floor', new C.Native('floor [num]:num', liftNumUnOp(Math.floor)));
+    builtins.set('round', new C.Native('round [num]:num', liftNumUnOp(Math.round)));
+    builtins.set('trunc', new C.Native('trunc [num]:num', liftNumUnOp(Math.trunc)));
+
+    // random numbers
+    builtins.set('rand', new C.Native('rand [num]:num', liftNumUnOp(Math.random)));
 
     // -------------------------------------------------------------------------
     // strings
@@ -104,8 +175,31 @@ export const constructRootEnvironment = () : E.Environment => {
     builtins.set('le', new C.Native('le [str;str]:bool', liftStrCompareOp((n, m) => n <= m)));
     builtins.set('lt', new C.Native('lt [str;str]:bool', liftStrCompareOp((n, m) => n <  m)));
 
+    builtins.set('uc', new C.Native('uc [str]:str', liftStrUnOp((s) => s.toUpperCase())));
+    builtins.set('lc', new C.Native('lc [str]:str', liftStrUnOp((s) => s.toLowerCase())));
+
+    builtins.set('split', new C.Native('split [str;str]:list', (args, env) => {
+        let [ seperator, string ] = args;
+        if (!(seperator instanceof C.Str)) throw new Error(`Exepected Str for seperator`);
+        if (!(string instanceof C.Str)) throw new Error(`Exepected Str for string`);
+        return new C.Cons( string.value.split( seperator.value ).map( (s) => new C.Str(s) ) )
+    }));
+
+    builtins.set('join', new C.Native('join [str;list]:str', (args, env) => {
+        let [ seperator, list ] = args;
+        if (!(seperator instanceof C.Str)) throw new Error(`Exepected Str for seperator`);
+        if (!(list instanceof C.Cons)) throw new Error(`Exepected List for list`);
+        return new C.Str( list.toNativeArray().map((t) => t.toNativeStr()).join( seperator.value ) );
+    }));
+
     // TODO
-    // - length, substr, char-at, etc.
+    // - length
+    // - substr, char-at
+    // - index, rindex
+    // - sprintf
+    // - lcfirst, ucfirst
+    // - trim, chop, chomp
+    // - chr, ord
 
     // -------------------------------------------------------------------------
     // booleans
@@ -179,7 +273,7 @@ export const constructRootEnvironment = () : E.Environment => {
     }));
 
     // -------------------------------------------------------------------------
-    // Special Forms (FExprs)
+    // Functions
     // -------------------------------------------------------------------------
 
     // lambdas
@@ -187,6 +281,10 @@ export const constructRootEnvironment = () : E.Environment => {
         let [ params, body ] = args;
         return [ K.Return( new C.Lambda( params as C.Cons, body, env ), env ) ]
     }));
+
+    // -------------------------------------------------------------------------
+    // Definitions
+    // -------------------------------------------------------------------------
 
     // definitions
     builtins.set('def', new C.FExpr('def [name;value]:(unit)', (args, env) => {
@@ -208,36 +306,8 @@ export const constructRootEnvironment = () : E.Environment => {
         ]
     }));
 
-    // -------------------------------------------------------------------------
-    // HOST functions
-    // -------------------------------------------------------------------------
-
-    builtins.set('print', new C.FExpr('print [any]:(unit)', (args, env) => {
-        return [
-            K.Host( 'IO::print', env, ...args ),
-            K.EvalConsRest( new C.Cons(args), env )
-        ]
-    }));
-
-    builtins.set('readline', new C.FExpr('readline []:string', (args, env) => {
-        return [ K.Host( 'IO::readline', env, ...args ) ]
-    }));
-
-    builtins.set('repl', new C.FExpr('repl []:any', (args, env) => {
-        return [ K.Host( 'IO::repl', env.capture(), ...args ) ]
-    }));
-
-    builtins.set('ai-repl', new C.FExpr('ai-repl [str]:any', (args, env) => {
-        return [ K.Host( 'AI::repl', env.capture(), ...args ) ]
-    }));
 
     // -------------------------------------------------------------------------
-    // TODO:
-    // -------------------------------------------------------------------------
-    // - abort
-    // - assert
-    // -------------------------------------------------------------------------
-
     return new E.Environment(builtins);
 }
 

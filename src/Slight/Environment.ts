@@ -20,7 +20,7 @@ export class Environment extends AbstractTerm {
             return this.bindings.get(sym.ident)!;
         if (this.parent)
             return this.parent.lookup(sym);
-        return new Exception(`Cannot find ${sym.toNativeStr()} in Environment`);
+        return new Exception(`Cannot find ${sym.pprint()} in Environment`);
     }
 
     define(name: Sym, value: Term): void {
