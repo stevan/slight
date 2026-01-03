@@ -104,7 +104,7 @@ export const constructRootEnvironment = () : E.Environment => {
     builtins.set('-',  new C.Native('- [num;num]:num',  liftNumBinOp((n, m) => n - m)));
     builtins.set('*',  new C.Native('* [num;num]:num',  liftNumBinOp((n, m) => n * m)));
     builtins.set('/',  new C.Native('/ [num;num]:num',  liftNumBinOp((n, m) => n / m)));
-    builtins.set('%',  new C.Native('% [num;num]:num',  liftNumBinOp((n, m) => n % m)));
+    builtins.set('mod',  new C.Native('mod [num;num]:num', liftNumBinOp((n, m) => n % m)));
 
     // numeric comparisons
     builtins.set('==', new C.Native('== [num;num]:bool', liftNumCompareOp((n, m) => n == m)));
