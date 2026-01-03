@@ -12,6 +12,8 @@ test("... playground", async (t) => {
 
         (def thirty 30)
 
+        (def FOO %( :foo 10 :bar %( :baz 10 :gorch 20 ) :bling 30 ))
+
         (defun (add x y) (+ x y))
 
         (defun (adder x)
@@ -70,6 +72,9 @@ test("... playground", async (t) => {
             (eval '(+ 10 20))
             (eval (cons (quote +) (quote (10 20))))
             (eval (cons '+ '(10 20)))
+            (+ (fetch FOO :foo) (fetch (fetch FOO :bar) :gorch))
+            (fetch FOO :bling)
+            (+ (fetch (fetch FOO :bar) :baz) (fetch (fetch FOO :bar) :gorch))
         )
     `));
 

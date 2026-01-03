@@ -246,7 +246,7 @@ export const constructRootEnvironment = () : E.Environment => {
     builtins.set('if',  builtins.get('?:')!);
 
     // -------------------------------------------------------------------------
-    // lists
+    // Lists
     // -------------------------------------------------------------------------
 
     builtins.set('list' , new C.Native('list [...]:list', (args, env) => new C.Cons(args)));
@@ -273,6 +273,43 @@ export const constructRootEnvironment = () : E.Environment => {
     }));
 
     // -------------------------------------------------------------------------
+    // Tables
+    // -------------------------------------------------------------------------
+
+    builtins.set('table' , new C.Native('table [...]:table', (args, env) => new C.Table(args)));
+
+    builtins.set('fetch', new C.Native('fetch [table;tag]:any',  (args, env) => {
+        let [ table, tag ] = args;
+        if (!(table instanceof C.Table)) throw new Error(`Expected table as first arg to fetch, not ${table.constructor.name}`);
+        if (!(tag instanceof C.Tag)) throw new Error(`Expected tag as second arg to fetch, not ${tag.constructor.name}`);
+        return table.fetch( tag );
+    }));
+
+    builtins.set('exists', new C.Native('exists [table;tag]:bool', (args, env) => {
+        let [ table, tag ] = args;
+        if (!(table instanceof C.Table)) throw new Error(`Expected table as first arg to exists, not ${table.constructor.name}`);
+        if (!(tag instanceof C.Tag)) throw new Error(`Expected tag as second arg to exists, not ${tag.constructor.name}`);
+        return new C.Bool( table.exists( tag ) );
+    }));
+
+    builtins.set('store', new C.Native('store [table;tag;any]:unit', (args, env) => {
+        let [ table, tag, val ] = args;
+        if (!(table instanceof C.Table)) throw new Error(`Expected table as first arg to store, not ${table.constructor.name}`);
+        if (!(tag instanceof C.Tag)) throw new Error(`Expected tag as second arg to store, not ${tag.constructor.name}`);
+        if (val != undefined) throw new Error(`Expected value as third arg to store`);
+        table.store( tag, val );
+        return new C.Unit();
+    }));
+
+    builtins.set('delete', new C.Native('delete [table;tag]:unit',  (args, env) => {
+        let [ table, tag ] = args;
+        if (!(table instanceof C.Table)) throw new Error(`Expected table as first arg to delete, not ${table.constructor.name}`);
+        if (!(tag instanceof C.Tag)) throw new Error(`Expected tag as second arg to delete, not ${tag.constructor.name}`);
+        table.delete( tag );
+        return new C.Unit();
+    }));
+
+    // -------------------------------------------------------------------------
     // Functions
     // -------------------------------------------------------------------------
 
@@ -291,7 +328,7 @@ export const constructRootEnvironment = () : E.Environment => {
         let [ name, value ] = args;
         return [
             K.Define( name as C.Sym, env ),
-            K.Return( value, env )
+            K.EvalExpr( value, env )
         ]
     }));
 

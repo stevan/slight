@@ -3,12 +3,15 @@ import type { Environment } from './Environment'
 import type { Kontinue    } from './Kontinue'
 
 export type Term =
+    | Unit
     | Bool
     | Num
     | Str
     | Sym
     | Nil
     | Cons
+    | Tag
+    | Table
     | Lambda
     | Native
     | FExpr
@@ -28,6 +31,12 @@ export abstract class AbstractTerm {
 }
 
 // -----------------------------------------------------------------------------
+
+export class Unit extends AbstractTerm {
+    readonly kind = 'Unit' as const;
+
+    override toNativeStr  () : string { return '(unit)' }
+}
 
 export class Exception extends AbstractTerm {
     readonly kind = 'Exception' as const;
@@ -154,6 +163,72 @@ export class Cons extends List {
     }
 
     override toNativeBool () : boolean { return this.length == 0 ? false : true }
+}
+
+// -----------------------------------------------------------------------------
+
+export class Tag extends AbstractTerm {
+    readonly kind = 'Tag' as const;
+
+    public ident : string;
+
+    constructor (ident : string) {
+        super();
+        this.ident = ident;
+    }
+
+    override toNativeStr () : string { return `:${this.ident}` }
+}
+
+
+export class Table extends AbstractTerm {
+    readonly kind = 'Table' as const;
+
+    public items : Map<string,Term>;
+
+    constructor (items : Term[]) {
+        super();
+        if ((items.length % 2) != 0) throw new Error(`Expected even sized list, not ${items.length}`);
+        let map = new Map<string,Term>();
+        for (let i = 0; i < items.length; i += 2) {
+            let tag = items[i + 0];
+            let val = items[i + 1];
+            if (!(tag instanceof Tag)) throw new Error(`Expected tag, got ${tag.constructor.name}`);
+            map.set( tag.ident, val );
+        }
+        this.items = map;
+    }
+
+    fetch (tag : Tag) : Term {
+        return this.items.get( tag.ident ) ?? new Nil();
+    }
+
+    store (tag : Tag, value : Term) : void {
+        this.items.set( tag.ident, value );
+    }
+
+    delete (tag : Tag) : void {
+        this.items.delete( tag.ident );
+    }
+
+    exists (tag : Tag) : boolean {
+        return this.items.has(tag.ident);
+    }
+
+    keys () : Tag[] {
+        return [ ...this.items.keys() ].map((t) => new Tag(t));
+    }
+
+    values () : Term[] {
+        return [ ...this.items.values() ];
+    }
+
+    override toNativeStr () : string { return `%(${
+        [ ...this.items.entries() ].map((entry) => {
+            let [ k, v ] = entry;
+            return `:${k} ${v.toNativeStr()}`;
+        }).join(' ')
+    })` }
 }
 
 // -----------------------------------------------------------------------------

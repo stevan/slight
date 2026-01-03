@@ -23,13 +23,16 @@ export class Machine {
     // for evaluating any expression
     evaluateTerm (expr : C.Term, env : E.Environment) : K.Kontinue {
         switch (expr.kind) {
+        case 'Unit'      :
         case 'Nil'       :
         case 'Num'       :
         case 'Str'       :
         case 'Bool'      :
         case 'Native'    :
         case 'FExpr'     :
-        case 'Lambda'    : return K.Return( expr, env );
+        case 'Lambda'    :
+        case 'Tag'       :
+        case 'Table'     : return K.Return( expr, env );
         case 'Cons'      : return K.EvalCons( expr, env );
         case 'Sym'       :
             let value = env.lookup( expr );
@@ -69,7 +72,8 @@ export class Machine {
             case 'DEFINE':
                 let body = k.stack.pop()!;
                 k.env.define( k.name, body );
-                // FIXME - this should return SOMETHING?!
+                // FIXME - this should return SOMETHING more useful?!
+                this.returnValues( new C.Unit() );
                 break;
             // ---------------------------------------------------------------------
             // This is a literal value to be returned to the

@@ -10,11 +10,18 @@ test("... playground", async (t) => {
 
     let program = compile(parse(`
 
-        (repl)
+        (def Foo %(:foo 10 :bar %(:baz 10 :gorch 20) :bling 30))
+
+
+        (+ (fetch Foo :foo) (fetch (fetch Foo :bar) :gorch))
+
 
     `));
 
+    //
+
     Dumper.log("PROGRAM:\n", program.map((expr) => expr.toNativeStr()).join("\n"));
+    //Dumper.log("PROGRAM:\n", program);
 
     let slight = new Slight();
 

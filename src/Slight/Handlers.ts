@@ -134,7 +134,7 @@ export class IOHandler implements HostActionHandler {
         case 'IO::print':
             return new Promise<K.Kontinue[]>((resolve) => {
                 console.log("STDOUT: ", k.stack.map((t) => t.pprint()));
-                resolve([ K.Return( new C.Nil(), k.env ) ]);
+                resolve([ K.Return( new C.Unit(), k.env ) ]);
             });
         case 'IO::readline':
             return new Promise<K.Kontinue[]>((resolve) => {

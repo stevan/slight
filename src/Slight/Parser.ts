@@ -21,7 +21,7 @@ export type ParseNode = Token | ParseNode[];
 // -----------------------------------------------------------------------------
 
 function tokenize(source: string): Token[] {
-    const SPLITTER = /\(|\)|'|"(?:[^"\\]|\\.)*"|[^\s\(\)';]+/g;
+    const SPLITTER = /\(|\)|'|%|"(?:[^"\\]|\\.)*"|[^\s\(\)'%;]+/g;
     const tokens: Token[] = [];
 
     let match: RegExpExecArray | null;
@@ -51,26 +51,39 @@ function tokenize(source: string): Token[] {
 export function parse(source: string): ParseNode[] {
 
     const parseTokens = (tokens: Token[]): [ParseNode, Token[]] => {
-      const token = tokens[0];
-      if (token === undefined) throw new Error('Unexpected end of input');
+        const token = tokens[0];
+        if (token === undefined) throw new Error('Unexpected end of input');
 
-      const rest = tokens.slice(1);
+        const rest = tokens.slice(1);
 
-      if (token.value === '(') {
-          return parseList(rest, []);
-      }
+        if (token.value === '(') {
+            return parseList(rest, []);
+        }
 
-      if (token.value === "'") {
-          const [quoted, remaining] = parseTokens(rest);
-          // Create a synthetic "quote" token at the quote position
-          const quoteToken: Token = {
-              value: 'quote',
-              loc: token.loc  // reuse the ' location
-          };
-          return [[quoteToken, quoted], remaining];
-      }
+        if (token.value === "'") {
+            const [quoted, remaining] = parseTokens(rest);
+            // Create a synthetic "quote" token at the quote position
+            const quoteToken: Token = {
+                value: 'quote',
+                loc: token.loc  // reuse the ' location
+            };
+            return [[quoteToken, quoted], remaining];
+        }
 
-      return [token, rest];
+        if (token.value === "%") {
+            const [table, remaining] = parseTokens(rest);
+            if (!Array.isArray(table)) throw new Error(`Expected table body to be Array, not ${table.constructor.name}`);
+
+            // Create a synthetic "table" token at the quote position
+            const tableToken: Token = {
+                value: 'table',
+                loc: token.loc  // reuse the % location
+            };
+
+            return [[tableToken, ...table], remaining];
+        }
+
+        return [token, rest];
     };
 
     const parseList = (tokens: Token[], acc: ParseNode[]): [ParseNode[], Token[]] => {
