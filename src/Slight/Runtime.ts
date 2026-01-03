@@ -20,9 +20,25 @@ export const constructRootEnvironment = () : E.Environment => {
     // Utils
     // -------------------------------------------------------------------------
 
+    // pretty print any value
     builtins.set('pprint', new C.Native('pprint [any]:str', (args, env) => {
         let [ arg ] = args;
         return new C.Str( arg.toNativeStr() );
+    }));
+
+    // quote
+    builtins.set('quote', new C.FExpr('quote [any]:any', (args, env) => {
+        let [expr] = args;
+        return [ K.Return( expr, env ) ];
+    }));
+
+    // eval
+    builtins.set('eval', new C.FExpr('eval [any]:any', (args, env) => {
+        let [expr] = args;
+        return [
+            K.EvalTOS(env),
+            K.EvalExpr(expr, env),
+        ];
     }));
 
     // -------------------------------------------------------------------------
@@ -54,12 +70,14 @@ export const constructRootEnvironment = () : E.Environment => {
     // numbers
     // -------------------------------------------------------------------------
 
+    // operators
     builtins.set('+',  new C.Native('+ [num;num]:num',  liftNumBinOp((n, m) => n + m)));
     builtins.set('-',  new C.Native('- [num;num]:num',  liftNumBinOp((n, m) => n - m)));
     builtins.set('*',  new C.Native('* [num;num]:num',  liftNumBinOp((n, m) => n * m)));
     builtins.set('/',  new C.Native('/ [num;num]:num',  liftNumBinOp((n, m) => n / m)));
     builtins.set('%',  new C.Native('% [num;num]:num',  liftNumBinOp((n, m) => n % m)));
 
+    // numeric comparisons
     builtins.set('==', new C.Native('== [num;num]:bool', liftNumCompareOp((n, m) => n == m)));
     builtins.set('!=', new C.Native('!= [num;num]:bool', liftNumCompareOp((n, m) => n != m)));
     builtins.set('>=', new C.Native('>= [num;num]:bool', liftNumCompareOp((n, m) => n >= m)));
@@ -67,12 +85,18 @@ export const constructRootEnvironment = () : E.Environment => {
     builtins.set('<=', new C.Native('<= [num;num]:bool', liftNumCompareOp((n, m) => n <= m)));
     builtins.set('<',  new C.Native( '< [num;num]:bool', liftNumCompareOp((n, m) => n <  m)));
 
+    // TODO
+    // - sin, cos, atan, etc.
+    // - trunc, round, etc.
+
     // -------------------------------------------------------------------------
     // strings
     // -------------------------------------------------------------------------
 
+    // concat
     builtins.set('~' , new C.Native('~ [str;str]:str',  liftStrBinOp((n, m) => n + m)));
 
+    // string comparisons
     builtins.set('eq', new C.Native('eq [str;str]:bool', liftStrCompareOp((n, m) => n == m)));
     builtins.set('ne', new C.Native('ne [str;str]:bool', liftStrCompareOp((n, m) => n != m)));
     builtins.set('ge', new C.Native('ge [str;str]:bool', liftStrCompareOp((n, m) => n >= m)));
@@ -80,46 +104,21 @@ export const constructRootEnvironment = () : E.Environment => {
     builtins.set('le', new C.Native('le [str;str]:bool', liftStrCompareOp((n, m) => n <= m)));
     builtins.set('lt', new C.Native('lt [str;str]:bool', liftStrCompareOp((n, m) => n <  m)));
 
+    // TODO
+    // - length, substr, char-at, etc.
+
     // -------------------------------------------------------------------------
     // booleans
     // -------------------------------------------------------------------------
 
+    // unary negation
     builtins.set('!', new C.Native('! [bool]:bool', (args, env) => {
         let [ arg ] = args;
         if (!(arg instanceof C.Bool)) throw new Error(`Can only call ! on Bool, not ${arg.constructor.name}`);
         return new C.Bool( !arg.value );
     }));
 
-    // -------------------------------------------------------------------------
-    // lists
-    // -------------------------------------------------------------------------
-
-    builtins.set('cons', new C.Native('cons [x;xs]:list', (args, env) => {
-        let [ first, rest ] = args;
-        if (rest instanceof C.Nil)  return new C.Cons([ first ]);
-        if (rest instanceof C.Cons) return new C.Cons([ first, ...rest.toNativeArray() ]);
-        return new C.Cons([ first, rest ]);
-    }));
-
-    builtins.set('list' , new C.Native('list [...]:list', (args, env) => new C.Cons(args)));
-
-    builtins.set('first' , new C.Native('first [list]:any', (args, env) => {
-        let [ arg ] = args;
-        if (!(arg instanceof C.Cons)) throw new Error(`Can only call first() on Cons, not ${arg.constructor.name}`);
-        return arg.first;
-    }));
-
-    builtins.set('rest' , new C.Native('rest [list]:list', (args, env) => {
-        let [ arg ] = args;
-        if (!(arg instanceof C.Cons)) throw new Error(`Can only call rest() on Cons, not ${arg.constructor.name}`);
-        return arg.rest;
-    }));
-
-    // -------------------------------------------------------------------------
-    // Special Forms (FExprs)
-    // -------------------------------------------------------------------------
     // short circuit AND
-
     builtins.set('&&', new C.FExpr('&& [any;any]:any', (args, env) => {
         let [ lhs, rhs ] = args;
         return [
@@ -128,9 +127,7 @@ export const constructRootEnvironment = () : E.Environment => {
         ]
     }));
 
-
     // short circuit OR
-
     builtins.set('||', new C.FExpr('|| [any;any]:any', (args, env) => {
         let [ lhs, rhs ] = args;
         return [
@@ -140,7 +137,6 @@ export const constructRootEnvironment = () : E.Environment => {
     }));
 
     // ternary condtional
-
     builtins.set('?:', new C.FExpr('?: [cond;any;any]:any', (args, env) => {
         let [ cond, ifTrue, ifFalse ] = args;
         return [
@@ -155,14 +151,49 @@ export const constructRootEnvironment = () : E.Environment => {
     builtins.set('or',  builtins.get('||')!);
     builtins.set('if',  builtins.get('?:')!);
 
+    // -------------------------------------------------------------------------
+    // lists
+    // -------------------------------------------------------------------------
+
+    builtins.set('list' , new C.Native('list [...]:list', (args, env) => new C.Cons(args)));
+
+    builtins.set('cons', new C.Native('cons [x;xs]:list', (args, env) => {
+        let [ first, rest ] = args;
+        if (rest instanceof C.Nil)  return new C.Cons([ first ]);
+        if (rest instanceof C.Cons) return new C.Cons([ first, ...rest.toNativeArray() ]);
+        return new C.Cons([ first, rest ]);
+    }));
+
+    builtins.set('first' , new C.Native('first [list]:any', (args, env) => {
+        let [ arg ] = args;
+        if (!(arg instanceof C.Cons))
+            throw new Error(`Can only call first() on Cons, not ${arg.constructor.name}`);
+        return arg.first;
+    }));
+
+    builtins.set('rest' , new C.Native('rest [list]:list', (args, env) => {
+        let [ arg ] = args;
+        if (!(arg instanceof C.Cons))
+            throw new Error(`Can only call rest() on Cons, not ${arg.constructor.name}`);
+        return arg.rest;
+    }));
+
+    // -------------------------------------------------------------------------
+    // Special Forms (FExprs)
+    // -------------------------------------------------------------------------
+
     // lambdas
     builtins.set('lambda', new C.FExpr('lambda [[params];body]:(λ + E)', (args, env) => {
         let [ params, body ] = args;
+        return [ K.Return( new C.Lambda( params as C.Cons, body, env ), env ) ]
+    }));
+
+    // definitions
+    builtins.set('def', new C.FExpr('def [name;value]:(unit)', (args, env) => {
+        let [ name, value ] = args;
         return [
-            K.Return(
-                new C.Lambda( params as C.Cons, body, env ),
-                env
-            )
+            K.Define( name as C.Sym, env ),
+            K.Return( value, env )
         ]
     }));
 
@@ -173,26 +204,8 @@ export const constructRootEnvironment = () : E.Environment => {
         let params = (sig as C.Cons).rest;
         return [
             K.Define( name as C.Sym, env ),
-            K.Return(
-                new C.Lambda( params as C.Cons, body, env ),
-                env
-            )
+            K.Return( new C.Lambda( params as C.Cons, body, env ), env )
         ]
-    }));
-
-    // quote
-    builtins.set('quote', new C.FExpr('quote [any]:any', (args, env) => {
-        let [expr] = args;
-        return [ K.Return( expr, env ) ];
-    }));
-
-    // eval
-    builtins.set('eval', new C.FExpr('eval [any]:any', (args, env) => {
-        let [expr] = args;
-        return [
-            K.EvalTOS(env),
-            K.EvalExpr(expr, env),
-        ];
     }));
 
     // -------------------------------------------------------------------------

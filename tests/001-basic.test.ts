@@ -9,6 +9,9 @@ import { parse, compile, Slight } from '../src/Slight'
 
 test("... playground", async (t) => {
     let program = compile(parse(`
+
+        (def thirty 30)
+
         (defun (add x y) (+ x y))
 
         (defun (adder x)
@@ -36,6 +39,7 @@ test("... playground", async (t) => {
 
         (list
             30
+            thirty
             (+ 10 20)
             (+ 10 (+ 10 10))
             (+ (* 2 5) 20)
