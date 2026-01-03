@@ -10,6 +10,7 @@ test("... playground", async (t) => {
 
     let program = compile(parse(`
 
+        (repl)
 
     `));
 

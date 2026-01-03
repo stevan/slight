@@ -273,53 +273,101 @@ export const constructRootEnvironment = () : E.Environment => {
     }));
 
     // -------------------------------------------------------------------------
-    // Tables
+    // Hashes
     // -------------------------------------------------------------------------
 
-    builtins.set('table' , new C.Native('table [...]:table', (args, env) => new C.Table(args)));
+    builtins.set('hash' , new C.Native('hash [...]:hash', (args, env) => new C.Hash(args)));
 
-    builtins.set('fetch', new C.Native('fetch [table;tag]:any',  (args, env) => {
-        let [ table, tag ] = args;
-        if (!(table instanceof C.Table)) throw new Error(`Expected table as first arg to fetch, not ${table.constructor.name}`);
-        if (!(tag instanceof C.Tag)) throw new Error(`Expected tag as second arg to fetch, not ${tag.constructor.name}`);
-        return table.fetch( tag );
+    builtins.set('fetch', new C.Native('fetch [hash;key]:any',  (args, env) => {
+        let [ hash, key ] = args;
+        if (!(hash instanceof C.Hash)) throw new Error(`Expected hash as first arg to fetch, not ${hash.constructor.name}`);
+        if (!(key instanceof C.Key)) throw new Error(`Expected key as second arg to fetch, not ${key.constructor.name}`);
+        return hash.fetch( key );
     }));
 
-    builtins.set('exists', new C.Native('exists [table;tag]:bool', (args, env) => {
-        let [ table, tag ] = args;
-        if (!(table instanceof C.Table)) throw new Error(`Expected table as first arg to exists, not ${table.constructor.name}`);
-        if (!(tag instanceof C.Tag)) throw new Error(`Expected tag as second arg to exists, not ${tag.constructor.name}`);
-        return new C.Bool( table.exists( tag ) );
+    builtins.set('exists?', new C.Native('exists? [hash;key]:bool', (args, env) => {
+        let [ hash, key ] = args;
+        if (!(hash instanceof C.Hash)) throw new Error(`Expected hash as first arg to exists?, not ${hash.constructor.name}`);
+        if (!(key instanceof C.Key)) throw new Error(`Expected key as second arg to exists?, not ${key.constructor.name}`);
+        return new C.Bool( hash.exists( key ) );
     }));
 
-    builtins.set('store', new C.Native('store [table;tag;any]:unit', (args, env) => {
-        let [ table, tag, val ] = args;
-        if (!(table instanceof C.Table)) throw new Error(`Expected table as first arg to store, not ${table.constructor.name}`);
-        if (!(tag instanceof C.Tag)) throw new Error(`Expected tag as second arg to store, not ${tag.constructor.name}`);
-        if (val == undefined) throw new Error(`Expected value as third arg to store`);
-        table.store( tag, val );
+    builtins.set('store!', new C.Native('store! [hash;key;any]:unit', (args, env) => {
+        let [ hash, key, val ] = args;
+        if (!(hash instanceof C.Hash)) throw new Error(`Expected hash as first arg to store!, not ${hash.constructor.name}`);
+        if (!(key instanceof C.Key)) throw new Error(`Expected key as second arg to store!, not ${key.constructor.name}`);
+        if (val == undefined) throw new Error(`Expected value as third arg to store!`);
+        hash.store( key, val );
         return new C.Unit();
     }));
 
-    builtins.set('delete', new C.Native('delete [table;tag]:unit',  (args, env) => {
-        let [ table, tag ] = args;
-        if (!(table instanceof C.Table)) throw new Error(`Expected table as first arg to delete, not ${table.constructor.name}`);
-        if (!(tag instanceof C.Tag)) throw new Error(`Expected tag as second arg to delete, not ${tag.constructor.name}`);
-        table.delete( tag );
+    builtins.set('delete!', new C.Native('delete! [hash;key]:unit',  (args, env) => {
+        let [ hash, key ] = args;
+        if (!(hash instanceof C.Hash)) throw new Error(`Expected hash as first arg to delete!, not ${hash.constructor.name}`);
+        if (!(key instanceof C.Key)) throw new Error(`Expected key as second arg to delete!, not ${key.constructor.name}`);
+        hash.delete( key );
         return new C.Unit();
     }));
 
-    builtins.set('keys', new C.Native('keys [table]:list',  (args, env) => {
-        let [ table, tag ] = args;
-        if (!(table instanceof C.Table)) throw new Error(`Expected table as first arg to keys, not ${table.constructor.name}`);
-        return new C.Cons(table.keys());
+    builtins.set('keys', new C.Native('keys [hash]:list',  (args, env) => {
+        let [ hash ] = args;
+        if (!(hash instanceof C.Hash)) throw new Error(`Expected hash as first arg to keys, not ${hash.constructor.name}`);
+        return new C.Cons(hash.keys());
     }));
 
-    builtins.set('values', new C.Native('values [table]:list',  (args, env) => {
-        let [ table, tag ] = args;
-        if (!(table instanceof C.Table)) throw new Error(`Expected table as first arg to values, not ${table.constructor.name}`);
-        return new C.Cons(table.values());
+    builtins.set('values', new C.Native('values [hash]:list',  (args, env) => {
+        let [ hash ] = args;
+        if (!(hash instanceof C.Hash)) throw new Error(`Expected hash as first arg to values, not ${hash.constructor.name}`);
+        return new C.Cons(hash.values());
     }));
+
+    // -------------------------------------------------------------------------
+    // Env
+    // -------------------------------------------------------------------------
+
+    builtins.set('*Env', new C.Native('*Env []:env', (args, env) => env));
+    builtins.set('^Env', new C.Native('^Env []:env', (args, env) => env.parent ?? new C.Nil()));
+    builtins.set('$Env', new C.Native('$Env []:env', (args, env) => new E.Environment(builtins)));
+
+    builtins.set('env-lookup', new C.Native('env-lookup [env;key]:any',  (args, env) => {
+        let [ localEnv, key ] = args;
+        if (!(localEnv instanceof E.Environment)) throw new Error(`Expected Environment as first arg to env-lookup, not ${localEnv.constructor.name}`);
+        if (!(key instanceof C.Ident)) throw new Error(`Expected key as second arg to fetch, not ${key.constructor.name}`);
+        return localEnv.lookup( key );
+    }));
+
+    builtins.set('env-exists?', new C.Native('env-exists? [env;key]:bool', (args, env) => {
+        let [ localEnv, key ] = args;
+        if (!(localEnv instanceof E.Environment)) throw new Error(`Expected Environment as first arg to env-exists?, not ${localEnv.constructor.name}`);
+        if (!(key instanceof C.Ident)) throw new Error(`Expected key as second arg to env-exists?, not ${key.constructor.name}`);
+        return new C.Bool( localEnv.exists( key ) );
+    }));
+
+    builtins.set('env-set!', new C.Native('env-set! [env;key;any]:unit', (args, env) => {
+        let [ localEnv, key, val ] = args;
+        if (!(localEnv instanceof E.Environment)) throw new Error(`Expected Environment as first arg to env-set!, not ${localEnv.constructor.name}`);
+        if (!(key instanceof C.Ident)) throw new Error(`Expected key as second arg to env-set!, not ${key.constructor.name}`);
+        if (val == undefined) throw new Error(`Expected value as third arg to env-set!`);
+        localEnv.define( key, val );
+        return new C.Unit();
+    }));
+
+    builtins.set('env-delete!', new C.Native('env-delete! [env;key]:unit',  (args, env) => {
+        let [ localEnv, key ] = args;
+        if (!(localEnv instanceof E.Environment)) throw new Error(`Expected Environment as first arg to env-delete!, not ${localEnv.constructor.name}`);
+        if (!(key instanceof C.Ident)) throw new Error(`Expected key as second arg to env-delete!, not ${key.constructor.name}`);
+        localEnv.delete( key );
+        return new C.Unit();
+    }));
+
+    builtins.set('env-keys', new C.Native('env-keys [env]:list',  (args, env) => {
+        let [ localEnv ] = args;
+        if (!(localEnv instanceof E.Environment)) throw new Error(`Expected Environment as first arg to env-keys, not ${localEnv.constructor.name}`);
+        return new C.Cons(localEnv.keys());
+    }));
+
+    // TODO
+    // - env->hash
 
     // -------------------------------------------------------------------------
     // Functions

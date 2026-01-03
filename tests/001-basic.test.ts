@@ -75,6 +75,7 @@ test("... playground", async (t) => {
             (+ (fetch FOO :foo) (fetch (fetch FOO :bar) :gorch))
             (fetch FOO :bling)
             (+ (fetch (fetch FOO :bar) :baz) (fetch (fetch FOO :bar) :gorch))
+            (env-lookup (*Env) :thirty)
         )
     `));
 

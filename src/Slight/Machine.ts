@@ -23,18 +23,19 @@ export class Machine {
     // for evaluating any expression
     evaluateTerm (expr : C.Term, env : E.Environment) : K.Kontinue {
         switch (expr.kind) {
-        case 'Unit'      :
-        case 'Nil'       :
-        case 'Num'       :
-        case 'Str'       :
-        case 'Bool'      :
-        case 'Native'    :
-        case 'FExpr'     :
-        case 'Lambda'    :
-        case 'Tag'       :
-        case 'Table'     : return K.Return( expr, env );
-        case 'Cons'      : return K.EvalCons( expr, env );
-        case 'Sym'       :
+        case 'Unit'        :
+        case 'Nil'         :
+        case 'Num'         :
+        case 'Str'         :
+        case 'Bool'        :
+        case 'Native'      :
+        case 'FExpr'       :
+        case 'Lambda'      :
+        case 'Key'         :
+        case 'Hash'        :
+        case 'Environment' : return K.Return( expr, env );
+        case 'Cons'        : return K.EvalCons( expr, env );
+        case 'Sym'         :
             let value = env.lookup( expr );
             if (value instanceof C.Exception) return K.Throw( value, env );
             return K.Return( env.lookup( expr ), env );

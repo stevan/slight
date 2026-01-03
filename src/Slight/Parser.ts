@@ -71,16 +71,16 @@ export function parse(source: string): ParseNode[] {
         }
 
         if (token.value === "%") {
-            const [table, remaining] = parseTokens(rest);
-            if (!Array.isArray(table)) throw new Error(`Expected table body to be Array, not ${table.constructor.name}`);
+            const [hash, remaining] = parseTokens(rest);
+            if (!Array.isArray(hash)) throw new Error(`Expected hash body to be Array, not ${hash.constructor.name}`);
 
-            // Create a synthetic "table" token at the quote position
-            const tableToken: Token = {
-                value: 'table',
+            // Create a synthetic "hash" token at the quote position
+            const hashToken: Token = {
+                value: 'hash',
                 loc: token.loc  // reuse the % location
             };
 
-            return [[tableToken, ...table], remaining];
+            return [[hashToken, ...hash], remaining];
         }
 
         return [token, rest];

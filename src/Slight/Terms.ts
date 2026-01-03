@@ -10,12 +10,13 @@ export type Term =
     | Sym
     | Nil
     | Cons
-    | Tag
-    | Table
+    | Key
+    | Hash
     | Lambda
     | Native
     | FExpr
     | Exception
+    | Environment
 
 export abstract class AbstractTerm {
     abstract readonly kind: string;
@@ -53,7 +54,9 @@ export class Exception extends AbstractTerm {
 
 // -----------------------------------------------------------------------------
 
-export class Sym extends AbstractTerm {
+export abstract class Ident extends AbstractTerm {}
+
+export class Sym extends Ident {
     readonly kind = 'Sym' as const;
 
     public ident : string;
@@ -167,8 +170,8 @@ export class Cons extends List {
 
 // -----------------------------------------------------------------------------
 
-export class Tag extends AbstractTerm {
-    readonly kind = 'Tag' as const;
+export class Key extends Ident {
+    readonly kind = 'Key' as const;
 
     public ident : string;
 
@@ -181,8 +184,8 @@ export class Tag extends AbstractTerm {
 }
 
 
-export class Table extends AbstractTerm {
-    readonly kind = 'Table' as const;
+export class Hash extends AbstractTerm {
+    readonly kind = 'Hash' as const;
 
     public items : Map<string,Term>;
 
@@ -193,30 +196,30 @@ export class Table extends AbstractTerm {
         for (let i = 0; i < items.length; i += 2) {
             let tag = items[i + 0];
             let val = items[i + 1];
-            if (!(tag instanceof Tag)) throw new Error(`Expected tag, got ${tag.constructor.name}`);
+            if (!(tag instanceof Key)) throw new Error(`Expected tag, got ${tag.constructor.name}`);
             map.set( tag.ident, val );
         }
         this.items = map;
     }
 
-    fetch (tag : Tag) : Term {
+    fetch (tag : Key) : Term {
         return this.items.get( tag.ident ) ?? new Nil();
     }
 
-    store (tag : Tag, value : Term) : void {
+    store (tag : Key, value : Term) : void {
         this.items.set( tag.ident, value );
     }
 
-    delete (tag : Tag) : void {
+    delete (tag : Key) : void {
         this.items.delete( tag.ident );
     }
 
-    exists (tag : Tag) : boolean {
+    exists (tag : Key) : boolean {
         return this.items.has(tag.ident);
     }
 
-    keys () : Tag[] {
-        return [ ...this.items.keys() ].map((t) => new Tag(t));
+    keys () : Key[] {
+        return [ ...this.items.keys() ].map((t) => new Key(t));
     }
 
     values () : Term[] {

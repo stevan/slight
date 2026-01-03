@@ -1,5 +1,5 @@
 
-import { AbstractTerm, Term, Sym, Exception } from './Terms'
+import { AbstractTerm, Term, Sym, Exception, Key } from './Terms'
 
 export type MaybeEnvironment = Environment | undefined
 
@@ -15,21 +15,7 @@ export class Environment extends AbstractTerm {
         this.parent   = parent;
     }
 
-    lookup(sym: Sym) : Term {
-        if (this.bindings.has(sym.ident))
-            return this.bindings.get(sym.ident)!;
-        if (this.parent)
-            return this.parent.lookup(sym);
-        return new Exception(`Cannot find ${sym.pprint()} in Environment`);
-    }
-
-    define(name: Sym, value: Term): void {
-        this.bindings.set(name.ident, value);
-    }
-
-    capture () : Environment {
-        return new Environment( new Map<string, Term>(), this );
-    }
+    // only for internal use (for now, cause the API sucks)
 
     derive (params : Sym[], args : Term[]) : Environment {
         let local = this.capture();
@@ -39,6 +25,42 @@ export class Environment extends AbstractTerm {
 
         return local;
     }
+
+    capture () : Environment {
+        return new Environment( new Map<string, Term>(), this );
+    }
+
+    // -----------------------------------------------
+    // external API uses Keys, internal API uses Syms
+    // -----------------------------------------------
+
+    lookup(sym: Sym | Key) : Term {
+        if (this.bindings.has(sym.ident))
+            return this.bindings.get(sym.ident)!;
+        if (this.parent)
+            return this.parent.lookup(sym);
+        return new Exception(`Cannot find ${sym.pprint()} in Environment`);
+    }
+
+    exists (sym : Sym | Key) : boolean {
+        if (this.bindings.has(sym.ident)) return true;
+        if (this.parent) return this.parent.exists(sym);
+        return false;
+    }
+
+    define(name: Sym | Key, value: Term): void {
+        this.bindings.set(name.ident, value);
+    }
+
+    delete (sym : Sym | Key) : void {
+        this.bindings.delete( sym.ident );
+    }
+
+    keys () : Key[] {
+        return [ ...this.bindings.keys() ].map((t) => new Key(t));
+    }
+
+    // ...
 
     override toNativeStr(): string {
         return `Env(${[...this.bindings.keys()].join(', ')})`;
