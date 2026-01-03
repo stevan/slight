@@ -12,8 +12,13 @@ test("... playground", async (t) => {
 
         (def Foo %(:foo 10 :bar %(:baz 10 :gorch 20) :bling 30))
 
+        (store Foo :other (+ (fetch Foo :foo) (fetch Foo :foo)))
 
-        (+ (fetch Foo :foo) (fetch (fetch Foo :bar) :gorch))
+        (+ (fetch Foo :foo) (fetch Foo :other))
+
+        (delete Foo :bar)
+
+        (pprint Foo)
 
 
     `));

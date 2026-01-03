@@ -296,7 +296,7 @@ export const constructRootEnvironment = () : E.Environment => {
         let [ table, tag, val ] = args;
         if (!(table instanceof C.Table)) throw new Error(`Expected table as first arg to store, not ${table.constructor.name}`);
         if (!(tag instanceof C.Tag)) throw new Error(`Expected tag as second arg to store, not ${tag.constructor.name}`);
-        if (val != undefined) throw new Error(`Expected value as third arg to store`);
+        if (val == undefined) throw new Error(`Expected value as third arg to store`);
         table.store( tag, val );
         return new C.Unit();
     }));
