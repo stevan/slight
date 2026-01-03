@@ -1,6 +1,7 @@
 
 import type { Environment } from './Environment'
 import type { Kontinue    } from './Kontinue'
+import type { Location    } from './Parser'
 
 export type Term =
     | Unit
@@ -21,6 +22,8 @@ export type Term =
 export abstract class AbstractTerm {
     abstract readonly kind: string;
 
+    loc?: Location;
+
     abstract toNativeStr  () : string;
 
     toNativeBool () : boolean { return true }
@@ -29,6 +32,11 @@ export abstract class AbstractTerm {
     toBool () : Bool { return new Bool(this.toNativeBool()) }
 
     pprint () : string { return this.toNativeStr() }
+
+    setLoc (loc: Location): this {
+        this.loc = loc;
+        return this;
+    }
 }
 
 // -----------------------------------------------------------------------------

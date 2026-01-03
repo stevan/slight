@@ -13,7 +13,7 @@ import {
     AgentHandler,
 } from './Slight/Handlers'
 
-export { parse   } from './Slight/Parser'
+export { parse, SourceCode, type ParseResult, type Location, type Token } from './Slight/Parser'
 export { compile } from './Slight/Compiler'
 
 // -----------------------------------------------------------------------------

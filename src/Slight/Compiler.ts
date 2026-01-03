@@ -1,28 +1,34 @@
 
-import { type ParseNode, isToken } from './Parser'
+import { type ParseNode, type ParseResult, isToken, getSpan } from './Parser'
 
 import * as C from './Terms';
 
-export function compile (expr : ParseNode[]) : C.Term[] {
+export function compile (parseResult : ParseResult) : C.Term[] {
 
     const compileExpression = (node : ParseNode) : C.Term => {
         if (isToken(node)) {
-            const expr = node.value;  // extract the string value
+            const expr = node.value;
+            const loc  = node.loc;
+            let term: C.Term;
             switch (true) {
-            case expr === 'true'       : return new C.Bool(true);
-            case expr === 'false'      : return new C.Bool(false);
-            case !isNaN(Number(expr))  : return new C.Num(Number(expr));
-            case expr.charAt(0) === '"': return new C.Str(expr.slice(1, -1));
-            case expr.charAt(0) === ':': return new C.Key(expr.slice(1));
-            default                    : return new C.Sym(expr);
+            case expr === 'true'       : term = new C.Bool(true);         break;
+            case expr === 'false'      : term = new C.Bool(false);        break;
+            case !isNaN(Number(expr))  : term = new C.Num(Number(expr));  break;
+            case expr.charAt(0) === '"': term = new C.Str(expr.slice(1, -1)); break;
+            case expr.charAt(0) === ':': term = new C.Key(expr.slice(1)); break;
+            default                    : term = new C.Sym(expr);          break;
             }
+            return term.setLoc(loc);
         }
 
         if (node.length == 0) return new C.Cons([]);
         let rest = node.map((e) => compileExpression(e));
-        return new C.Cons( rest );
+        const cons = new C.Cons(rest);
+        const span = getSpan(node);
+        if (span) cons.setLoc(span);
+        return cons;
     }
 
-    return expr.map(compileExpression);
+    return parseResult.exprs.map(compileExpression);
 }
 
