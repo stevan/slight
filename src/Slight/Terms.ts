@@ -3,17 +3,16 @@ import type { Environment } from './Environment'
 import type { Kontinue    } from './Kontinue'
 
 export type Term =
-    | Nil
     | Bool
     | Num
     | Str
     | Sym
+    | Nil
     | Cons
     | Lambda
     | Native
     | FExpr
     | Exception
-    | Tag
 
 export abstract class AbstractTerm {
     abstract readonly kind: string;
@@ -38,65 +37,7 @@ export class Exception extends AbstractTerm {
     override toNativeStr () : string { return `Exception ${this.msg}` }
 }
 
-export class Tag extends AbstractTerm {
-    readonly kind = 'Tag' as const;
-
-    public ident : string;
-
-    constructor (ident : string) {
-        super();
-        this.ident = ident;
-    }
-
-    override toNativeStr () : string { return this.ident }
-}
-
 // -----------------------------------------------------------------------------
-
-export class Nil extends AbstractTerm {
-    readonly kind = 'Nil' as const;
-
-    override toNativeStr () : string { return '()' }
-}
-
-export class Bool extends AbstractTerm {
-    readonly kind = 'Bool' as const;
-
-    public value : boolean;
-
-    constructor (value : boolean) {
-        super();
-        this.value = value;
-    }
-
-    override toNativeStr () : string { return this.value ? 'true' : 'false' }
-}
-
-export class Num extends AbstractTerm {
-    readonly kind = 'Num' as const;
-
-    public value : number;
-
-    constructor (value : number) {
-        super();
-        this.value = value;
-    }
-
-    override toNativeStr () : string { return this.value.toString() }
-}
-
-export class Str extends AbstractTerm {
-    readonly kind = 'Str' as const;
-
-    public value : string;
-
-    constructor (value : string) {
-        super();
-        this.value = value;
-    }
-
-    override toNativeStr () : string { return `"${this.value}"` }
-}
 
 export class Sym extends AbstractTerm {
     readonly kind = 'Sym' as const;
@@ -113,33 +54,81 @@ export class Sym extends AbstractTerm {
 
 // -----------------------------------------------------------------------------
 
-abstract class List<T extends Term> extends AbstractTerm {
-    public items  : T[];
+export abstract class Literal extends AbstractTerm {}
+
+export class Bool extends Literal {
+    readonly kind = 'Bool' as const;
+
+    public value : boolean;
+
+    constructor (value : boolean) {
+        super();
+        this.value = value;
+    }
+
+    override toNativeStr () : string { return this.value ? 'true' : 'false' }
+}
+
+export class Num extends Literal {
+    readonly kind = 'Num' as const;
+
+    public value : number;
+
+    constructor (value : number) {
+        super();
+        this.value = value;
+    }
+
+    override toNativeStr () : string { return this.value.toString() }
+}
+
+export class Str extends Literal {
+    readonly kind = 'Str' as const;
+
+    public value : string;
+
+    constructor (value : string) {
+        super();
+        this.value = value;
+    }
+
+    override toNativeStr () : string { return `"${this.value}"` }
+}
+
+// -----------------------------------------------------------------------------
+
+export abstract class List extends AbstractTerm {}
+
+export class Nil extends List {
+    readonly kind = 'Nil' as const;
+
+    override toNativeStr () : string { return '()' }
+}
+
+export class Cons extends List {
+    readonly kind = 'Cons' as const;
+
+    public items  : Term[];
     public offset : number;
 
-    constructor (items : T[], offset : number = 0) {
+    constructor (items : Term[], offset : number = 0) {
         super();
         this.items  = items;
         this.offset = offset;
     }
 
-    at (i : number) : T {
-        if ((this.offset + i) > this.items.length) throw new Error('OVERFLOW!');
+    at (i : number) : Term {
+        if ((this.offset + i) > this.items.length) throw new Error(`Index(${i}) out of range`);
         return this.items[ this.offset + i ];
     }
 
-    mapItems<U> (f : (i : T) => U) : U[] {
-        let list = [];
-        for (let i = 0; i < this.length; i++) {
-            list.push( f( this.at(i) ) );
-        }
-        return list;
-    }
-
     get length () : number { return this.items.length - this.offset }
-    get head   () : T      { return this.items[this.offset] }
+    get first  () : Term   { return this.items[this.offset] }
 
-    abstract get tail () : Term;
+    get rest () : Cons | Nil {
+        if (this.length == 1) return new Nil();
+        return new Cons(this.items, this.offset + 1);
+    }
 
     toNativeArray () : Term[] {
         let list = [];
@@ -154,26 +143,15 @@ abstract class List<T extends Term> extends AbstractTerm {
     }
 }
 
-export class Cons extends List<Term> {
-    readonly kind = 'Cons' as const;
-
-    get tail () : Cons | Nil {
-        if (this.length == 1) return new Nil();
-        return new Cons(this.items, this.offset + 1);
-    }
-
-    map (f : (i : Term) => Term) : Cons {
-        return new Cons( this.mapItems<Term>(f) );
-    }
-}
-
 // -----------------------------------------------------------------------------
 
 export type NativeFunc  = (params : Term[], env : Environment) => Term;
 export type NativeFExpr = (params : Term[], env : Environment) => Kontinue[];
 
-export abstract class Applicative extends AbstractTerm {}
-export abstract class Operative   extends AbstractTerm {}
+export abstract class Callable extends AbstractTerm {}
+
+export abstract class Applicative extends Callable {}
+export abstract class Operative   extends Callable {}
 
 export class Lambda extends Applicative {
     readonly kind = 'Lambda' as const;

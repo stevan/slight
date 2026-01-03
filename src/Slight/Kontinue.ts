@@ -26,7 +26,7 @@ export type Kontinue =
     | { op : 'EVAL/EXPR',      stack : Term[], env : Environment, expr : Term }
     | { op : 'EVAL/TOS',       stack : Term[], env : Environment }
     | { op : 'EVAL/CONS',      stack : Term[], env : Environment, cons : Cons }
-    | { op : 'EVAL/CONS/TAIL', stack : Term[], env : Environment, tail : Term }
+    | { op : 'EVAL/CONS/REST', stack : Term[], env : Environment, rest : Term }
     | { op : 'APPLY/EXPR',        stack : Term[], env : Environment, args : Term }
     | { op : 'APPLY/OPERATIVE',   stack : Term[], env : Environment, call : Operative, args : Term }
     | { op : 'APPLY/APPLICATIVE', stack : Term[], env : Environment, call : Applicative }
@@ -56,8 +56,8 @@ export function EvalCons (cons : Cons, env : Environment) : Kontinue {
     return { op : 'EVAL/CONS', stack : [], env, cons }
 }
 
-export function EvalConsTail (tail : Term, env : Environment) : Kontinue {
-    return { op : 'EVAL/CONS/TAIL', stack : [], env, tail }
+export function EvalConsRest (rest : Term, env : Environment) : Kontinue {
+    return { op : 'EVAL/CONS/REST', stack : [], env, rest }
 }
 
 export function ApplyExpr (args : Term, env : Environment) : Kontinue {
@@ -81,7 +81,7 @@ export function pprint (k : Kontinue) : string {
     case 'EVAL/EXPR'         : return `${k.op}[${k.expr.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
     case 'EVAL/TOS'          : return `${k.op}[] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
     case 'EVAL/CONS'         : return `${k.op}[${k.cons.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
-    case 'EVAL/CONS/TAIL'    : return `${k.op}[${k.tail.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
+    case 'EVAL/CONS/REST'    : return `${k.op}[${k.rest.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
     case 'APPLY/EXPR'        : return `${k.op}[${k.args.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
     case 'APPLY/OPERATIVE'   : return `${k.op}[${k.call.toNativeStr()}](${k.args.toNativeStr()}) ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;
     case 'APPLY/APPLICATIVE' : return `${k.op}[${k.call.toNativeStr()}] ^(${k.stack.map((i) => i.toNativeStr()).join(';')})`;

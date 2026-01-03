@@ -29,8 +29,7 @@ export class Machine {
         case 'Bool'      :
         case 'Native'    :
         case 'FExpr'     :
-        case 'Lambda'    :
-        case 'Tag'       : return K.Return( expr, env );
+        case 'Lambda'    : return K.Return( expr, env );
         case 'Cons'      : return K.EvalCons( expr, env );
         case 'Sym'       :
             let value = env.lookup( expr );
@@ -71,7 +70,6 @@ export class Machine {
                 let body = k.stack.pop()!;
                 k.env.define( k.name, body );
                 // FIXME - this should return SOMETHING?!
-                //this.returnValues( k.env.toPairList() );
                 break;
             // ---------------------------------------------------------------------
             // This is a literal value to be returned to the
@@ -131,27 +129,27 @@ export class Machine {
             // ---------------------------------------------------------------------
             case 'EVAL/CONS':
                 let cons  = k.cons;
-                let check = K.ApplyExpr( cons.tail, k.env );
-                this.queue.push( check, this.evaluateTerm( cons.head, k.env ) );
+                let check = K.ApplyExpr( cons.rest, k.env );
+                this.queue.push( check, this.evaluateTerm( cons.first, k.env ) );
                 break;
-            case 'EVAL/CONS/TAIL':
-                let tail = k.tail;
+            case 'EVAL/CONS/REST':
+                let tail = k.rest;
                 // FIXME - this error should not happen because
                 // it is prevented by the conditional below,
                 // and by the conditionals in APPLY/EXPR, there
                 // has to be a cleaner way to do this, but it
                 // works for now.
                 if (tail instanceof C.Nil) {
-                    this.queue.push( K.Throw( new C.Exception('Got Nil in EVAL/CONS/TAIL, should never happen!'), k.env) );
+                    this.queue.push( K.Throw( new C.Exception('Got Nil in EVAL/CONS/REST, should never happen!'), k.env) );
                     break;
                 }
 
-                if (!((tail as C.Cons).tail instanceof C.Nil)) {
-                    this.queue.push( K.EvalConsTail( (tail as C.Cons).tail, k.env ) );
+                if (!((tail as C.Cons).rest instanceof C.Nil)) {
+                    this.queue.push( K.EvalConsRest( (tail as C.Cons).rest, k.env ) );
                 }
 
                 k.stack.splice(0).forEach((evaled) => this.returnValues( evaled ));
-                this.queue.push( this.evaluateTerm( (tail as C.Cons).head, k.env ) );
+                this.queue.push( this.evaluateTerm( (tail as C.Cons).first, k.env ) );
                 break;
             // ---------------------------------------------------------------------
             // Handle function calls
@@ -174,9 +172,9 @@ export class Machine {
                 else if (call instanceof C.Applicative) {
                     this.queue.push( K.ApplyApplicative( (call as C.Applicative), k.env ) );
                     // FIXME - I think this is right place for this
-                    // but see comment above in EVAL/CONS/TAIL
+                    // but see comment above in EVAL/CONS/REST
                     if (!(k.args instanceof C.Nil)) {
-                        this.queue.push( K.EvalConsTail( k.args, k.env ) );
+                        this.queue.push( K.EvalConsRest( k.args, k.env ) );
                     }
                 }
                 else {

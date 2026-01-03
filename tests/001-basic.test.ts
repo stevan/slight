@@ -17,7 +17,7 @@ test("... playground", async (t) => {
         (defun (length list)
             (if (nil? list)
                 0
-                (+ 1 (length (tail list)))))
+                (+ 1 (length (rest list)))))
 
         (defun (factorial n)
             (if (== n 0)
@@ -46,8 +46,8 @@ test("... playground", async (t) => {
             ((lambda (x y) (+ x y)) 10 (* 2 10))
             ((lambda (x y) (+ x y)) (+ 5 5) (* 2 10))
             (((lambda (x) (lambda (y) (+ x y))) 10) 20)
-            (head (tail (tail (list 10 20 30))))
-            (+ (head (list 10 20)) (head (tail (list 10 20))))
+            (first (rest (rest (list 10 20 30))))
+            (+ (first (list 10 20)) (first (rest (list 10 20))))
             (?: true  30 0)
             (?: false 0 30)
             (?: (== 10 10) (+ 10 20) 0)

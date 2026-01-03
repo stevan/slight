@@ -17,18 +17,38 @@ export const constructRootEnvironment = () : E.Environment => {
     let builtins = new Map<string, C.Term>();
 
     // -------------------------------------------------------------------------
-    // everythings
+    // Utils
     // -------------------------------------------------------------------------
-
-    builtins.set('type-of', new C.Native('type-of [any]:str', (args, env) => {
-        let [ arg ] = args;
-        return new C.Str( arg.constructor.name );
-    }));
 
     builtins.set('pprint', new C.Native('pprint [any]:str', (args, env) => {
         let [ arg ] = args;
         return new C.Str( arg.toNativeStr() );
     }));
+
+    // -------------------------------------------------------------------------
+    // types & predicates
+    // -------------------------------------------------------------------------
+
+    builtins.set('type-of', new C.Native('type-of [any]:str', (args, env) => new C.Str( args[0]!.constructor.name )));
+
+    builtins.set('literal?', new C.Native('literal? [any]:bool', (args, env) => new C.Bool( args[0]! instanceof C.Literal )));
+    builtins.set('bool?',    new C.Native('bool? [any]:bool', (args, env) => new C.Bool( args[0]!.constructor == C.Bool )));
+    builtins.set('num?',     new C.Native('num? [any]:bool',  (args, env) => new C.Bool( args[0]!.constructor == C.Num )));
+    builtins.set('str?',     new C.Native('str? [any]:bool',  (args, env) => new C.Bool( args[0]!.constructor == C.Str )));
+    builtins.set('sym?',     new C.Native('sym? [any]:bool',  (args, env) => new C.Bool( args[0]!.constructor == C.Sym )));
+
+    builtins.set('list?', new C.Native('list? [any]:bool', (args, env) => new C.Bool( args[0]! instanceof C.List )));
+    builtins.set('nil?',  new C.Native('nil? [any]:bool',  (args, env) => new C.Bool( args[0]!.constructor == C.Nil )));
+    builtins.set('cons?', new C.Native('cons? [any]:bool', (args, env) => new C.Bool( args[0]!.constructor == C.Cons )));
+
+    builtins.set('callable?',    new C.Native('callable? [any]:bool',    (args, env) => new C.Bool( args[0]! instanceof C.Callable)));
+    builtins.set('operative?',   new C.Native('operative? [any]:bool',   (args, env) => new C.Bool( args[0]! instanceof C.Operative)));
+    builtins.set('applicative?', new C.Native('applicative? [any]:bool', (args, env) => new C.Bool( args[0]! instanceof C.Applicative)));
+    builtins.set('lambda?',      new C.Native('lambda? [any]:bool',      (args, env) => new C.Bool( args[0]!.constructor == C.Lambda )));
+    builtins.set('native?',      new C.Native('native? [any]:bool',      (args, env) => new C.Bool( args[0]!.constructor == C.Native )));
+    builtins.set('fexpr?',       new C.Native('fexpr? [any]:bool',       (args, env) => new C.Bool( args[0]!.constructor == C.FExpr )));
+
+    builtins.set('exception?', new C.Native('exception? [any]:bool', (args, env) => new C.Bool( args[0]!.constructor == C.Exception )));
 
     // -------------------------------------------------------------------------
     // numbers
@@ -75,28 +95,24 @@ export const constructRootEnvironment = () : E.Environment => {
     // -------------------------------------------------------------------------
 
     builtins.set('cons', new C.Native('cons [x;xs]:list', (args, env) => {
-        let [ head, tail ] = args;
-        if (tail instanceof C.Nil)  return new C.Cons([ head ]);
-        if (tail instanceof C.Cons) return new C.Cons([ head, ...tail.toNativeArray() ]);
-        return new C.Cons([ head, tail ]);
+        let [ first, rest ] = args;
+        if (rest instanceof C.Nil)  return new C.Cons([ first ]);
+        if (rest instanceof C.Cons) return new C.Cons([ first, ...rest.toNativeArray() ]);
+        return new C.Cons([ first, rest ]);
     }));
 
     builtins.set('list' , new C.Native('list [...]:list', (args, env) => new C.Cons(args)));
-    builtins.set('head' , new C.Native('head [list]:any', (args, env) => {
+
+    builtins.set('first' , new C.Native('first [list]:any', (args, env) => {
         let [ arg ] = args;
-        if (!(arg instanceof C.Cons)) throw new Error(`Can only call head() on Cons, not ${arg.constructor.name}`);
-        return arg.head;
+        if (!(arg instanceof C.Cons)) throw new Error(`Can only call first() on Cons, not ${arg.constructor.name}`);
+        return arg.first;
     }));
 
-    builtins.set('tail' , new C.Native('tail [list]:list', (args, env) => {
+    builtins.set('rest' , new C.Native('rest [list]:list', (args, env) => {
         let [ arg ] = args;
-        if (!(arg instanceof C.Cons)) throw new Error(`Can only call tail() on Cons, not ${arg.constructor.name}`);
-        return arg.tail;
-    }));
-
-    builtins.set('nil?' , new C.Native('nil? [any]:bool', (args, env) => {
-        let [ arg ] = args;
-        return new C.Bool( arg instanceof C.Nil );
+        if (!(arg instanceof C.Cons)) throw new Error(`Can only call rest() on Cons, not ${arg.constructor.name}`);
+        return arg.rest;
     }));
 
     // -------------------------------------------------------------------------
@@ -153,8 +169,8 @@ export const constructRootEnvironment = () : E.Environment => {
     // definitions
     builtins.set('defun', new C.FExpr('defun [[name;params...];body]:(unit)', (args, env) => {
         let [ sig, body ] = args;
-        let name   = (sig as C.Cons).head;
-        let params = (sig as C.Cons).tail;
+        let name   = (sig as C.Cons).first;
+        let params = (sig as C.Cons).rest;
         return [
             K.Define( name as C.Sym, env ),
             K.Return(
@@ -186,7 +202,7 @@ export const constructRootEnvironment = () : E.Environment => {
     builtins.set('print', new C.FExpr('print [any]:(unit)', (args, env) => {
         return [
             K.Host( 'IO::print', env, ...args ),
-            K.EvalConsTail( new C.Cons(args), env )
+            K.EvalConsRest( new C.Cons(args), env )
         ]
     }));
 
