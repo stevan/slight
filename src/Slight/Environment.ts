@@ -34,6 +34,8 @@ export class Environment extends AbstractTerm {
     // external API uses Keys, internal API uses Syms
     // -----------------------------------------------
 
+    depth () : number { return 1 + (this.parent?.depth() ?? 0) }
+
     lookup(sym: Sym | Key) : Term {
         if (this.bindings.has(sym.ident))
             return this.bindings.get(sym.ident)!;
@@ -63,6 +65,6 @@ export class Environment extends AbstractTerm {
     // ...
 
     override toNativeStr(): string {
-        return `Env(${[...this.bindings.keys()].join(', ')})`;
+        return `Env[${this.depth()}](${[...this.bindings.keys()].join(', ')})`;
     }
 }

@@ -40,25 +40,33 @@ export class AgentHandler implements HostActionHandler {
 You are an agent working in a Lisp REPL to answer a query.
 Do not use any context outside of this REPL.
 
-AVAILABLE OPERATIONS:
-(+ n m) - add two numbers
-(- n m) - subtract two numbers
-(* n m) - mulitply two numbers
-(/ n m) - divide two numbers
-(% n m) - modulo two numbers
-(lambda (x y) (...)) - create lambda functions
+You can explore the language by exploring the environment starting
+by calling ($Env) to get the root builtin environment. Some other
+important forms are:
+
+    - ($Env) - the root builtin environment
+    - (*Env) - the current environment
+    - (^Env) - the current parent environment
+    - (lambda (x y) ...) - lambda construction
+    - (def name value) - defining variables in *Env
+    - (defun (nane x y) ...) - defining functions in *Env
+    - %(:key value :key value ...) - defining a hash
+
+NOTES:
+    - a :key is a symbol that always evalutes to itself
+    - the env-* functions accept :key or (quote sym) as arguments
 
 Generate the next REPL expression. You can:
 - Call any available operation to explore or act
 - Use (resume <value>) when the problem is solved
 
-Respond with ONLY a single S-expression, nothing else.
+**Respond with ONLY a single S-expression, nothing else.**
 
 HISTORY:
 ${prev_results}
 
 QUERY:
-${query.pprint()}
+${query.toNativeStr()}
 
 ?`
     }

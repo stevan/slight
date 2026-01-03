@@ -18,34 +18,6 @@ export const constructRootEnvironment = () : E.Environment => {
     let builtins = new Map<string, C.Term>();
 
     // -------------------------------------------------------------------------
-    // HOST functions
-    // -------------------------------------------------------------------------
-
-    builtins.set('print', new C.FExpr('print [any]:(unit)', (args, env) => {
-        return [
-            K.Host( 'IO::print', env, ...args ),
-            K.EvalConsRest( new C.Cons(args), env )
-        ]
-    }));
-
-    builtins.set('readline', new C.FExpr('readline []:string', (args, env) => {
-        return [ K.Host( 'IO::readline', env, ...args ) ]
-    }));
-
-    builtins.set('repl', new C.FExpr('repl []:any', (args, env) => {
-        return [ K.Host( 'IO::repl', env.capture(), ...args ) ]
-    }));
-
-    builtins.set('ai-repl', new C.FExpr('ai-repl [str]:any', (args, env) => {
-        return [ K.Host( 'AI::repl', env.capture(), ...args ) ]
-    }));
-
-    // TODO
-    // - say/warn
-    // - sleep
-    // - slurp/spew
-
-    // -------------------------------------------------------------------------
     // Utils
     // -------------------------------------------------------------------------
 
@@ -322,6 +294,40 @@ export const constructRootEnvironment = () : E.Environment => {
     }));
 
     // -------------------------------------------------------------------------
+    // Functions
+    // -------------------------------------------------------------------------
+
+    // lambdas
+    builtins.set('lambda', new C.FExpr('lambda [[params];body]:(λ + E)', (args, env) => {
+        let [ params, body ] = args;
+        return [ K.Return( new C.Lambda( params as C.Cons, body, env ), env ) ]
+    }));
+
+    // -------------------------------------------------------------------------
+    // Definitions
+    // -------------------------------------------------------------------------
+
+    // definitions
+    builtins.set('def', new C.FExpr('def [name;value]:(unit)', (args, env) => {
+        let [ name, value ] = args;
+        return [
+            K.Define( name as C.Sym, env ),
+            K.EvalExpr( value, env )
+        ]
+    }));
+
+    // definitions
+    builtins.set('defun', new C.FExpr('defun [[name;params...];body]:(unit)', (args, env) => {
+        let [ sig, body ] = args;
+        let name   = (sig as C.Cons).first;
+        let params = (sig as C.Cons).rest;
+        return [
+            K.Define( name as C.Sym, env ),
+            K.Return( new C.Lambda( params as C.Cons, body, env ), env )
+        ]
+    }));
+
+    // -------------------------------------------------------------------------
     // Env
     // -------------------------------------------------------------------------
 
@@ -366,45 +372,45 @@ export const constructRootEnvironment = () : E.Environment => {
         return new C.Cons(localEnv.keys());
     }));
 
+    builtins.set('env^upper', new C.Native('env^upper [env]:env', (args, env) => {
+        let [ localEnv ] = args;
+        if (!(localEnv instanceof E.Environment)) throw new Error(`Expected Environment as first arg to env-keys, not ${localEnv.constructor.name}`);
+        return localEnv.parent ?? new C.Nil();
+    }));
+
     // TODO
     // - env->hash
 
     // -------------------------------------------------------------------------
-    // Functions
+    // HOST functions
     // -------------------------------------------------------------------------
 
-    // lambdas
-    builtins.set('lambda', new C.FExpr('lambda [[params];body]:(λ + E)', (args, env) => {
-        let [ params, body ] = args;
-        return [ K.Return( new C.Lambda( params as C.Cons, body, env ), env ) ]
-    }));
-
-    // -------------------------------------------------------------------------
-    // Definitions
-    // -------------------------------------------------------------------------
-
-    // definitions
-    builtins.set('def', new C.FExpr('def [name;value]:(unit)', (args, env) => {
-        let [ name, value ] = args;
+    builtins.set('print', new C.FExpr('print [any]:(unit)', (args, env) => {
         return [
-            K.Define( name as C.Sym, env ),
-            K.EvalExpr( value, env )
+            K.Host( 'IO::print', env, ...args ),
+            K.EvalConsRest( new C.Cons(args), env )
         ]
     }));
 
-    // definitions
-    builtins.set('defun', new C.FExpr('defun [[name;params...];body]:(unit)', (args, env) => {
-        let [ sig, body ] = args;
-        let name   = (sig as C.Cons).first;
-        let params = (sig as C.Cons).rest;
-        return [
-            K.Define( name as C.Sym, env ),
-            K.Return( new C.Lambda( params as C.Cons, body, env ), env )
-        ]
+    builtins.set('readline', new C.FExpr('readline []:string', (args, env) => {
+        return [ K.Host( 'IO::readline', env, ...args ) ]
     }));
 
+    builtins.set('repl', new C.FExpr('repl []:any', (args, env) => {
+        return [ K.Host( 'IO::repl', env.capture(), ...args ) ]
+    }));
+
+    builtins.set('ai-repl', new C.FExpr('ai-repl [str]:any', (args, env) => {
+        return [ K.Host( 'AI::repl', env.capture(), ...args ) ]
+    }));
+
+    // TODO
+    // - say/warn
+    // - sleep
+    // - slurp/spew
 
     // -------------------------------------------------------------------------
+
     return new E.Environment(builtins);
 }
 
