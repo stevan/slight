@@ -13,6 +13,7 @@ export function compile (parseResult : ParseResult) : C.Term[] {
             switch (true) {
             case expr === 'true'       : term = new C.Bool(true);         break;
             case expr === 'false'      : term = new C.Bool(false);        break;
+            case expr === 'nil'        : term = new C.Nil();              break;
             case !isNaN(Number(expr))  : term = new C.Num(Number(expr));  break;
             case expr.charAt(0) === '"': term = new C.Str(expr.slice(1, -1)); break;
             case expr.charAt(0) === ':': term = new C.Key(expr.slice(1)); break;

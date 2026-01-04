@@ -10,11 +10,7 @@ test("... playground", async (t) => {
 
     let program = compile(parse(`
 
-            (+ 10
-                (try
-                    (throw "I need twenty!")
-                    (catch (e)
-                        (repl))))
+        (ai-repl "explore the language a bit")
 
     `));
 
@@ -30,7 +26,7 @@ test("... playground", async (t) => {
     Dumper.log("RESULTS", {
         action : k.action,
         args   : k.args,
-        stack  : k.stack,
+        stack  : k.stack.map((i) => i.pprint()),
         env    : k.env.bindings,
     });
 });

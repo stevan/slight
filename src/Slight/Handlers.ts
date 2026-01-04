@@ -60,7 +60,7 @@ Generate the next REPL expression. You can:
 - Call any available operation to explore or act
 - Use (resume <value>) when the problem is solved
 
-**Respond with ONLY a single S-expression, nothing else.**
+**Respond with ONLY a single S-expression, followed by a line break, nothing else.**
 
 HISTORY:
 ${prev_results}

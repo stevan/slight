@@ -92,8 +92,9 @@ export class Machine {
                         this.returnValues( k.exception );
                         break;
                     } else {
+                        let _discard = this.queue.pop();
                         // unwind, and discard results
-                        if (DEBUG) console.log("UNWInDING", this.queue.pop()!.op);
+                        if (DEBUG) console.log("UNWInDING", K.pprint(_discard as K.Kontinue) );
                     }
                 }
                 // if we ran out completely, then we
