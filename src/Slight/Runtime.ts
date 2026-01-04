@@ -1,13 +1,70 @@
 
-import {
-    liftNumUnOp,      liftStrUnOp,
-    liftNumBinOp,     liftStrBinOp,
-    liftNumCompareOp, liftStrCompareOp,
-} from './Util'
-
 import * as C from './Terms'
 import * as E from './Environment'
 import * as K from './Kontinue'
+
+
+// -----------------------------------------------------------------------------
+// helpers for builtins
+// -----------------------------------------------------------------------------
+
+// ...
+
+export const liftNumBinOp = (f : (n : number, m : number) => number) : C.NativeFunc => {
+    return (args : C.Term[], env : E.Environment) => {
+        let [ lhs, rhs ] = args;
+        if (!(lhs instanceof C.Num)) return new C.Exception(`LHS must be a Num, not ${lhs.constructor.name}`);
+        if (!(rhs instanceof C.Num)) return new C.Exception(`RHS must be a Num, not ${rhs.constructor.name}`);
+        return new C.Num( f(lhs.value, rhs.value) );
+    }
+}
+
+export const liftNumUnOp = (f : (t : number) => number) : C.NativeFunc => {
+    return (args : C.Term[], env : E.Environment) => {
+        let [ num ] = args;
+        if (!(num instanceof C.Num)) return new C.Exception(`Expected instance of Num`);
+        return new C.Num( f( num.value ) );
+    }
+}
+
+// ...
+
+export const liftStrBinOp = (f : (n : string, m : string) => string) : C.NativeFunc => {
+    return (args : C.Term[], env : E.Environment) => {
+        let [ lhs, rhs ] = args;
+        if (!(lhs instanceof C.Str)) return new C.Exception(`LHS must be a Str, not ${lhs.constructor.name}`);
+        if (!(rhs instanceof C.Str)) return new C.Exception(`RHS must be a Str, not ${rhs.constructor.name}`);
+        return new C.Str( f(lhs.value, rhs.value) );
+    }
+}
+
+export const liftStrUnOp = (f : (t : string) => string) : C.NativeFunc => {
+    return (args : C.Term[], env : E.Environment) => {
+        let [ str ] = args;
+        if (!(str instanceof C.Str)) return new C.Exception(`Expected instance of Str`);
+        return new C.Str( f( str.value ) );
+    }
+}
+
+// ...
+
+export const liftNumCompareOp = (f : (n : number, m : number) => boolean) : C.NativeFunc => {
+    return (args : C.Term[], env : E.Environment) => {
+        let [ lhs, rhs ] = args;
+        if (!(lhs instanceof C.Num)) return new C.Exception(`LHS must be a Num, not ${lhs.constructor.name}`);
+        if (!(rhs instanceof C.Num)) return new C.Exception(`RHS must be a Num, not ${rhs.constructor.name}`);
+        return new C.Bool( f(lhs.value, rhs.value) );
+    }
+}
+
+export const liftStrCompareOp = (f : (n : string, m : string) => boolean) : C.NativeFunc => {
+    return (args : C.Term[], env : E.Environment) => {
+        let [ lhs, rhs ] = args;
+        if (!(lhs instanceof C.Str)) return new C.Exception(`LHS must be a Str, not ${lhs.constructor.name}`);
+        if (!(rhs instanceof C.Str)) return new C.Exception(`RHS must be a Str, not ${rhs.constructor.name}`);
+        return new C.Bool( f(lhs.value, rhs.value) );
+    }
+}
 
 // -----------------------------------------------------------------------------
 // the base environment ()
@@ -83,13 +140,13 @@ export const constructRootEnvironment = () : E.Environment => {
 
     builtins.set('str->int', new C.Native('str->int [str]:num', (args, env) => {
         let [ str ] = args;
-        if (!(str instanceof C.Str)) throw new Error(`Can only call str->int on Str, not ${str.constructor.name}`);
+        if (!(str instanceof C.Str)) return new C.Exception(`Can only call str->int on Str, not ${str.constructor.name}`);
         return new C.Num( Number.parseInt( str.value ) );
     }));
 
     builtins.set('str->float', new C.Native('str->float [str]:num', (args, env) => {
         let [ str ] = args;
-        if (!(str instanceof C.Str)) throw new Error(`Can only call str->float on Str, not ${str.constructor.name}`);
+        if (!(str instanceof C.Str)) return new C.Exception(`Can only call str->float on Str, not ${str.constructor.name}`);
         return new C.Num( Number.parseFloat( str.value ) );
     }));
 
@@ -152,15 +209,15 @@ export const constructRootEnvironment = () : E.Environment => {
 
     builtins.set('split', new C.Native('split [str;str]:list', (args, env) => {
         let [ seperator, string ] = args;
-        if (!(seperator instanceof C.Str)) throw new Error(`Exepected Str for seperator`);
-        if (!(string instanceof C.Str)) throw new Error(`Exepected Str for string`);
-        return new C.Cons( string.value.split( seperator.value ).map( (s) => new C.Str(s) ) )
+        if (!(seperator instanceof C.Str)) return new C.Exception(`Exepected Str for seperator`);
+        if (!(string instanceof C.Str)) return new C.Exception(`Exepected Str for string`);
+        return C.Cons.make( string.value.split( seperator.value ).map( (s) => new C.Str(s) ) )
     }));
 
     builtins.set('join', new C.Native('join [str;list]:str', (args, env) => {
         let [ seperator, list ] = args;
-        if (!(seperator instanceof C.Str)) throw new Error(`Exepected Str for seperator`);
-        if (!(list instanceof C.Cons)) throw new Error(`Exepected List for list`);
+        if (!(seperator instanceof C.Str)) return new C.Exception(`Exepected Str for seperator`);
+        if (!(list instanceof C.Cons)) return new C.Exception(`Exepected List for list`);
         return new C.Str( list.toNativeArray().map((t) => t.toNativeStr()).join( seperator.value ) );
     }));
 
@@ -180,7 +237,7 @@ export const constructRootEnvironment = () : E.Environment => {
     // unary negation
     builtins.set('!', new C.Native('! [bool]:bool', (args, env) => {
         let [ arg ] = args;
-        if (!(arg instanceof C.Bool)) throw new Error(`Can only call ! on Bool, not ${arg.constructor.name}`);
+        if (!(arg instanceof C.Bool)) return new C.Exception(`Can only call ! on Bool, not ${arg.constructor.name}`);
         return new C.Bool( !arg.value );
     }));
 
@@ -221,26 +278,26 @@ export const constructRootEnvironment = () : E.Environment => {
     // Lists
     // -------------------------------------------------------------------------
 
-    builtins.set('list' , new C.Native('list [...]:list', (args, env) => new C.Cons(args)));
+    builtins.set('list' , new C.Native('list [...]:list', (args, env) => C.Cons.make(args)));
 
     builtins.set('cons', new C.Native('cons [x;xs]:list', (args, env) => {
         let [ first, rest ] = args;
-        if (rest instanceof C.Nil)  return new C.Cons([ first ]);
-        if (rest instanceof C.Cons) return new C.Cons([ first, ...rest.toNativeArray() ]);
-        return new C.Cons([ first, rest ]);
+        if (rest instanceof C.Nil)  return C.Cons.make([ first ]);
+        if (rest instanceof C.Cons) return C.Cons.make([ first, ...rest.toNativeArray() ]);
+        return C.Cons.make([ first, rest ]);
     }));
 
     builtins.set('first' , new C.Native('first [list]:any', (args, env) => {
         let [ arg ] = args;
         if (!(arg instanceof C.Cons))
-            throw new Error(`Can only call first() on Cons, not ${arg.constructor.name}`);
+            return new C.Exception(`Can only call first() on Cons, not ${arg.constructor.name}`);
         return arg.first;
     }));
 
     builtins.set('rest' , new C.Native('rest [list]:list', (args, env) => {
         let [ arg ] = args;
         if (!(arg instanceof C.Cons))
-            throw new Error(`Can only call rest() on Cons, not ${arg.constructor.name}`);
+            return new C.Exception(`Can only call rest() on Cons, not ${arg.constructor.name}`);
         return arg.rest;
     }));
 
@@ -248,49 +305,49 @@ export const constructRootEnvironment = () : E.Environment => {
     // Hashes
     // -------------------------------------------------------------------------
 
-    builtins.set('hash' , new C.Native('hash [...]:hash', (args, env) => new C.Hash(args)));
+    builtins.set('hash' , new C.Native('hash [...]:hash', (args, env) => C.Hash.make(args)));
 
     builtins.set('fetch', new C.Native('fetch [hash;key]:any',  (args, env) => {
         let [ hash, key ] = args;
-        if (!(hash instanceof C.Hash)) throw new Error(`Expected hash as first arg to fetch, not ${hash.constructor.name}`);
-        if (!(key instanceof C.Key)) throw new Error(`Expected key as second arg to fetch, not ${key.constructor.name}`);
+        if (!(hash instanceof C.Hash)) return new C.Exception(`Expected hash as first arg to fetch, not ${hash.constructor.name}`);
+        if (!(key instanceof C.Key)) return new C.Exception(`Expected key as second arg to fetch, not ${key.constructor.name}`);
         return hash.fetch( key );
     }));
 
     builtins.set('exists?', new C.Native('exists? [hash;key]:bool', (args, env) => {
         let [ hash, key ] = args;
-        if (!(hash instanceof C.Hash)) throw new Error(`Expected hash as first arg to exists?, not ${hash.constructor.name}`);
-        if (!(key instanceof C.Key)) throw new Error(`Expected key as second arg to exists?, not ${key.constructor.name}`);
+        if (!(hash instanceof C.Hash)) return new C.Exception(`Expected hash as first arg to exists?, not ${hash.constructor.name}`);
+        if (!(key instanceof C.Key)) return new C.Exception(`Expected key as second arg to exists?, not ${key.constructor.name}`);
         return new C.Bool( hash.exists( key ) );
     }));
 
     builtins.set('store!', new C.Native('store! [hash;key;any]:unit', (args, env) => {
         let [ hash, key, val ] = args;
-        if (!(hash instanceof C.Hash)) throw new Error(`Expected hash as first arg to store!, not ${hash.constructor.name}`);
-        if (!(key instanceof C.Key)) throw new Error(`Expected key as second arg to store!, not ${key.constructor.name}`);
-        if (val == undefined) throw new Error(`Expected value as third arg to store!`);
+        if (!(hash instanceof C.Hash)) return new C.Exception(`Expected hash as first arg to store!, not ${hash.constructor.name}`);
+        if (!(key instanceof C.Key)) return new C.Exception(`Expected key as second arg to store!, not ${key.constructor.name}`);
+        if (val == undefined) return new C.Exception(`Expected value as third arg to store!`);
         hash.store( key, val );
         return new C.Unit();
     }));
 
     builtins.set('delete!', new C.Native('delete! [hash;key]:unit',  (args, env) => {
         let [ hash, key ] = args;
-        if (!(hash instanceof C.Hash)) throw new Error(`Expected hash as first arg to delete!, not ${hash.constructor.name}`);
-        if (!(key instanceof C.Key)) throw new Error(`Expected key as second arg to delete!, not ${key.constructor.name}`);
+        if (!(hash instanceof C.Hash)) return new C.Exception(`Expected hash as first arg to delete!, not ${hash.constructor.name}`);
+        if (!(key instanceof C.Key)) return new C.Exception(`Expected key as second arg to delete!, not ${key.constructor.name}`);
         hash.delete( key );
         return new C.Unit();
     }));
 
     builtins.set('keys', new C.Native('keys [hash]:list',  (args, env) => {
         let [ hash ] = args;
-        if (!(hash instanceof C.Hash)) throw new Error(`Expected hash as first arg to keys, not ${hash.constructor.name}`);
-        return new C.Cons(hash.keys());
+        if (!(hash instanceof C.Hash)) return new C.Exception(`Expected hash as first arg to keys, not ${hash.constructor.name}`);
+        return C.Cons.make(hash.keys());
     }));
 
     builtins.set('values', new C.Native('values [hash]:list',  (args, env) => {
         let [ hash ] = args;
-        if (!(hash instanceof C.Hash)) throw new Error(`Expected hash as first arg to values, not ${hash.constructor.name}`);
-        return new C.Cons(hash.values());
+        if (!(hash instanceof C.Hash)) return new C.Exception(`Expected hash as first arg to values, not ${hash.constructor.name}`);
+        return C.Cons.make(hash.values());
     }));
 
     // -------------------------------------------------------------------------
@@ -337,44 +394,44 @@ export const constructRootEnvironment = () : E.Environment => {
 
     builtins.set('env-lookup', new C.Native('env-lookup [env;key]:any',  (args, env) => {
         let [ localEnv, key ] = args;
-        if (!(localEnv instanceof E.Environment)) throw new Error(`Expected Environment as first arg to env-lookup, not ${localEnv.constructor.name}`);
-        if (!(key instanceof C.Ident)) throw new Error(`Expected key as second arg to fetch, not ${key.constructor.name}`);
+        if (!(localEnv instanceof E.Environment)) return new C.Exception(`Expected Environment as first arg to env-lookup, not ${localEnv.constructor.name}`);
+        if (!(key instanceof C.Ident)) return new C.Exception(`Expected key as second arg to fetch, not ${key.constructor.name}`);
         return localEnv.lookup( key );
     }));
 
     builtins.set('env-exists?', new C.Native('env-exists? [env;key]:bool', (args, env) => {
         let [ localEnv, key ] = args;
-        if (!(localEnv instanceof E.Environment)) throw new Error(`Expected Environment as first arg to env-exists?, not ${localEnv.constructor.name}`);
-        if (!(key instanceof C.Ident)) throw new Error(`Expected key as second arg to env-exists?, not ${key.constructor.name}`);
+        if (!(localEnv instanceof E.Environment)) return new C.Exception(`Expected Environment as first arg to env-exists?, not ${localEnv.constructor.name}`);
+        if (!(key instanceof C.Ident)) return new C.Exception(`Expected key as second arg to env-exists?, not ${key.constructor.name}`);
         return new C.Bool( localEnv.exists( key ) );
     }));
 
     builtins.set('env-set!', new C.Native('env-set! [env;key;any]:unit', (args, env) => {
         let [ localEnv, key, val ] = args;
-        if (!(localEnv instanceof E.Environment)) throw new Error(`Expected Environment as first arg to env-set!, not ${localEnv.constructor.name}`);
-        if (!(key instanceof C.Ident)) throw new Error(`Expected key as second arg to env-set!, not ${key.constructor.name}`);
-        if (val == undefined) throw new Error(`Expected value as third arg to env-set!`);
+        if (!(localEnv instanceof E.Environment)) return new C.Exception(`Expected Environment as first arg to env-set!, not ${localEnv.constructor.name}`);
+        if (!(key instanceof C.Ident)) return new C.Exception(`Expected key as second arg to env-set!, not ${key.constructor.name}`);
+        if (val == undefined) return new C.Exception(`Expected value as third arg to env-set!`);
         localEnv.define( key, val );
         return new C.Unit();
     }));
 
     builtins.set('env-delete!', new C.Native('env-delete! [env;key]:unit',  (args, env) => {
         let [ localEnv, key ] = args;
-        if (!(localEnv instanceof E.Environment)) throw new Error(`Expected Environment as first arg to env-delete!, not ${localEnv.constructor.name}`);
-        if (!(key instanceof C.Ident)) throw new Error(`Expected key as second arg to env-delete!, not ${key.constructor.name}`);
+        if (!(localEnv instanceof E.Environment)) return new C.Exception(`Expected Environment as first arg to env-delete!, not ${localEnv.constructor.name}`);
+        if (!(key instanceof C.Ident)) return new C.Exception(`Expected key as second arg to env-delete!, not ${key.constructor.name}`);
         localEnv.delete( key );
         return new C.Unit();
     }));
 
     builtins.set('env-keys', new C.Native('env-keys [env]:list',  (args, env) => {
         let [ localEnv ] = args;
-        if (!(localEnv instanceof E.Environment)) throw new Error(`Expected Environment as first arg to env-keys, not ${localEnv.constructor.name}`);
-        return new C.Cons(localEnv.keys());
+        if (!(localEnv instanceof E.Environment)) return new C.Exception(`Expected Environment as first arg to env-keys, not ${localEnv.constructor.name}`);
+        return C.Cons.make(localEnv.keys());
     }));
 
     builtins.set('env^upper', new C.Native('env^upper [env]:env', (args, env) => {
         let [ localEnv ] = args;
-        if (!(localEnv instanceof E.Environment)) throw new Error(`Expected Environment as first arg to env-keys, not ${localEnv.constructor.name}`);
+        if (!(localEnv instanceof E.Environment)) return new C.Exception(`Expected Environment as first arg to env-keys, not ${localEnv.constructor.name}`);
         return localEnv.parent ?? new C.Nil();
     }));
 
@@ -388,7 +445,7 @@ export const constructRootEnvironment = () : E.Environment => {
     builtins.set('print', new C.FExpr('print [any]:(unit)', (args, env) => {
         return [
             K.Host( 'IO::print', env, ...args ),
-            K.EvalConsRest( new C.Cons(args), env )
+            K.EvalConsRest( C.Cons.make(args), env )
         ]
     }));
 

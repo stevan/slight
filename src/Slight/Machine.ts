@@ -213,7 +213,11 @@ export class Machine {
             // - the arguments are not evaluated
             // ---------------------------------------------------------------------
             case 'APPLY/OPERATIVE':
-                this.queue.push(...(k.call as C.FExpr).body( (k.args as C.Cons).toNativeArray(), k.env ));
+                try {
+                    this.queue.push(...(k.call as C.FExpr).body( (k.args as C.Cons).toNativeArray(), k.env ));
+                } catch (e) {
+                    this.queue.push( K.Throw( new C.Exception( `FExpr Error :: ${(e as Error).stack}` ), k.env) );
+                }
                 break;
             // ---------------------------------------------------------------------
             // Applicatives, or Lambdas & Native Functions
@@ -222,7 +226,11 @@ export class Machine {
             case 'APPLY/APPLICATIVE':
                 switch (k.call.constructor) {
                 case C.Native:
-                    this.queue.push( K.Return( (k.call as C.Native).body( k.stack, k.env ), k.env ));
+                    try {
+                        this.queue.push( K.Return( (k.call as C.Native).body( k.stack, k.env ), k.env ));
+                    } catch (e) {
+                        this.queue.push( K.Throw( new C.Exception( `Native Error :: ${(e as Error).stack} ` ), k.env) );
+                    }
                     break;
                 case C.Lambda:
                     let lambda  = k.call as C.Lambda;

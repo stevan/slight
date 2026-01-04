@@ -148,8 +148,16 @@ export class Cons extends List {
         this.offset = offset;
     }
 
+    static make (items : Term[], offset : number = 0) : Term {
+        try {
+            return new Cons( items, offset );
+        } catch (e) {
+            return new Exception( `Failed to make Cons :: ${e}` );
+        }
+    }
+
     at (i : number) : Term {
-        if ((this.offset + i) > this.items.length) throw new Error(`Index(${i}) out of range`);
+        if ((this.offset + i) > this.items.length) return new Exception(`Index(${i}) out of range`);
         return this.items[ this.offset + i ];
     }
 
@@ -208,6 +216,14 @@ export class Hash extends AbstractTerm {
             map.set( tag.ident, val );
         }
         this.items = map;
+    }
+
+    static make (items : Term[]) : Term {
+        try {
+            return new Hash( items );
+        } catch (e) {
+            return new Exception( `Failed to make Cons :: ${e}` );
+        }
     }
 
     fetch (tag : Key) : Term {
