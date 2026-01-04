@@ -86,6 +86,8 @@ export function ApplyApplicative (call : Applicative, env : Environment) : Konti
 
 export function pprint (k : Kontinue) : string {
     switch (k.op) {
+    case 'THROW'             : return `${k.op}[] ^(${k.stack.map((i) => i.pprint()).join(';')}) exception: ${k.exception.pprint()}`;
+    case 'CATCH'             : return `${k.op}[] ^(${k.stack.map((i) => i.pprint()).join(';')}) handler: ${k.handler.pprint()}`;
     case 'HOST'              : return `${k.op}[] ^(${k.stack.map((i) => i.pprint()).join(';')}) action: ${k.action}`;
     case 'IF/ELSE'           : return `${k.op}[] ^(${k.stack.map((i) => i.pprint()).join(';')}) then: ${k.ifTrue.pprint()} else: ${k.ifFalse.pprint()}`;
     case 'DEFINE'            : return `${k.op}[${k.name.pprint()}] ^(${k.stack.map((i) => i.pprint()).join(';')})`;

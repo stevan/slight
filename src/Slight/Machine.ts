@@ -1,4 +1,6 @@
 
+import { DEBUG } from './Util'
+
 import * as C from './Terms'
 import * as E from './Environment'
 import * as K from './Kontinue'
@@ -22,6 +24,7 @@ export class Machine {
     // provides the starting continuation
     // for evaluating any expression
     evaluateTerm (expr : C.Term, env : E.Environment) : K.Kontinue {
+        if (DEBUG) console.log('!!EVAL!!', expr?.pprint());
         switch (expr.kind) {
         case 'Unit'        :
         case 'Nil'         :
@@ -37,9 +40,12 @@ export class Machine {
         case 'Cons'        : return K.EvalCons( expr, env );
         case 'Sym'         :
             let value = env.lookup( expr );
-            if (value instanceof C.Exception) return K.Throw( value, env );
-            return K.Return( env.lookup( expr ), env );
+            if (value == undefined) {
+                return K.Throw( new C.Exception(`Cannot find ${expr.pprint()} in Environment`), env );
+            }
+            return K.Return( value, env );
         case 'Exception' :
+            // XXX - not sure this should happen
             console.log("******************* EXCEPTION! ", expr.pprint());
             return K.Throw( expr, env );
         }
@@ -56,7 +62,14 @@ export class Machine {
     runUntilHost () : K.HostKontinue {
         while (this.queue.length > 0) {
             this.ticks++;
+            if (DEBUG) console.log('>TICK', '-'.repeat(80));
+            if (DEBUG) console.group("CONT in ", this.ticks);
+            if (DEBUG) console.log(this.queue.map((c) => K.pprint(c)));
+            if (DEBUG) console.groupEnd();
+            if (DEBUG) console.log('=TICK', '-'.repeat(80));
             let k = this.queue.pop() as K.Kontinue;
+            if (DEBUG) console.log('K -> ', K.pprint(k));
+            if (DEBUG) console.log('E -> ', k.env.pprint());
             switch (k.op) {
             // ---------------------------------------------------------------------
             // This is the end of HOST operation, an async exit point
@@ -67,10 +80,10 @@ export class Machine {
             // Exception handling
             // ---------------------------------------------------------------------
             case 'THROW':
-
-                console.group("CONT in throw", k.exception.pprint());
-                console.log(this.queue.map((c) => c.op));
-                console.groupEnd();
+                if (DEBUG) console.log('>THROW', '-'.repeat(80));
+                if (DEBUG) console.group("CONT in throw", k.exception.pprint());
+                if (DEBUG) console.log(this.queue.map((c) => K.pprint(c)));
+                if (DEBUG) console.groupEnd();
 
                 while (this.queue.length > 0) {
                     let isCatch = this.queue.at(-1)!;
@@ -80,7 +93,7 @@ export class Machine {
                         break;
                     } else {
                         // unwind, and discard results
-                        console.log("UNWInDING", this.queue.pop()!.op);
+                        if (DEBUG) console.log("UNWInDING", this.queue.pop()!.op);
                     }
                 }
                 // if we ran out completely, then we
@@ -89,18 +102,19 @@ export class Machine {
                     return K.Host( 'SYS::error', k.env, k.exception );
                 // but if we still have a queue it means
                 // that we have a CATCH to process ...
-                console.log('... continuing to the catch');
-                console.group("CONT before going to catch");
-                console.log(this.queue.map((c) => c.op));
-                console.groupEnd();
+                if (DEBUG) console.log('... continuing to the catch');
+                if (DEBUG) console.group("CONT before going to catch");
+                if (DEBUG) console.log(this.queue.map((c) => K.pprint(c)));
+                if (DEBUG) console.groupEnd();
+                if (DEBUG) console.log('<THROW', '-'.repeat(80));
                 break;
             case 'CATCH':
-                console.log("IN CATCH!!!!!!!");
+                if (DEBUG) console.log('>CATCH', '-'.repeat(80));
                 let handler = k.handler;
                 let results = k.stack.pop()!;
                 if (results instanceof C.Exception) {
-                    console.log("@@@@@@@@@ GOT EXCEPTION", results.pprint());
-                    console.log("HANDLER", handler.pprint());
+                    if (DEBUG) console.log("@@@@@@@@@ GOT EXCEPTION", results.pprint());
+                    if (DEBUG) console.log("HANDLER", handler.pprint());
 
                     let catcher = K.ApplyApplicative( (handler as C.Applicative), k.env );
                     catcher.stack.push( results );
@@ -108,9 +122,10 @@ export class Machine {
                 } else {
                     this.queue.push( K.Return( results, k.env ) );
                 }
-                console.group("CONT after CATCH");
-                console.log(this.queue.map((c) => c.op));
-                console.groupEnd();
+                if (DEBUG) console.group("CONT after CATCH");
+                if (DEBUG) console.log(this.queue.map((c) => K.pprint(c)));
+                if (DEBUG) console.groupEnd();
+                if (DEBUG) console.log('<CATCH', '-'.repeat(80));
                 break;
             // ---------------------------------------------------------------------
             // This is for defining things in the environment
@@ -266,7 +281,11 @@ export class Machine {
 
                     let params  = lambda.params.toNativeArray();
                     let args    = k.stack;
-                    this.queue.push( K.EvalExpr( lambda.body, local.derive( params as C.Sym[], args ) ) );
+                    if (DEBUG) console.log('LAMBDA PARAMS', params.map((a) => a.pprint()));
+                    if (DEBUG) console.log('LAMBDA ARGS', args.map((a) => a.pprint()));
+                    let localEnv = local.derive( params as C.Sym[], args );
+                    if (DEBUG) console.log('LAMBDA ENV', localEnv.pprint());
+                    this.queue.push( K.EvalExpr( lambda.body, localEnv ) );
                 }
                 break;
             // ---------------------------------------------------------------------
@@ -275,6 +294,7 @@ export class Machine {
             default:
                 throw new Error(`Unknown Continuation op ${JSON.stringify(k)}`);
             }
+            if (DEBUG) console.log('<TICK', '-'.repeat(80));
         }
 
         // should never happen

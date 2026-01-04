@@ -429,7 +429,7 @@ export const constructRootEnvironment = () : E.Environment => {
         let [ localEnv, key ] = args;
         if (!(localEnv instanceof E.Environment)) return new C.Exception(`Expected Environment as first arg to env-lookup, not ${localEnv.constructor.name}`);
         if (!(key instanceof C.Ident)) return new C.Exception(`Expected key as second arg to fetch, not ${key.constructor.name}`);
-        return localEnv.lookup( key );
+        return localEnv.lookup( key ) ?? new C.Exception(`Could not find ${key.pprint()} in Environment`);
     }));
 
     builtins.set('env-exists?', new C.Native('env-exists? [env;key]:bool', (args, env) => {

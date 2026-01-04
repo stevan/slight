@@ -36,12 +36,12 @@ export class Environment extends AbstractTerm {
 
     depth () : number { return 1 + (this.parent?.depth() ?? 0) }
 
-    lookup(sym: Sym | Key) : Term {
+    lookup(sym: Sym | Key) : Term | undefined {
         if (this.bindings.has(sym.ident))
             return this.bindings.get(sym.ident)!;
         if (this.parent)
             return this.parent.lookup(sym);
-        return new Exception(`Cannot find ${sym.pprint()} in Environment`);
+        return;
     }
 
     exists (sym : Sym | Key) : boolean {
