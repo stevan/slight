@@ -99,7 +99,17 @@ export const constructRootEnvironment = () : E.Environment => {
         ];
     }));
 
+    builtins.set('do', new C.FExpr('do [...any]:any', (args, env) => {
+        return args.map((arg) => K.EvalExpr(arg, env)).reverse();
+    }));
+
     // exception handling ...
+
+    builtins.set('exception-msg', new C.Native('exception-msg [exception]:str', (args, env) => {
+        let [ exception ] = args;
+        if (exception == undefined) throw new Error('FUCK');
+        return new C.Str( (exception as C.Exception).msg );
+    }));
 
     builtins.set('throw', new C.FExpr('throw [any]:unit', (args, env) => {
         let [ error ] = args;
