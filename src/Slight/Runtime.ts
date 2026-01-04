@@ -13,8 +13,8 @@ import * as K from './Kontinue'
 export const liftNumBinOp = (f : (n : number, m : number) => number) : C.NativeFunc => {
     return (args : C.Term[], env : E.Environment) => {
         let [ lhs, rhs ] = args;
-        if (!(lhs instanceof C.Num)) return new C.Exception(`LHS must be a Num, not ${lhs.constructor.name}`);
-        if (!(rhs instanceof C.Num)) return new C.Exception(`RHS must be a Num, not ${rhs.constructor.name}`);
+        if (!(lhs instanceof C.Num)) return new C.Exception(`LHS must be a Num, not ${lhs?.constructor.name}`);
+        if (!(rhs instanceof C.Num)) return new C.Exception(`RHS must be a Num, not ${rhs?.constructor.name}`);
         return new C.Num( f(lhs.value, rhs.value) );
     }
 }
@@ -32,8 +32,8 @@ export const liftNumUnOp = (f : (t : number) => number) : C.NativeFunc => {
 export const liftStrBinOp = (f : (n : string, m : string) => string) : C.NativeFunc => {
     return (args : C.Term[], env : E.Environment) => {
         let [ lhs, rhs ] = args;
-        if (!(lhs instanceof C.Str)) return new C.Exception(`LHS must be a Str, not ${lhs.constructor.name}`);
-        if (!(rhs instanceof C.Str)) return new C.Exception(`RHS must be a Str, not ${rhs.constructor.name}`);
+        if (!(lhs instanceof C.Str)) return new C.Exception(`LHS must be a Str, not ${lhs?.constructor.name}`);
+        if (!(rhs instanceof C.Str)) return new C.Exception(`RHS must be a Str, not ${rhs?.constructor.name}`);
         return new C.Str( f(lhs.value, rhs.value) );
     }
 }
@@ -51,8 +51,8 @@ export const liftStrUnOp = (f : (t : string) => string) : C.NativeFunc => {
 export const liftNumCompareOp = (f : (n : number, m : number) => boolean) : C.NativeFunc => {
     return (args : C.Term[], env : E.Environment) => {
         let [ lhs, rhs ] = args;
-        if (!(lhs instanceof C.Num)) return new C.Exception(`LHS must be a Num, not ${lhs.constructor.name}`);
-        if (!(rhs instanceof C.Num)) return new C.Exception(`RHS must be a Num, not ${rhs.constructor.name}`);
+        if (!(lhs instanceof C.Num)) return new C.Exception(`LHS must be a Num, not ${lhs?.constructor.name}`);
+        if (!(rhs instanceof C.Num)) return new C.Exception(`RHS must be a Num, not ${rhs?.constructor.name}`);
         return new C.Bool( f(lhs.value, rhs.value) );
     }
 }
@@ -60,8 +60,8 @@ export const liftNumCompareOp = (f : (n : number, m : number) => boolean) : C.Na
 export const liftStrCompareOp = (f : (n : string, m : string) => boolean) : C.NativeFunc => {
     return (args : C.Term[], env : E.Environment) => {
         let [ lhs, rhs ] = args;
-        if (!(lhs instanceof C.Str)) return new C.Exception(`LHS must be a Str, not ${lhs.constructor.name}`);
-        if (!(rhs instanceof C.Str)) return new C.Exception(`RHS must be a Str, not ${rhs.constructor.name}`);
+        if (!(lhs instanceof C.Str)) return new C.Exception(`LHS must be a Str, not ${lhs?.constructor.name}`);
+        if (!(rhs instanceof C.Str)) return new C.Exception(`RHS must be a Str, not ${rhs?.constructor.name}`);
         return new C.Bool( f(lhs.value, rhs.value) );
     }
 }
@@ -96,6 +96,39 @@ export const constructRootEnvironment = () : E.Environment => {
         return [
             K.EvalTOS(env),
             K.EvalExpr(expr, env),
+        ];
+    }));
+
+    // exception handling ...
+
+    builtins.set('throw', new C.FExpr('throw [any]:unit', (args, env) => {
+        let [ error ] = args;
+        if (!(error instanceof C.AbstractTerm)) {
+            error = new C.Exception(`Throw execpted a Term, not undefined`);
+        } else {
+            if (!(error instanceof C.Exception)) {
+                error = new C.Exception( error.toNativeStr() );
+            }
+        }
+        return [ K.Throw( error, env ) ];
+    }));
+
+    builtins.set('try', new C.FExpr('try [any;handler]:any', (args, env) => {
+        let [ body, catcher ] = args;
+
+        if (!(body instanceof C.AbstractTerm))
+            return [ K.Throw( new C.Exception(`try <body> <catch> expected body to be a Term, not undefined`), env ) ];
+
+        if (catcher instanceof C.Cons) {
+            let [ _name, params, body ] = catcher.toNativeArray();
+            catcher = new C.Lambda( params as C.Cons, body, env );
+        } else {
+            return [ K.Throw( new C.Exception(`try <body> <catch> expected catch a Cons not ${catcher.constructor.name}`), env ) ];
+        }
+
+        return [
+            K.Catch( catcher, env ),
+            K.EvalExpr( body, env ),
         ];
     }));
 

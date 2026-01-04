@@ -39,7 +39,9 @@ export class Machine {
             let value = env.lookup( expr );
             if (value instanceof C.Exception) return K.Throw( value, env );
             return K.Return( env.lookup( expr ), env );
-        case 'Exception' : return K.Throw( expr, env );
+        case 'Exception' :
+            console.log("******************* EXCEPTION! ", expr.pprint());
+            return K.Throw( expr, env );
         }
     }
 
@@ -64,26 +66,52 @@ export class Machine {
             // ---------------------------------------------------------------------
             // Exception handling
             // ---------------------------------------------------------------------
-            // THE PLAN:
-            //
-            // (try (<body>) (catch (e) <handler>))
-            //
-            // K.Catch((lambda (e) <handler>))
-            // K.EvalExpr(<body>)
-            //
-            // K.Catch
-            //     - looks at result on stack
-            //         - if Exception, handles it
-            //         - if not, ... returns it
-            //
-            // K.Throw
-            //     - rewinds the queue to the last K.Catch
-            //
-            case 'CATCH':
-                throw new Error('TODO - CATCH continuation!')
             case 'THROW':
-                console.log('TODO - THROW continuation correctly ... ', k.exception.pprint());
-                return K.Host( 'SYS::error', k.env, k.exception );
+
+                console.group("CONT in throw", k.exception.pprint());
+                console.log(this.queue.map((c) => c.op));
+                console.groupEnd();
+
+                while (this.queue.length > 0) {
+                    let isCatch = this.queue.at(-1)!;
+                    if (isCatch.op == 'CATCH') {
+                        // when we find a catch, give it the exception
+                        this.returnValues( k.exception );
+                        break;
+                    } else {
+                        // unwind, and discard results
+                        console.log("UNWInDING", this.queue.pop()!.op);
+                    }
+                }
+                // if we ran out completely, then we
+                // continue to a SYS::error ...
+                if (this.queue.length == 0)
+                    return K.Host( 'SYS::error', k.env, k.exception );
+                // but if we still have a queue it means
+                // that we have a CATCH to process ...
+                console.log('... continuing to the catch');
+                console.group("CONT before going to catch");
+                console.log(this.queue.map((c) => c.op));
+                console.groupEnd();
+                break;
+            case 'CATCH':
+                console.log("IN CATCH!!!!!!!");
+                let handler = k.handler;
+                let results = k.stack.pop()!;
+                if (results instanceof C.Exception) {
+                    console.log("@@@@@@@@@ GOT EXCEPTION", results.pprint());
+                    console.log("HANDLER", handler.pprint());
+
+                    let catcher = K.ApplyApplicative( (handler as C.Applicative), k.env );
+                    catcher.stack.push( results );
+                    this.queue.push( catcher );
+                } else {
+                    this.queue.push( K.Return( results, k.env ) );
+                }
+                console.group("CONT after CATCH");
+                console.log(this.queue.map((c) => c.op));
+                console.groupEnd();
+                break;
             // ---------------------------------------------------------------------
             // This is for defining things in the environment
             // ---------------------------------------------------------------------

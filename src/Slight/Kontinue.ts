@@ -21,7 +21,7 @@ export type CatchKontinue = {
     op        : 'CATCH',
     stack     : Term[],
     env       : Environment,
-    handler   : Lambda
+    handler   : Applicative
 };
 
 export type Kontinue =
@@ -47,7 +47,7 @@ export function Throw (exception : Exception, env : Environment) : ThrowKontinue
     return { op : 'THROW', stack : [], env, exception }
 }
 
-export function Catch (handler : Lambda, env : Environment) : CatchKontinue {
+export function Catch (handler : Applicative, env : Environment) : CatchKontinue {
     return { op : 'CATCH', stack : [], env, handler }
 }
 
