@@ -113,7 +113,15 @@ ${query.toNativeStr()}
                         k.stack.push(compiled[0]!);
                         prepared.unshift(k);
                     }
-                    resolve(prepared);
+                    resolve([
+                        K.Catch( new C.Native('ai-repl-catch', (args, env) => {
+                            let [ arg ] = args;
+                            if (arg == undefined) throw new Error(`REPL got undefined`);
+                            console.log("REPL GOT ERROR!", arg.pprint());
+                            return arg;
+                        }), k.env ),
+                        ...prepared
+                    ]);
                 });
             });
         default:
@@ -126,12 +134,12 @@ ${query.toNativeStr()}
 }
 
 export class IOHandler implements HostActionHandler {
-    public rl             : readline.ReadLine;
+    public readline       : readline.ReadLine;
     public prepareProgram : PrepareProgram;
 
     constructor (prepareProgram : PrepareProgram) {
         this.prepareProgram = prepareProgram;
-        this.rl = readline.createInterface({
+        this.readline = readline.createInterface({
             input  : process.stdin,
             output : process.stdout,
         });
@@ -146,7 +154,7 @@ export class IOHandler implements HostActionHandler {
             });
         case 'IO::readline':
             return new Promise<K.Kontinue[]>((resolve) => {
-                this.rl.question('? ', (input : string) => {
+                this.readline.question('? ', (input : string) => {
                     // XXX - should I add SIGINT handling here?
                     resolve([ K.Return( new C.Str(input), k.env ) ]);
                 });
@@ -161,10 +169,16 @@ export class IOHandler implements HostActionHandler {
                 }
                 // XXX - probably should remove this handler
                 // after I get the response from the REPL
-                this.rl.on('SIGINT', () => { resolve([ K.Return( result, k.env ) ]) });
-                this.rl.question('repl? ', (source : string) => {
+                this.readline.on('SIGINT', () => { resolve([ K.Return( result, k.env ) ]) });
+                this.readline.question('repl? ', (source : string) => {
                     resolve([
                         K.Host( 'IO::repl', k.env ),
+                        K.Catch( new C.Native('repl-catch', (args, env) => {
+                            let [ arg ] = args;
+                            if (arg == undefined) throw new Error(`REPL got undefined`);
+                            console.log("REPL GOT ERROR!");
+                            return arg;
+                        }), k.env ),
                         ...this.prepareProgram( compile(parse(source)), k.env ),
                     ]);
                 });
@@ -175,6 +189,6 @@ export class IOHandler implements HostActionHandler {
     }
 
     shutdown () : void {
-        this.rl.close();
+        this.readline.close();
     }
 }

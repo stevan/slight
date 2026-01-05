@@ -10,17 +10,7 @@ test("... playground", async (t) => {
 
     let program = compile(parse(`
 
-            (+ 10
-                (try
-                    (throw "need twenty!")
-                    (catch (e)
-                        (try
-                            (do
-                                (print e)
-                                (throw 20))
-                            (catch (e)
-                                (exception-msg e))
-                        ))))
+        (repl)
 
     `));
 

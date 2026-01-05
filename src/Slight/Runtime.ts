@@ -129,6 +129,9 @@ export const constructRootEnvironment = () : E.Environment => {
         if (!(body instanceof C.AbstractTerm))
             return [ K.Throw( new C.Exception(`try <body> <catch> expected body to be a Term, not undefined`), env ) ];
 
+        if (catcher == undefined)
+            return [ K.Throw( new C.Exception(`try <body> <catch> expected catcher to be a Cons, not undefined`), env ) ];
+
         if (catcher instanceof C.Cons) {
             let [ _name, params, body ] = catcher.toNativeArray();
             catcher = new C.Lambda( params as C.Cons, body, env );

@@ -76,6 +76,14 @@ test("... playground", async (t) => {
             (fetch FOO :bling)
             (+ (fetch (fetch FOO :bar) :baz) (fetch (fetch FOO :bar) :gorch))
             (env-lookup (*Env) :thirty)
+            (+ 10
+                (try
+                    (throw "need twenty!")
+                (catch (e)
+                    (try
+                        (throw 20)
+                    (catch (e)
+                        (str->int (exception-msg e)))))))
         )
     `));
 
