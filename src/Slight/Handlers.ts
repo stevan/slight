@@ -2,6 +2,8 @@
 import * as readline from 'node:readline';
 import { spawn } from "child_process";
 
+import ollama from 'ollama';
+
 import type { Machine } from './Machine'
 
 import * as C from './Terms'
@@ -24,9 +26,11 @@ type PrepareProgram = (program : C.Term[], env : E.Environment) => K.Kontinue[];
 
 export class AgentHandler implements HostActionHandler {
     public prepareProgram : PrepareProgram;
+    public loopCount      : number;
 
     constructor (prepareProgram : PrepareProgram) {
         this.prepareProgram = prepareProgram;
+        this.loopCount      = 0;
     }
 
     constructPrompt (query : C.Term, results : C.Term[]) : string {
@@ -37,36 +41,23 @@ export class AgentHandler implements HostActionHandler {
             prev_results += `  ? ${prev.pprint()}\n  > ${resp.pprint()}\n`;
         }
         return `
-You are an agent working in a Lisp REPL to answer a query.
-Do not use any context outside of this REPL.
+You are an agent working with a REPL for a Scheme-like language.
 
-You can explore the language by exploring the environment starting
-by calling ($Env) to get the root builtin environment. Some other
-important forms are:
+Your task is to use the REPL to figure out the answer the QUERY below.
 
-    - ($Env) - the root builtin environment
-    - (*Env) - the current environment
-    - (^Env) - the current parent environment
-    - (lambda (x y) ...) - lambda construction
-    - (def name value) - defining variables in *Env
-    - (defun (nane x y) ...) - defining functions in *Env
-    - %(:key value :key value ...) - defining a hash
+Respond only with a single S-expression to be evaluated. Do not include
+any instructions or information, only code.
 
-NOTES:
-    - a :key is a symbol that always evalutes to itself
-    - the env-* functions accept :key or (quote sym) as arguments
+Previous expressions and their results can be found in the HISTORY section below.
 
-Generate the next REPL expression. You can:
-- Call any available operation to explore or act
-- Use (resume <value>) when the problem is solved
-
-**Respond with ONLY a single S-expression, followed by a line break, nothing else.**
-
-HISTORY:
-${prev_results}
+Start by calling ($Env) to see the list of builtin functions available.
+Use the (env-lookup ($Env) '+) function to see the signature for the builtins.
 
 QUERY:
 ${query.toNativeStr()}
+
+HISTORY:
+${prev_results}
 
 ?`
     }
@@ -74,6 +65,14 @@ ${query.toNativeStr()}
     accept (k : K.HostKontinue) : Promise<K.Kontinue[]> {
         switch (k.action) {
         case 'AI::repl':
+            this.loopCount++;
+
+            if (this.loopCount > 10) {
+                return new Promise<K.Kontinue[]>((resolve) => {
+                    resolve([ K.Throw( new C.Exception("Max number of tries exceeded!"), k.env ) ]);
+                });
+            }
+
             return new Promise<K.Kontinue[]>((resolve) => {
                 if (k.stack.length > 0) {
                     let result = k.stack.pop()!;
@@ -99,13 +98,20 @@ ${query.toNativeStr()}
                 console.log("PROMPT: ", prompt);
                 console.groupEnd();
 
-                const claude = spawn("claude", ["-p", prompt]);
-                claude.stdin.end();
-
-                let output = "";
-                claude.stdout.on("data", (data) => output += data);
-                claude.on("close", () => {
-                    let source   = output.trim();
+                let response = ollama.generate({
+                    // codellama:7b-instruct
+                    // starcoder2:7b
+                    // deepseek-coder:6.7b-instruct-q4_K_M
+                    // stable-code:3b
+                    model   : 'deepseek-coder:6.7b-instruct-q4_K_M',
+                    prompt  : prompt,
+                    options : {
+                        stop        : ['\n--STOP--\n'],
+                        temperature : 0,
+                    }
+                });
+                response.then((output) => {
+                    let source   = output.response.trim();
                     console.log('>>>>> GOT SOURCE :', source);
                     let compiled = compile(parse(source));
                     let prepared = this.prepareProgram( compiled, k.env )
@@ -123,6 +129,30 @@ ${query.toNativeStr()}
                         ...prepared
                     ]);
                 });
+
+                //const claude = spawn("claude", ["-p", prompt]);
+                //claude.stdin.end();
+                //let output = "";
+                //claude.stdout.on("data", (data) => output += data);
+                //claude.on("close", () => {
+                //  let source   = output.trim();
+                //  console.log('>>>>> GOT SOURCE :', source);
+                //  let compiled = compile(parse(source));
+                //  let prepared = this.prepareProgram( compiled, k.env )
+                //  if (!source.startsWith('(resume')) {
+                //      k.stack.push(compiled[0]!);
+                //      prepared.unshift(k);
+                //  }
+                //  resolve([
+                //      K.Catch( new C.Native('ai-repl-catch', (args, env) => {
+                //          let [ arg ] = args;
+                //          if (arg == undefined) throw new Error(`REPL got undefined`);
+                //          console.log("REPL GOT ERROR!", arg.pprint());
+                //          return arg;
+                //      }), k.env ),
+                //      ...prepared
+                //  ]);
+                //});
             });
         default:
             throw new Error(`The Host ${k.action} is not supported`);

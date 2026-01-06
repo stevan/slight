@@ -135,7 +135,7 @@ export class Machine {
                 let body = k.stack.pop()!;
                 k.env.define( k.name, body );
                 // FIXME - this should return SOMETHING more useful?!
-                this.returnValues( new C.Unit() );
+                this.returnValues( body );
                 break;
             // ---------------------------------------------------------------------
             // This is a literal value to be returned to the

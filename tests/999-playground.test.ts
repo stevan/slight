@@ -10,7 +10,7 @@ test("... playground", async (t) => {
 
     let program = compile(parse(`
 
-        (repl)
+        (ai-repl "explore the environment")
 
     `));
 

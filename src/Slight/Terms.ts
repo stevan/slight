@@ -57,7 +57,7 @@ export class Exception extends AbstractTerm {
         this.msg = msg;
     }
 
-    override toNativeStr  () : string { return `Exception ${this.msg}` }
+    override toNativeStr  () : string { return `!Exception:"${this.msg}"` }
 }
 
 // -----------------------------------------------------------------------------
